@@ -1,0 +1,12 @@
+version: "2"
+
+sql:
+  - engine: "postgresql"
+    schema: "./internals/services/auth/db/migrations/"
+    queries: "./internals/services/auth/db/queries.sql"
+    gen:
+      go:
+        package: "queries"
+        out: "./internals/services/auth/queries/"
+        emit_prepared_queries: true
+        emit_empty_slices: true
