@@ -50,27 +50,26 @@ A staged, event-driven backend using schema-per-service architecture.
 
 ### Auth Service
 
-* [ ] Schema:
+* [x] Schema:
 
-  * [ ] users
-  * [ ] sessions
+  * [x] users
+  * [x] sessions
 
 * [ ] Interface:
 
   ```go
   type AuthService interface {
       Signup(email, password string) (User, error)
-      Login(email, password string) (Tokens, error)
+      Login(email, password string) (Session, error)
       Logout(userID string) error
       DeleteAccount(userID string) error
-      RefreshToken(token string) (Tokens, error)
   }
   ```
 
 * [ ] Implement:
 
-  * [ ] Argon2 password hashing
-  * [ ] JWT (access + refresh)
+  * [ ] ~Argon2~ bcrypt password hashing
+  * [ ] ~JWT (access + refresh)~ sessions
 
 ---
 
@@ -382,8 +381,8 @@ A staged, event-driven backend using schema-per-service architecture.
 
 ## Data Integrity
 
+* [ ] outbox pattern
 * [ ] idempotency constraints
-* [ ] unique indexes
 * [ ] circuit breaker pattern
 * [ ] timestamp-based conflict resolution
 

@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"log/slog"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -12,7 +12,7 @@ func WithLogging(c fiber.Ctx) error {
 	err := c.Next()
 	took := time.Since(start)
 
-	logger := fiber.MustGetState[*log.Logger](c.App().State(), "logger")
+	logger := fiber.MustGetState[*slog.Logger](c.App().State(), "logger")
 	logger.Info("request handled",
 		"took", took,
 		"ip", c.IP(),

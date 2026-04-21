@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,13 +34,13 @@ import (
 )
 
 func main() {
-	logger := log.NewWithOptions(os.Stderr, log.Options{
+	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
 		Formatter:       log.TextFormatter,
 		ReportTimestamp: true,
-	})
+	}))
 	postgresConnection := connectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
-	// redisConectionn := connectToRedis(utils.MustGetEnv("REDIS_ADDR"))
-	// redisPubsub := redis_pubsub.New(redisConectionn)
+	redisConectionn := connectToRedis(utils.MustGetEnv("REDIS_ADDR"))
+	pubsub := redis_pubsub.New(redisConectionn)
 	mailer := mailer.New(
 		utils.MustGetEnv("PAPERCUT_HOST"),
 		utils.MustGetEnv("PAPERCUT_PORT"),
@@ -47,7 +48,7 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	authService := auth.New(postgresConnection, mailer)
+	authService := auth.New(postgresConnection, mailer, pubsub, logger)
 	userService := user.New()
 	videoService := video.New()
 	mediaService := media.New()
@@ -91,15 +92,17 @@ func main() {
 		if err := app.Listen(fmt.Sprintf(":%s", port), fiber.ListenConfig{
 			EnablePrefork: true,
 		}); err != nil {
-			logger.Fatal("failed to start server", "error", err)
+			logger.Error("failed to start server", "error", err, "pid", os.Getpid())
+			os.Exit(1)
 		}
 	}()
 
 	<-quitChan
-	logger.Info("gracefully shutting down server. press Ctrl-c to force shutdown.")
+	logger.Warn("gracefully shutting down server. press Ctrl-c to force shutdown.", "pid", os.Getpid())
 
 	if err := app.ShutdownWithTimeout(5 * time.Second); err != nil {
-		logger.Fatal("failed to shutdown server", "error", err)
+		logger.Error("failed to shutdown server", "error", err, "pid", os.Getpid())
+		os.Exit(1)
 	}
 }
 

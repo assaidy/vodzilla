@@ -1,5 +1,11 @@
 version: "2"
-
+overrides:
+  go:
+    overrides:
+      - db_type: "uuid"
+        go_type:
+          import: "github.com/google/uuid"
+          type: "UUID"
 sql:
   - engine: "postgresql"
     schema: "./internals/services/auth/db/migrations/"

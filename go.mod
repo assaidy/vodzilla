@@ -12,6 +12,8 @@ require (
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
+require github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
+
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/assaidy/pubsubs v0.0.0-20260420114235-e63e168c5712 // indirect
@@ -24,6 +26,7 @@ require (
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
+	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofiber/schema v1.7.0 // indirect
 	github.com/gofiber/utils/v2 v2.0.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
