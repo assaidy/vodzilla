@@ -7,20 +7,20 @@ package queries
 import (
 	"time"
 
-	"github.com/google/uuid"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 type AuthEmailVerificationToken struct {
-	ID        uuid.UUID
-	OwnerID   uuid.UUID
+	ID        ulid.ULID
+	OwnerID   ulid.ULID
 	Token     string
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
 
 type AuthSession struct {
-	ID           uuid.UUID
-	OwnerID      uuid.UUID
+	ID           ulid.ULID
+	OwnerID      ulid.ULID
 	SessionToken string
 	CsrfToken    string
 	CreatedAt    time.Time
@@ -28,7 +28,7 @@ type AuthSession struct {
 }
 
 type AuthUser struct {
-	ID           uuid.UUID
+	ID           ulid.ULID
 	Email        string
 	PasswordHash string
 	CreatedAt    time.Time

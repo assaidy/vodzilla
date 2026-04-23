@@ -33,8 +33,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteUserStmt, err = db.PrepareContext(ctx, deleteUser); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUser: %w", err)
 	}
-	if q.getSessionByTokenStmt, err = db.PrepareContext(ctx, getSessionByToken); err != nil {
-		return nil, fmt.Errorf("error preparing query GetSessionByToken: %w", err)
+	if q.getSessionByIDStmt, err = db.PrepareContext(ctx, getSessionByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSessionByID: %w", err)
 	}
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
@@ -71,9 +71,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteUserStmt: %w", cerr)
 		}
 	}
-	if q.getSessionByTokenStmt != nil {
-		if cerr := q.getSessionByTokenStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getSessionByTokenStmt: %w", cerr)
+	if q.getSessionByIDStmt != nil {
+		if cerr := q.getSessionByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionByIDStmt: %w", cerr)
 		}
 	}
 	if q.getUserByEmailStmt != nil {
@@ -143,7 +143,7 @@ type Queries struct {
 	checkEmailStmt                   *sql.Stmt
 	deleteSessionForUserStmt         *sql.Stmt
 	deleteUserStmt                   *sql.Stmt
-	getSessionByTokenStmt            *sql.Stmt
+	getSessionByIDStmt               *sql.Stmt
 	getUserByEmailStmt               *sql.Stmt
 	insertEmailVerificationTokenStmt *sql.Stmt
 	insertSessionStmt                *sql.Stmt
@@ -158,7 +158,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		checkEmailStmt:                   q.checkEmailStmt,
 		deleteSessionForUserStmt:         q.deleteSessionForUserStmt,
 		deleteUserStmt:                   q.deleteUserStmt,
-		getSessionByTokenStmt:            q.getSessionByTokenStmt,
+		getSessionByIDStmt:               q.getSessionByIDStmt,
 		getUserByEmailStmt:               q.getUserByEmailStmt,
 		insertEmailVerificationTokenStmt: q.insertEmailVerificationTokenStmt,
 		insertSessionStmt:                q.insertSessionStmt,

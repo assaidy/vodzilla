@@ -25,11 +25,11 @@ values ($1, $2, $3, $4);
 -- name: VerifyEmailByToken :execrows
 update auth.users
 set is_verified = true
-where id in(
+where id in (
   select owner_id
-  from auth.email_verification_tokens
+  from auth.email_verification_tokens evt
   where token = $1 and expires_at > now()
 );
 
--- name: GetSessionByToken :one
-select * from auth.sessions where session_token = $1;
+-- name: GetSessionByID :one
+select * from auth.sessions where id = $1;

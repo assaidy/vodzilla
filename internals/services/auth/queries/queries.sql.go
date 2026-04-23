@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 const checkEmail = `-- name: CheckEmail :one
@@ -28,8 +28,8 @@ delete from auth.sessions where id = $1 and owner_id = $2
 `
 
 type DeleteSessionForUserParams struct {
-	SessionID uuid.UUID
-	UserID    uuid.UUID
+	SessionID ulid.ULID
+	UserID    ulid.ULID
 }
 
 func (q *Queries) DeleteSessionForUser(ctx context.Context, arg DeleteSessionForUserParams) (int64, error) {
@@ -44,7 +44,7 @@ const deleteUser = `-- name: DeleteUser :execrows
 delete from auth.users where id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
+func (q *Queries) DeleteUser(ctx context.Context, id ulid.ULID) (int64, error) {
 	result, err := q.exec(ctx, q.deleteUserStmt, deleteUser, id)
 	if err != nil {
 		return 0, err
@@ -52,12 +52,12 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
 	return result.RowsAffected()
 }
 
-const getSessionByToken = `-- name: GetSessionByToken :one
-select id, owner_id, session_token, csrf_token, created_at, expires_at from auth.sessions where session_token = $1
+const getSessionByID = `-- name: GetSessionByID :one
+select id, owner_id, session_token, csrf_token, created_at, expires_at from auth.sessions where id = $1
 `
 
-func (q *Queries) GetSessionByToken(ctx context.Context, sessionToken string) (AuthSession, error) {
-	row := q.queryRow(ctx, q.getSessionByTokenStmt, getSessionByToken, sessionToken)
+func (q *Queries) GetSessionByID(ctx context.Context, id ulid.ULID) (AuthSession, error) {
+	row := q.queryRow(ctx, q.getSessionByIDStmt, getSessionByID, id)
 	var i AuthSession
 	err := row.Scan(
 		&i.ID,
@@ -93,8 +93,8 @@ values ($1, $2, $3, $4)
 `
 
 type InsertEmailVerificationTokenParams struct {
-	ID        uuid.UUID
-	OwnerID   uuid.UUID
+	ID        ulid.ULID
+	OwnerID   ulid.ULID
 	Token     string
 	ExpiresAt time.Time
 }
@@ -115,8 +115,8 @@ values ($1, $2, $3, $4, $5)
 `
 
 type InsertSessionParams struct {
-	ID           uuid.UUID
-	OwnerID      uuid.UUID
+	ID           ulid.ULID
+	OwnerID      ulid.ULID
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -139,7 +139,7 @@ values ($1, $2, $3)
 `
 
 type InsertUserParams struct {
-	ID           uuid.UUID
+	ID           ulid.ULID
 	Email        string
 	PasswordHash string
 }
@@ -152,9 +152,9 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 const verifyEmailByToken = `-- name: VerifyEmailByToken :execrows
 update auth.users
 set is_verified = true
-where id in(
+where id in (
   select owner_id
-  from auth.email_verification_tokens
+  from auth.email_verification_tokens evt
   where token = $1 and expires_at > now()
 )
 `

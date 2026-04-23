@@ -33,6 +33,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// TODO: put all config in a package?
+
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
 		Formatter:       log.TextFormatter,

@@ -3,20 +3,26 @@ module github.com/assaidy/video_streaming_app
 go 1.26.1
 
 require (
-	github.com/assaidy/workers v1.2.0
+	github.com/assaidy/hyper/v2 v2.2.0
+	github.com/assaidy/workers v1.2.3
 	github.com/charmbracelet/log v1.0.0
 	github.com/gofiber/fiber/v3 v3.1.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
+	github.com/oklog/ulid/v2 v2.1.1
 	github.com/redis/go-redis/v9 v9.18.0
+	github.com/starfederation/datastar-go v1.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
-require github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
+require (
+	github.com/CAFxX/httpcompression v0.0.9 // indirect
+	github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 // indirect
+)
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
-	github.com/assaidy/pubsubs v0.0.0-20260420114235-e63e168c5712 // indirect
+	github.com/assaidy/pubsubs v0.0.0-20260420114235-e63e168c5712
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
@@ -45,7 +51,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/crypto v0.48.0
 	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect

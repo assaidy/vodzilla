@@ -3,7 +3,13 @@
 // which would cause duplicate cron job execution.
 package main
 
-import "github.com/assaidy/workers"
+import (
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/assaidy/workers"
+)
 
 func main() {
 	wm := workers.NewWorkerManager()
@@ -11,4 +17,9 @@ func main() {
 	// register workers (ie. cron jobs) here...
 
 	wm.Start()
+	defer wm.Stop()
+
+	quitChan := make(chan os.Signal, 1)
+	signal.Notify(quitChan, syscall.SIGINT, syscall.SIGTERM)
+	<-quitChan
 }

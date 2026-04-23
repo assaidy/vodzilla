@@ -18,9 +18,6 @@ create table auth.sessions (
   expires_at    timestamptz               not null
 );
 
-create index session_owner_id_index on auth.sessions (owner_id);
-
-
 create table auth.email_verification_tokens (
   id         uuid                      primary key,
   owner_id   uuid                      not null references auth.users (id) on delete cascade,

@@ -4,8 +4,8 @@ overrides:
     overrides:
       - db_type: "uuid"
         go_type:
-          import: "github.com/google/uuid"
-          type: "UUID"
+          import: "github.com/oklog/ulid/v2"
+          type: "ULID"
 sql:
   - engine: "postgresql"
     schema: "./internals/services/auth/db/migrations/"

@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 	"time"
 
 	pubsub "github.com/assaidy/pubsubs"
@@ -17,9 +17,10 @@ import (
 	"github.com/assaidy/video_streaming_app/internals/services/auth/queries"
 	"github.com/assaidy/video_streaming_app/internals/utils"
 	"github.com/assaidy/video_streaming_app/internals/utils/mailer"
+	"github.com/assaidy/workers"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/google/uuid"
+	"github.com/oklog/ulid/v2"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -28,43 +29,43 @@ const Name = "auth"
 var _ services.Service = (*Service)(nil)
 
 type Service struct {
-	db        *sql.DB
-	mailer    *mailer.Mailer
-	pubsub    pubsub.Pubsub
-	logger    *slog.Logger
-	stopChan  chan struct{} // used to communicate stop signal with goroutines
-	workersWg sync.WaitGroup
+	db            *sql.DB
+	mailer        *mailer.Mailer
+	pubsub        pubsub.Pubsub
+	logger        *slog.Logger
+	workerManager *workers.WorkerManager
 }
 
 func New(db *sql.DB, mailer *mailer.Mailer, pubsub pubsub.Pubsub, logger *slog.Logger) *Service {
-	return &Service{db: db, mailer: mailer, pubsub: pubsub, logger: logger}
+	service := &Service{
+		db:            db,
+		mailer:        mailer,
+		pubsub:        pubsub,
+		logger:        logger,
+		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
+	}
+
+	service.workerManager.RegisterWorker(
+		workers.NewWorker("verification email sender", service.verificationEmailSenderWorker,
+			workers.WithNRuns(1),
+			workers.WithNRetries(0),
+		),
+	)
+
+	return service
 }
 
 func (me *Service) Start(ctx context.Context) error {
-	// FIX: this ctx is used mainly for start timeout.
-	// it shouldn't be passed to workers as it will stop them event if we started all of them before the timeout.
-	// use worker manager from workers after adding a stop mechanism to it: WorkerManager.Stop()
-	me.workersWg.Go(func() { me.startVerificationEmailSenderWorker(ctx) })
+	me.workerManager.Start()
 	return nil
 }
 
 func (me *Service) Stop(ctx context.Context) error {
-	stoppedChan := make(chan struct{})
-	go func() {
-		close(me.stopChan)
-		me.workersWg.Wait()
-		close(stoppedChan)
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-stoppedChan:
-		return nil
-	}
+	me.workerManager.Stop()
+	return nil
 }
 
-func (me *Service) startVerificationEmailSenderWorker(ctx context.Context) {
+func (me *Service) verificationEmailSenderWorker(ctx context.Context) error {
 	sub := pubsub.SubscribeWithCodec(
 		ctx,
 		me.pubsub,
@@ -83,14 +84,13 @@ func (me *Service) startVerificationEmailSenderWorker(ctx context.Context) {
 		},
 		pubsub.CodecJson,
 	)
-	defer sub.Close()
 
 	for {
 		select {
 		case err := <-sub.Errs():
 			me.logger.Error("failed to handle event", "service", Name, "event", EmailVerificationEvent, "error", err)
-		case <-me.stopChan:
-			return
+		case <-ctx.Done():
+			return sub.Close()
 		}
 	}
 }
@@ -136,7 +136,7 @@ func (me *Service) Signup(ctx context.Context, email, password string) error {
 		return ErrEmailConflict
 	}
 
-	userID := uuid.Must(uuid.NewV7())
+	userID := ulid.Make()
 	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
@@ -157,8 +157,8 @@ func (me *Service) Signup(ctx context.Context, email, password string) error {
 	return nil
 }
 
-func (me *Service) SendEmailVerificationEmail(ctx context.Context, userID uuid.UUID, email, url string) error {
-	verificationTokenID := uuid.Must(uuid.NewV7())
+func (me *Service) SendVerificationEmail(ctx context.Context, userID ulid.ULID, email, url string) error {
+	verificationTokenID := ulid.Make()
 	verificationToken := fmt.Sprintf("%s_%s", verificationTokenID, generateCryptoRandomHex(32))
 
 	q := queries.New(me.db)
@@ -177,7 +177,7 @@ func (me *Service) SendEmailVerificationEmail(ctx context.Context, userID uuid.U
 		EmailVerificationEvent,
 		EmailVerificationEventPayload{
 			Email:            email,
-			VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationToken),
+			VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationTokenID),
 		},
 		pubsub.CodecJson,
 	); err != nil {
@@ -187,18 +187,21 @@ func (me *Service) SendEmailVerificationEmail(ctx context.Context, userID uuid.U
 	return nil
 }
 
-func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) error {
+func (me *Service) VerifyEmail(ctx context.Context, verificationTokenBase64 string) error {
+	verificationToken, _ := base64.StdEncoding.DecodeString(verificationTokenBase64)
 	q := queries.New(me.db)
-	if n, err := q.VerifyEmailByToken(ctx, verificationToken); err != nil {
+
+	if n, err := q.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
 		return fmt.Errorf("failed to verify email: %w", err)
 	} else if n == 0 {
 		return ErrNotFound
 	}
+
 	return nil
 }
 
 type Session struct {
-	ID           uuid.UUID
+	ID           ulid.ULID
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -229,7 +232,7 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 		return nil, ErrUnauthorized
 	}
 
-	sessionID := uuid.Must(uuid.NewV7())
+	sessionID := ulid.Make()
 	// session id prefix ensures uniqueness
 	sessionToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
 	csrfToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
@@ -264,15 +267,17 @@ func generateCryptoRandomHex(nBytes uint) string {
 	return hex.EncodeToString(buf)
 }
 
-func (me *Service) GetSessionByToken(ctx context.Context, sessionToken string) (*Session, error) {
+func (me *Service) GetSession(ctx context.Context, sessionID ulid.ULID) (*Session, error) {
 	q := queries.New(me.db)
-	session, err := q.GetSessionByToken(ctx, sessionToken)
+
+	session, err := q.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get session by token: %w", err)
 	}
+
 	return &Session{
 		ID:           session.ID,
 		SessionToken: session.SessionToken,
@@ -281,8 +286,9 @@ func (me *Service) GetSessionByToken(ctx context.Context, sessionToken string) (
 	}, nil
 }
 
-func (me *Service) Logout(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) error {
+func (me *Service) Logout(ctx context.Context, userID ulid.ULID, sessionID ulid.ULID) error {
 	q := queries.New(me.db)
+
 	if nDeleted, err := q.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
 		SessionID: sessionID,
 		UserID:    userID,
@@ -291,15 +297,18 @@ func (me *Service) Logout(ctx context.Context, userID uuid.UUID, sessionID uuid.
 	} else if nDeleted == 0 {
 		return ErrNotFound
 	}
+
 	return nil
 }
 
-func (me *Service) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+func (me *Service) DeleteAccount(ctx context.Context, userID ulid.ULID) error {
 	q := queries.New(me.db)
+
 	if nDeleted, err := q.DeleteUser(ctx, userID); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	} else if nDeleted == 0 {
 		return ErrNotFound
 	}
+
 	return nil
 }
