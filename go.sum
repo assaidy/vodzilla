@@ -11,8 +11,8 @@ github.com/andybalholm/brotli v1.2.0 h1:ukwgCxwYrmACq68yiUqwIWnGY0cTPox/M94sVwTo
 github.com/andybalholm/brotli v1.2.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 h1:zV3ejI06GQ59hwDQAvmK1qxOQGB3WuVTRoY0okPTAv0=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496/go.mod h1:oGkLhpf+kjZl6xBf758TQhh5XrAeiJv/7FRz/2spLIg=
-github.com/assaidy/hyper/v2 v2.2.0 h1:Y0B/iZPWaLqv+BvyHrhpDiYAMS48UuBLV7I8Nydddzo=
-github.com/assaidy/hyper/v2 v2.2.0/go.mod h1:BT2+KTeIVtlgYOK6g14ZkmE3Xo5SEAKHwUM6m8rR1Es=
+github.com/assaidy/hyper/v2 v2.2.1 h1:m7dLVzA177CZQcacWB9q91h2ey8EnjT59xQ+uT50FdU=
+github.com/assaidy/hyper/v2 v2.2.1/go.mod h1:BT2+KTeIVtlgYOK6g14ZkmE3Xo5SEAKHwUM6m8rR1Es=
 github.com/assaidy/pubsubs v0.0.0-20260420114235-e63e168c5712 h1:a+oUN9IXtU52ibHYbjTernXydso0arxH2e+dgsqGRT4=
 github.com/assaidy/pubsubs v0.0.0-20260420114235-e63e168c5712/go.mod h1:96LZqHZZqxoVRCT+JF0YwwfZWuWSkHWVTj1wd6IQxrs=
 github.com/assaidy/workers v1.2.3 h1:m/bp+nEWMvPNXYQpeIf6s+NE/qCD035hWSh2twXSfws=

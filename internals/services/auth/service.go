@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -21,6 +21,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -30,15 +31,18 @@ var _ services.Service = (*Service)(nil)
 
 type Service struct {
 	db            *sql.DB
+	redis         *redis.Client
 	mailer        *mailer.Mailer
 	pubsub        pubsub.Pubsub
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, mailer *mailer.Mailer, pubsub pubsub.Pubsub, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, mailer *mailer.Mailer, pubsub pubsub.Pubsub, logger *slog.Logger) *Service {
+	logger = logger.WithGroup("auth service")
 	service := &Service{
 		db:            db,
+		redis:         redis,
 		mailer:        mailer,
 		pubsub:        pubsub,
 		logger:        logger,
@@ -46,7 +50,7 @@ func New(db *sql.DB, mailer *mailer.Mailer, pubsub pubsub.Pubsub, logger *slog.L
 	}
 
 	service.workerManager.RegisterWorker(
-		workers.NewWorker("verification email sender", service.verificationEmailSenderWorker,
+		workers.NewWorker("verification email sender", service.verificationEmailSenderJob,
 			workers.WithNRuns(1),
 			workers.WithNRetries(0),
 		),
@@ -65,63 +69,122 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (me *Service) verificationEmailSenderWorker(ctx context.Context) error {
-	sub := pubsub.SubscribeWithCodec(
-		ctx,
-		me.pubsub,
-		EmailVerificationEvent,
-		func(ctx context.Context, payload EmailVerificationEventPayload) error {
+func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			result, err := me.redis.BLPop(ctx, 5*time.Second, EmailVerificationQueue).Result()
+			if err != nil {
+				if !errors.Is(err, redis.Nil) && ctx.Err() == nil { // not a BLPop timout or context canceled
+					me.logger.Error("failed to LPop email verification queue", "error", err)
+				}
+				continue
+			}
+
+			var payload EmailVerificationQueuePayload
+			if err := json.Unmarshal([]byte(result[1]), &payload); err != nil {
+				me.logger.Error("failed to decode email verification queue payload", "error", err)
+				continue
+			}
+
 			if err := me.mailer.SendEmail(ctx, mailer.Message{
 				From:        utils.MustGetEnv("EMAIL_FROM"),
 				To:          []string{payload.Email},
 				Subject:     "Verification email for Video Streaming App",
-				ContentType: "text/plain; charset=utf-8",
+				ContentType: "text/html; charset=utf-8",
 				Body:        fmt.Sprintf(`To verifiy you email click <a href="%s">here</a>`, payload.VerificationLink),
 			}); err != nil {
-				return fmt.Errorf("failed to verification send email: %w", err)
+				me.logger.Error("failed to send verification email", "error", err)
 			}
-			return nil
-		},
-		pubsub.CodecJson,
-	)
-
-	for {
-		select {
-		case err := <-sub.Errs():
-			me.logger.Error("failed to handle event", "service", Name, "event", EmailVerificationEvent, "error", err)
-		case <-ctx.Done():
-			return sub.Close()
 		}
 	}
 }
 
 func validateRegisterParams(email, password string) error {
-	var errs SignupValidationErrors
-	if err := validation.Validate(email, validation.Required, is.Email, validation.Length(0, 255)); err != nil {
+	data := struct {
+		Email    string
+		Password string
+	}{
+		Email:    email,
+		Password: password,
+	}
+
+	if err := validation.ValidateStruct(&data,
 		// validate length because is.Email doesn't check the length
-		errs.Email = err
+		validation.Field(&data.Email, validation.Required, is.Email, validation.Length(0, 255)),
+		validation.Field(&data.Password, validation.Required, validation.Length(8, 50)),
+	); err != nil {
+		errs := err.(validation.Errors)
+		return RegisterValidationErrors{
+			Email:    errs["Email"],
+			Password: errs["Password"],
+		}
 	}
-	if err := validation.Validate(password, validation.Required, validation.Length(8, 50)); err != nil {
-		errs.Password = err
-	}
-	return errs
+
+	return nil
 }
 
-type SignupValidationErrors struct {
+type RegisterValidationErrors struct {
 	Email    error
 	Password error
 }
 
-func (me SignupValidationErrors) Error() string {
+func (me RegisterValidationErrors) Error() string {
 	return fmt.Sprintf("email: %v, password: %v", me.Email, me.Password)
 }
 
-func (me *Service) Signup(ctx context.Context, email, password string) error {
+func (me *Service) Register(ctx context.Context, email, password string) (string, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	if err := validateRegisterParams(email, password); err != nil {
-		return fmt.Errorf("%w: %w", ErrValidation, err)
+		return "", fmt.Errorf("%w: %w", ErrValidation, err)
 	}
+
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := queries.New(me.db).WithTx(tx)
+
+	if ok, err := qtx.CheckEmail(ctx, email); err != nil {
+		return "", fmt.Errorf("failed to check email: %w", err)
+	} else if ok {
+		return "", ErrEmailConflict
+	}
+
+	userID := ulid.Make().String()
+	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	if err := qtx.InsertUser(ctx, queries.InsertUserParams{
+		ID:           userID,
+		Email:        email,
+		PasswordHash: string(password_hash),
+	}); err != nil {
+		return "", fmt.Errorf("failed to insert user: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return userID, nil
+}
+
+const EmailVerificationQueue = "auth.EmailVerification"
+
+type EmailVerificationQueuePayload struct {
+	Email            string
+	VerificationLink string
+}
+
+func (me *Service) SendVerificationEmail(ctx context.Context, email, url string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
 
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -130,65 +193,45 @@ func (me *Service) Signup(ctx context.Context, email, password string) error {
 	defer tx.Rollback()
 	qtx := queries.New(me.db).WithTx(tx)
 
-	if ok, err := qtx.CheckEmail(ctx, email); err != nil {
-		return fmt.Errorf("failed to check email: %w", err)
-	} else if ok {
-		return ErrEmailConflict
-	}
-
-	userID := ulid.Make()
-	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	user, err := qtx.GetUserByEmail(ctx, email)
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	if err := qtx.InsertUser(ctx, queries.InsertUserParams{
-		ID:           userID,
-		Email:        email,
-		PasswordHash: string(password_hash),
-	}); err != nil {
-		return fmt.Errorf("failed to insert user: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	return nil
-}
-
-func (me *Service) SendVerificationEmail(ctx context.Context, userID ulid.ULID, email, url string) error {
-	verificationTokenID := ulid.Make()
+	verificationTokenID := ulid.Make().String()
 	verificationToken := fmt.Sprintf("%s_%s", verificationTokenID, generateCryptoRandomHex(32))
 
-	q := queries.New(me.db)
-	if err := q.InsertEmailVerificationToken(ctx, queries.InsertEmailVerificationTokenParams{
+	if err := qtx.InsertEmailVerificationToken(ctx, queries.InsertEmailVerificationTokenParams{
 		ID:        verificationTokenID,
-		OwnerID:   userID,
+		OwnerID:   user.ID,
 		Token:     verificationToken,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}); err != nil {
 		return fmt.Errorf("failed to insert email verification token: %w", err)
 	}
 
-	if err := pubsub.PublishWithCodec(
-		ctx,
-		me.pubsub,
-		EmailVerificationEvent,
-		EmailVerificationEventPayload{
-			Email:            email,
-			VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationTokenID),
-		},
-		pubsub.CodecJson,
-	); err != nil {
-		return fmt.Errorf("failed to publish %s event: %w", EmailVerificationEvent, err)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	paylaod, err := json.Marshal(EmailVerificationQueuePayload{
+		Email:            email,
+		VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationTokenID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode email verification queue payload: %w", err)
+	}
+	if err := me.redis.RPush(ctx, EmailVerificationQueue, paylaod).Err(); err != nil {
+		return fmt.Errorf("failed to enqueue email verification queue payload: %w", err)
 	}
 
 	return nil
 }
 
-func (me *Service) VerifyEmail(ctx context.Context, verificationTokenBase64 string) error {
-	verificationToken, _ := base64.StdEncoding.DecodeString(verificationTokenBase64)
+func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) error {
 	q := queries.New(me.db)
 
 	if n, err := q.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
@@ -201,7 +244,7 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationTokenBase64 stri
 }
 
 type Session struct {
-	ID           ulid.ULID
+	ID           string
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -225,14 +268,11 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	if !user.IsVerified {
+	if !user.IsVerified || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		return nil, ErrUnverified
 	}
-	if user.Email != email || bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
-		return nil, ErrUnauthorized
-	}
 
-	sessionID := ulid.Make()
+	sessionID := ulid.Make().String()
 	// session id prefix ensures uniqueness
 	sessionToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
 	csrfToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
@@ -267,7 +307,7 @@ func generateCryptoRandomHex(nBytes uint) string {
 	return hex.EncodeToString(buf)
 }
 
-func (me *Service) GetSession(ctx context.Context, sessionID ulid.ULID) (*Session, error) {
+func (me *Service) GetSession(ctx context.Context, sessionID string) (*Session, error) {
 	q := queries.New(me.db)
 
 	session, err := q.GetSessionByID(ctx, sessionID)
@@ -286,7 +326,7 @@ func (me *Service) GetSession(ctx context.Context, sessionID ulid.ULID) (*Sessio
 	}, nil
 }
 
-func (me *Service) Logout(ctx context.Context, userID ulid.ULID, sessionID ulid.ULID) error {
+func (me *Service) Logout(ctx context.Context, userID string, sessionID string) error {
 	q := queries.New(me.db)
 
 	if nDeleted, err := q.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
@@ -301,7 +341,7 @@ func (me *Service) Logout(ctx context.Context, userID ulid.ULID, sessionID ulid.
 	return nil
 }
 
-func (me *Service) DeleteAccount(ctx context.Context, userID ulid.ULID) error {
+func (me *Service) DeleteAccount(ctx context.Context, userID string) error {
 	q := queries.New(me.db)
 
 	if nDeleted, err := q.DeleteUser(ctx, userID); err != nil {

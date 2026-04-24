@@ -37,3 +37,5 @@ func pageWithSse(title string, root HyperNode) HyperNode {
 		root,
 	))
 }
+
+// TODO: create general Toast(kind ToastKind, message string) component. knid is (Note, Warning, Error).

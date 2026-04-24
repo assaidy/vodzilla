@@ -13,12 +13,11 @@ func RegisterRoutes(app *fiber.App) {
 
 	app.Get("/health", handlers.HandleCheckHealth)
 	app.Get("/data_sse/:client_id", handlers.WithSseHelperData, handlers.HandleDatastarSse)
-	app.RouteChain("/register").
-		Get(handlers.HandleRegisterPage).
-		Post(handlers.HandleRegister)
-	app.RouteChain("/login").
-		Get(handlers.HandleLoginPage).
-		Post(handlers.HandleLogin)
+	app.Get("/register", handlers.HandleRegisterPage)
+	app.Post("/register", handlers.HandleRegister)
+	app.Get("/login", handlers.HandleLoginPage)
+	app.Post("/login", handlers.HandleLogin)
 	// app.Get("/verification_email", handlers.HandleGetVerificationEmail)
+	app.Get("/verification_email/sent", handlers.HandleVerificationEmailSentPage)
 	// app.Get("/verification_email/verify", handlers.HandleVerifiyEmail)
 }

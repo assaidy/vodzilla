@@ -1,8 +1,6 @@
 package templates
 
 import (
-	"errors"
-
 	. "github.com/assaidy/hyper/v2"
 )
 
@@ -26,16 +24,14 @@ func RegisterPage() HyperNode {
 }
 
 type RegisterFormParams struct {
-	Name              string
-	NameErr           error
-	Username          string
-	UsernameErr       error
-	Email             string
-	EmailErr          error
-	Password          string
-	PasswordErr       error
-	VerifyPassword    string
-	VerifyPasswordErr error
+	Name        string
+	NameErr     error
+	Username    string
+	UsernameErr error
+	Email       string
+	EmailErr    error
+	Password    string
+	PasswordErr error
 }
 
 func RegisterForm(params ...RegisterFormParams) HyperNode {
@@ -46,29 +42,24 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 
 	return FORM(AttrID("registerForm"), AttrClass("space-y-4"))(
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "name"))("Name"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("name"))("Name"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("name"), AttrName("name"), AttrValue(p.Name)),
 			If(p.NameErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.NameErr)),
 		),
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "username"))("Username"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("username"))("Username"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("username"), AttrName("username"), AttrValue(p.Username)),
 			If(p.UsernameErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.UsernameErr)),
 		),
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "email"))("Email"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email)),
 			If(p.EmailErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.EmailErr)),
 		),
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "password"))("Password"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("password"))("Password"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password)),
 			If(p.PasswordErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.PasswordErr)),
-		),
-		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "verifyPassword"))("Verify Password"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("verifyPassword"), AttrName("verifyPassword"), AttrValue(p.VerifyPassword)),
-			If(p.VerifyPasswordErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.VerifyPasswordErr)),
 		),
 		DIV(AttrClass("pt-2"))(
 			BUTTON(
@@ -81,6 +72,24 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 		),
 	)
+}
+
+var verificationEmailSentPageCache NodeCache
+
+func VerificationEmailSentPage() HyperNode {
+	return Cache(&verificationEmailSentPageCache,
+		page("Verification Email Sent", Group(
+			DIV(AttrClass("min-h-screen flex items-center justify-center bg-yt-bg"))(
+				DIV(AttrClass("w-full max-w-md p-8 bg-yt-surface rounded-lg shadow-lg text-center"))(
+					DIV(AttrClass("mb-4"))(RawText(`<svg class="w-16 h-16 mx-auto text-yellow-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-open-icon lucide-mail-open"><path d="M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z"/><path d="m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10"/></svg>`)),
+					H1(AttrClass("text-2xl font-bold text-yt-text mb-4"))("Verifictaion Email Sent"),
+					P(AttrClass("text-yt-text-secondary mb-6"))("We have sent you a verification email. Please check your inbox."),
+					// TODO: resend verification email
+				),
+			),
+		)),
+	)
+
 }
 
 var emailVerifiedPageCache NodeCache
@@ -160,11 +169,11 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 
 	return FORM(AttrID("loginForm"), AttrClass("space-y-4"))(
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "email"))("Email"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email)),
 		),
 		DIV()(
-			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), Attr("for", "password"))("Password"),
+			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("password"))("Password"),
 			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password)),
 		),
 		DIV(AttrClass("pt-2"))(

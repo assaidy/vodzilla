@@ -50,7 +50,7 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	authService := auth.New(postgresConnection, mailer, pubsub, logger)
+	authService := auth.New(postgresConnection, redisConectionn, mailer, pubsub, logger)
 	userService := user.New()
 	videoService := video.New()
 	mediaService := media.New()
