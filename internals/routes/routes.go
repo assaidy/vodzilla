@@ -12,12 +12,14 @@ func RegisterRoutes(app *fiber.App) {
 	app.Use(static.New("public/", static.Config{FS: web.PublicFS, MaxAge: 0}))
 
 	app.Get("/health", handlers.HandleCheckHealth)
-	app.Get("/data_sse/:client_id", handlers.WithSseHelperData, handlers.HandleDatastarSse)
+	app.Get("/data_sse/:clientID", handlers.WithSseHelperData, handlers.HandleDatastarSse)
 	app.Get("/register", handlers.HandleRegisterPage)
 	app.Post("/register", handlers.HandleRegister)
 	app.Get("/login", handlers.HandleLoginPage)
 	app.Post("/login", handlers.HandleLogin)
-	// app.Get("/verification_email", handlers.HandleGetVerificationEmail)
+	// app.Post("/verification_email", handlers.HandleGetVerificationEmail) // TODO:
 	app.Get("/verification_email/sent", handlers.HandleVerificationEmailSentPage)
-	// app.Get("/verification_email/verify", handlers.HandleVerifiyEmail)
+	app.Get("/verification_email/verify", handlers.HandleVerifyEmailPage)
+
+	app.Get("/", handlers.WithSessionToken, handlers.HandleHomePage)
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	redis_pubsub "github.com/assaidy/pubsubs/redis"
 	"github.com/assaidy/video_streaming_app/internals/handlers"
 	"github.com/assaidy/video_streaming_app/internals/routes"
 	"github.com/assaidy/video_streaming_app/internals/services"
@@ -29,8 +27,6 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/gofiber/fiber/v3"
 	_ "github.com/joho/godotenv/autoload"
-	_ "github.com/lib/pq"
-	"github.com/redis/go-redis/v9"
 )
 
 // TODO: put all config in a package?
@@ -40,9 +36,8 @@ func main() {
 		Formatter:       log.TextFormatter,
 		ReportTimestamp: true,
 	}))
-	postgresConnection := connectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
-	redisConectionn := connectToRedis(utils.MustGetEnv("REDIS_ADDR"))
-	pubsub := redis_pubsub.New(redisConectionn)
+	postgresConnection := utils.ConnectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
+	redisConectionn := utils.ConnectToRedis(utils.MustGetEnv("REDIS_ADDR"))
 	mailer := mailer.New(
 		utils.MustGetEnv("PAPERCUT_HOST"),
 		utils.MustGetEnv("PAPERCUT_PORT"),
@@ -50,7 +45,7 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	authService := auth.New(postgresConnection, redisConectionn, mailer, pubsub, logger)
+	authService := auth.New(postgresConnection, redisConectionn, mailer, logger)
 	userService := user.New()
 	videoService := video.New()
 	mediaService := media.New()
@@ -84,8 +79,7 @@ func main() {
 	app.State().Set("logger", logger)
 	app.State().Set(auth.Name, authService)
 
-	quitChan := make(chan os.Signal, 1)
-	signal.Notify(quitChan, syscall.SIGINT, syscall.SIGTERM)
+	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		routes.RegisterRoutes(app)
@@ -99,45 +93,12 @@ func main() {
 		}
 	}()
 
-	<-quitChan
+	<-quitCtx.Done()
+	quitCtxCancel()
 	logger.Warn("gracefully shutting down server. press Ctrl-c to force shutdown.", "pid", os.Getpid())
 
 	if err := app.ShutdownWithTimeout(5 * time.Second); err != nil {
 		logger.Error("failed to shutdown server", "error", err, "pid", os.Getpid())
 		os.Exit(1)
 	}
-}
-
-func connectToPostgres(url string) *sql.DB {
-	pool, err := sql.Open("postgres", url)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := pool.PingContext(ctx); err != nil {
-		panic(err)
-	}
-
-	pool.SetMaxOpenConns(25)
-	pool.SetMaxIdleConns(5)
-	pool.SetConnMaxLifetime(5 * time.Minute)
-	pool.SetConnMaxIdleTime(1 * time.Minute)
-
-	return pool
-}
-
-func connectToRedis(addr string) *redis.Client {
-	client := redis.NewClient(&redis.Options{
-		Addr: addr,
-	})
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
-		panic(err)
-	}
-
-	return client
 }

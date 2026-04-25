@@ -11,8 +11,8 @@ import (
 )
 
 func WithSseHelperData(c fiber.Ctx) error {
-	c.SetContext(context.WithValue(c.Context(), "fiber_app", c.App()))
-	c.SetContext(context.WithValue(c.Context(), "client_id", fiber.Params[string](c, "client_id")))
+	c.SetContext(context.WithValue(c.Context(), "fiberApp", c.App()))
+	c.SetContext(context.WithValue(c.Context(), "clientID", fiber.Params[string](c, "clientID")))
 	return c.Next()
 }
 
@@ -23,16 +23,22 @@ var HandleDatastarSse = adaptor.HTTPHandlerWithContext(
 			panic("fiber context not found")
 		}
 
-		app := ctx.Value("fiber_app").(*fiber.App)
-		clientID := ctx.Value("client_id").(string)
+		app := ctx.Value("fiberApp").(*fiber.App)
+		clientID := ctx.Value("clientID").(string)
 		setSseState(app, clientID, datastar.NewSSE(w, r))
+		<-ctx.Done()
+		deleteSseState(app, clientID)
 	}),
 )
 
 func setSseState(app *fiber.App, clientID string, sse *datastar.ServerSentEventGenerator) {
-	app.State().Set(fmt.Sprintf("sse_%s", clientID), sse)
+	app.State().Set(fmt.Sprintf("sse%s", clientID), sse)
 }
 
 func getSseState(app *fiber.App, clientID string) *datastar.ServerSentEventGenerator {
-	return fiber.MustGetState[*datastar.ServerSentEventGenerator](app.State(), fmt.Sprintf("sse_%s", clientID))
+	return fiber.MustGetState[*datastar.ServerSentEventGenerator](app.State(), fmt.Sprintf("sse%s", clientID))
+}
+
+func deleteSseState(app *fiber.App, clientID string) {
+	app.State().Delete(fmt.Sprintf("sse%s", clientID))
 }

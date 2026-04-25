@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	pubsub "github.com/assaidy/pubsubs"
 	"github.com/assaidy/video_streaming_app/internals/services"
 	"github.com/assaidy/video_streaming_app/internals/services/auth/queries"
 	"github.com/assaidy/video_streaming_app/internals/utils"
@@ -33,18 +32,16 @@ type Service struct {
 	db            *sql.DB
 	redis         *redis.Client
 	mailer        *mailer.Mailer
-	pubsub        pubsub.Pubsub
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, mailer *mailer.Mailer, pubsub pubsub.Pubsub, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
 	logger = logger.WithGroup("auth service")
 	service := &Service{
 		db:            db,
 		redis:         redis,
 		mailer:        mailer,
-		pubsub:        pubsub,
 		logger:        logger,
 		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
 	}
@@ -112,8 +109,7 @@ func validateRegisterParams(email, password string) error {
 	}
 
 	if err := validation.ValidateStruct(&data,
-		// validate length because is.Email doesn't check the length
-		validation.Field(&data.Email, validation.Required, is.Email, validation.Length(0, 255)),
+		validation.Field(&data.Email, validation.Required, is.Email),
 		validation.Field(&data.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
 		errs := err.(validation.Errors)
@@ -219,7 +215,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 
 	paylaod, err := json.Marshal(EmailVerificationQueuePayload{
 		Email:            email,
-		VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationTokenID),
+		VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationToken),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to encode email verification queue payload: %w", err)
