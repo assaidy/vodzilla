@@ -8,11 +8,11 @@ version: "2"
 #           type: "ULID"
 sql:
   - engine: "postgresql"
-    schema: "./internals/services/auth/db/migrations/"
-    queries: "./internals/services/auth/db/queries.sql"
+    schema: "./internals/services/user/db/migrations/"
+    queries: "./internals/services/user/db/queries.sql"
     gen:
       go:
         package: "queries"
-        out: "./internals/services/auth/queries/"
+        out: "./internals/services/user/queries/"
         emit_prepared_queries: true
         emit_empty_slices: true

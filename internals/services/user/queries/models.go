@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type AuthEmailVerificationToken struct {
+type UserServiceEmailVerificationToken struct {
 	ID        string
 	OwnerID   string
 	Token     string
@@ -16,7 +16,7 @@ type AuthEmailVerificationToken struct {
 	ExpiresAt time.Time
 }
 
-type AuthSession struct {
+type UserServiceSession struct {
 	ID           string
 	OwnerID      string
 	SessionToken string
@@ -25,10 +25,12 @@ type AuthSession struct {
 	ExpiresAt    time.Time
 }
 
-type AuthUser struct {
+type UserServiceUser struct {
 	ID           string
 	Email        string
 	PasswordHash string
+	Name         string
+	Username     string
 	CreatedAt    time.Time
 	IsVerified   bool
 }

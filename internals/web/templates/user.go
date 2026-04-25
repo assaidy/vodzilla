@@ -40,35 +40,39 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		p = params[0]
 	}
 
-	return FORM(AttrID("registerForm"), AttrClass("space-y-4"))(
+	return FORM(
+		AttrID("registerForm"),
+		AttrClass("space-y-4"),
+		Attr("data-on:submit", "@post('/register', {contentType: 'form'})"),
+		Attr("data-indicator:register-fetch", true),
+	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("name"))("Name"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("name"), AttrName("name"), AttrValue(p.Name)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("name"), AttrName("name"), AttrValue(p.Name), AttrRequired(true)),
 			If(p.NameErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.NameErr)),
 		),
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("username"))("Username"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("username"), AttrName("username"), AttrValue(p.Username)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeText), AttrID("username"), AttrName("username"), AttrValue(p.Username), AttrRequired(true)),
 			If(p.UsernameErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.UsernameErr)),
 		),
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email), AttrRequired(true)),
 			If(p.EmailErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.EmailErr)),
 		),
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("password"))("Password"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password), AttrRequired(true)),
 			If(p.PasswordErr != nil, P(AttrClass("mt-1 text-sm text-red-500"))(p.PasswordErr)),
 		),
 		DIV(AttrClass("pt-2"))(
 			BUTTON(
-				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
+				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover disabled:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
 				AttrType(TypeSubmit),
-				// TODO: data-indicator
-				Attr("data-on:click", "@post('/register', {contentType: 'form'})"),
+				Attr("data-attr:disabled", "$registerFetch"),
 			)(
-				"Sign Up",
+				"Register", spinner("$registerFetch"),
 			),
 		),
 	)
@@ -135,7 +139,7 @@ func LoginPage() HyperNode {
 		page("Login", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center bg-yt-bg"))(
 				DIV(AttrClass("w-full max-w-md p-8 bg-yt-surface rounded-lg shadow-lg"))(
-					H1(AttrClass("text-2xl font-bold text-center mb-6 text-yt-text"))("Sign In"),
+					H1(AttrClass("text-2xl font-bold text-center mb-6 text-yt-text"))("Login"),
 					LoginForm(),
 					P(AttrClass("mt-4 text-center text-yt-text-secondary text-sm"))(
 						"Don't have an account? ",
@@ -167,23 +171,27 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		p = params[0]
 	}
 
-	return FORM(AttrID("loginForm"), AttrClass("space-y-4"))(
+	return FORM(
+		AttrID("loginForm"),
+		AttrClass("space-y-4"),
+		Attr("data-on:submit", "@post('/login', {contentType: 'form'})"),
+		Attr("data-indicator:login-fetch", true),
+	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypeEmail), AttrID("email"), AttrName("email"), AttrValue(p.Email), AttrRequired(true)),
 		),
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("password"))("Password"),
-			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password)),
+			INPUT(AttrClass("w-full px-4 py-2 bg-yt-surface-hover border border-yt-border rounded text-yt-text placeholder-yt-text-secondary focus:outline-none focus:border-yt-red"), AttrType(TypePassword), AttrID("password"), AttrName("password"), AttrValue(p.Password), AttrRequired(true)),
 		),
 		DIV(AttrClass("pt-2"))(
 			BUTTON(
-				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
+				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover disabled:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
 				AttrType(TypeSubmit),
-				// TODO: data-indicator
-				Attr("data-on:click", "@post('/login', {contentType: 'form'})"),
+				Attr("data-attr:disabled", "$loginFetch"),
 			)(
-				"Sign In",
+				"Login", spinner("$loginFetch"),
 			),
 		),
 

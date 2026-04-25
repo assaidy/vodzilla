@@ -11,7 +11,7 @@ import (
 )
 
 const checkEmail = `-- name: CheckEmail :one
-select exists (select 1 from auth.users where email = $1 for update)
+select exists (select 1 from user_service.users where email = $1 for update)
 `
 
 func (q *Queries) CheckEmail(ctx context.Context, email string) (bool, error) {
@@ -21,8 +21,19 @@ func (q *Queries) CheckEmail(ctx context.Context, email string) (bool, error) {
 	return exists, err
 }
 
+const checkUsername = `-- name: CheckUsername :one
+select exists (select 1 from user_service.users where username = $1 for update)
+`
+
+func (q *Queries) CheckUsername(ctx context.Context, username string) (bool, error) {
+	row := q.queryRow(ctx, q.checkUsernameStmt, checkUsername, username)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const deleteSessionForUser = `-- name: DeleteSessionForUser :execrows
-delete from auth.sessions where id = $1 and owner_id = $2
+delete from user_service.sessions where id = $1 and owner_id = $2
 `
 
 type DeleteSessionForUserParams struct {
@@ -39,7 +50,7 @@ func (q *Queries) DeleteSessionForUser(ctx context.Context, arg DeleteSessionFor
 }
 
 const deleteUser = `-- name: DeleteUser :execrows
-delete from auth.users where id = $1
+delete from user_service.users where id = $1
 `
 
 func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
@@ -51,12 +62,12 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-select id, owner_id, session_token, csrf_token, created_at, expires_at from auth.sessions where id = $1
+select id, owner_id, session_token, csrf_token, created_at, expires_at from user_service.sessions where id = $1
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, id string) (AuthSession, error) {
+func (q *Queries) GetSessionByID(ctx context.Context, id string) (UserServiceSession, error) {
 	row := q.queryRow(ctx, q.getSessionByIDStmt, getSessionByID, id)
-	var i AuthSession
+	var i UserServiceSession
 	err := row.Scan(
 		&i.ID,
 		&i.OwnerID,
@@ -69,16 +80,18 @@ func (q *Queries) GetSessionByID(ctx context.Context, id string) (AuthSession, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-select id, email, password_hash, created_at, is_verified from auth.users where email = $1 for update
+select id, email, password_hash, name, username, created_at, is_verified from user_service.users where email = $1 for update
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (AuthUser, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserServiceUser, error) {
 	row := q.queryRow(ctx, q.getUserByEmailStmt, getUserByEmail, email)
-	var i AuthUser
+	var i UserServiceUser
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.PasswordHash,
+		&i.Name,
+		&i.Username,
 		&i.CreatedAt,
 		&i.IsVerified,
 	)
@@ -86,7 +99,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (AuthUser, e
 }
 
 const insertEmailVerificationToken = `-- name: InsertEmailVerificationToken :exec
-insert into auth.email_verification_tokens (id, owner_id, token, expires_at)
+insert into user_service.email_verification_tokens (id, owner_id, token, expires_at)
 values ($1, $2, $3, $4)
 `
 
@@ -108,7 +121,7 @@ func (q *Queries) InsertEmailVerificationToken(ctx context.Context, arg InsertEm
 }
 
 const insertSession = `-- name: InsertSession :exec
-insert into auth.sessions (id, owner_id, session_token, csrf_token, expires_at)
+insert into user_service.sessions (id, owner_id, session_token, csrf_token, expires_at)
 values ($1, $2, $3, $4, $5)
 `
 
@@ -132,27 +145,35 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 }
 
 const insertUser = `-- name: InsertUser :exec
-insert into auth.users (id, email, password_hash)
-values ($1, $2, $3)
+insert into user_service.users (id, email, password_hash, name, username)
+values ($1, $2, $3, $4, $5)
 `
 
 type InsertUserParams struct {
 	ID           string
 	Email        string
 	PasswordHash string
+	Name         string
+	Username     string
 }
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
-	_, err := q.exec(ctx, q.insertUserStmt, insertUser, arg.ID, arg.Email, arg.PasswordHash)
+	_, err := q.exec(ctx, q.insertUserStmt, insertUser,
+		arg.ID,
+		arg.Email,
+		arg.PasswordHash,
+		arg.Name,
+		arg.Username,
+	)
 	return err
 }
 
 const verifyEmailByToken = `-- name: VerifyEmailByToken :execrows
-update auth.users
+update user_service.users
 set is_verified = true
 where id in (
   select owner_id
-  from auth.email_verification_tokens evt
+  from user_service.email_verification_tokens evt
   where token = $1 and expires_at > now()
 )
 `

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/assaidy/video_streaming_app/internals/services/auth"
+	"github.com/assaidy/video_streaming_app/internals/services/user"
 	"github.com/assaidy/video_streaming_app/internals/utils"
 	"github.com/assaidy/video_streaming_app/internals/web/templates"
 	"github.com/gofiber/fiber/v3"
@@ -22,17 +22,18 @@ func HandleRegister(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
 
-	authService := fiber.MustGetState[*auth.Service](c.App().State(), auth.Name)
+	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
 
-	userID, err := authService.Register(c, email, password)
-	if err != nil {
-		if errors.Is(err, auth.ErrValidation) {
-			if validationErrs, ok := errors.AsType[auth.RegisterValidationErrors](err); !ok {
-				panic("expected auth.RegisterValidationErrors")
+	if err := userService.Register(c, email, password, name, username); err != nil {
+		if errors.Is(err, user.ErrValidation) {
+			if validationErrs, ok := errors.AsType[user.RegisterValidationErrors](err); !ok {
+				panic("expected user.RegisterValidationErrors")
 			} else {
 				return render(c, templates.RegisterForm(templates.RegisterFormParams{
 					Name:        name,
+					NameErr:     validationErrs.Name,
 					Username:    username,
+					UsernameErr: validationErrs.Username,
 					Email:       email,
 					EmailErr:    validationErrs.Email,
 					Password:    password,
@@ -40,13 +41,22 @@ func HandleRegister(c fiber.Ctx) error {
 				}))
 			}
 		}
-		if errors.Is(err, auth.ErrEmailConflict) {
+		if errors.Is(err, user.ErrEmailConflict) {
 			return render(c, templates.RegisterForm(templates.RegisterFormParams{
 				Name:     name,
 				Username: username,
 				Email:    email,
 				EmailErr: errors.New("email already exists"),
 				Password: password,
+			}))
+		}
+		if errors.Is(err, user.ErrUsernameConflict) {
+			return render(c, templates.RegisterForm(templates.RegisterFormParams{
+				Name:        name,
+				Username:    username,
+				UsernameErr: errors.New("username already exists"),
+				Email:       email,
+				Password:    password,
 			}))
 		}
 		return err
@@ -56,12 +66,9 @@ func HandleRegister(c fiber.Ctx) error {
 	if err != nil {
 		return fmt.Errorf("failed to general email verification url")
 	}
-	if err := authService.SendVerificationEmail(c, email, url); err != nil {
+	if err := userService.SendVerificationEmail(c, email, url); err != nil {
 		return err
 	}
-
-	// TODO: create a profile using profile service
-	_ = userID
 
 	return c.Redirect().To("/verification_email/sent")
 }
@@ -73,9 +80,9 @@ func HandleVerificationEmailSentPage(c fiber.Ctx) error {
 func HandleVerifyEmailPage(c fiber.Ctx) error {
 	token := fiber.Query[string](c, "token")
 
-	authService := fiber.MustGetState[*auth.Service](c.App().State(), auth.Name)
-	if err := authService.VerifyEmail(c, token); err != nil {
-		if errors.Is(err, auth.ErrNotFound) {
+	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	if err := userService.VerifyEmail(c, token); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
 			return render(c, templates.InvalidVerificationLinkPage())
 		}
 		return err
@@ -91,17 +98,17 @@ func HandleLoginPage(c fiber.Ctx) error {
 func HandleLogin(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
-	authService := fiber.MustGetState[*auth.Service](c.App().State(), auth.Name)
-	session, err := authService.Login(c, email, password)
+	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	session, err := userService.Login(c, email, password)
 	if err != nil {
-		if errors.Is(err, auth.ErrUnauthorized) {
+		if errors.Is(err, user.ErrUnauthorized) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
 				Email:    email,
 				Password: password,
 				Err:      templates.ErrInvalidCredentials,
 			}))
 		}
-		if errors.Is(err, auth.ErrUnverified) {
+		if errors.Is(err, user.ErrUnverified) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
 				Email:    email,
 				Password: password,
@@ -140,10 +147,10 @@ func WithSessionToken(c fiber.Ctx) error {
 		return c.Redirect().To("/login")
 	}
 
-	authService := fiber.MustGetState[*auth.Service](c.App().State(), auth.Name)
-	session, err := authService.GetSession(c, sessionID)
+	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	session, err := userService.GetSession(c, sessionID)
 	if err != nil {
-		if errors.Is(err, auth.ErrNotFound) {
+		if errors.Is(err, user.ErrNotFound) {
 			return c.Redirect().To("/login")
 		}
 		return err
@@ -155,6 +162,7 @@ func WithSessionToken(c fiber.Ctx) error {
 	c.Locals("sessionID", session.ID)
 	c.Locals("sessionToken", session.SessionToken)
 	c.Locals("csrfToken", session.CsrfToken)
+	c.Locals("userID", session.OwnerID)
 
 	return c.Next()
 }
