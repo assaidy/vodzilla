@@ -12,7 +12,6 @@ import (
 	"github.com/assaidy/video_streaming_app/internals/handlers"
 	"github.com/assaidy/video_streaming_app/internals/routes"
 	"github.com/assaidy/video_streaming_app/internals/services"
-	"github.com/assaidy/video_streaming_app/internals/services/user"
 	"github.com/assaidy/video_streaming_app/internals/services/feed"
 	"github.com/assaidy/video_streaming_app/internals/services/history"
 	"github.com/assaidy/video_streaming_app/internals/services/media"
@@ -20,6 +19,7 @@ import (
 	"github.com/assaidy/video_streaming_app/internals/services/reaction"
 	"github.com/assaidy/video_streaming_app/internals/services/search"
 	"github.com/assaidy/video_streaming_app/internals/services/social"
+	"github.com/assaidy/video_streaming_app/internals/services/user"
 	"github.com/assaidy/video_streaming_app/internals/services/video"
 	"github.com/assaidy/video_streaming_app/internals/utils"
 	"github.com/assaidy/video_streaming_app/internals/utils/mailer"
@@ -74,6 +74,7 @@ func main() {
 	})
 
 	app.State().Set("logger", logger)
+	app.State().Set("redis", redisConectionn)
 	app.State().Set(user.Name, userService)
 
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gofiber/fiber/v3"
@@ -16,29 +15,19 @@ func WithSseHelperData(c fiber.Ctx) error {
 	return c.Next()
 }
 
-var HandleDatastarSse = adaptor.HTTPHandlerWithContext(
+var HandleDatastarPersistentSse = adaptor.HTTPHandlerWithContext(
 	http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, ok := adaptor.LocalContextFromHTTPRequest(r)
 		if !ok {
 			panic("fiber context not found")
 		}
 
-		app := ctx.Value("fiberApp").(*fiber.App)
-		clientID := ctx.Value("clientID").(string)
-		setSseState(app, clientID, datastar.NewSSE(w, r))
-		<-ctx.Done()
-		deleteSseState(app, clientID)
+		_ = ctx.Value("fiberApp").(*fiber.App)
+		_ = ctx.Value("clientID").(string)
+		_ = datastar.NewSSE(w, r)
+
+		// TODO: because we are working in a distributed env,
+		// subscribe to sse topic, and send events if clientID is identical.
+		// if failed to send close the connection and return. also close the subscription.
 	}),
 )
-
-func setSseState(app *fiber.App, clientID string, sse *datastar.ServerSentEventGenerator) {
-	app.State().Set(fmt.Sprintf("sse%s", clientID), sse)
-}
-
-func getSseState(app *fiber.App, clientID string) *datastar.ServerSentEventGenerator {
-	return fiber.MustGetState[*datastar.ServerSentEventGenerator](app.State(), fmt.Sprintf("sse%s", clientID))
-}
-
-func deleteSseState(app *fiber.App, clientID string) {
-	app.State().Delete(fmt.Sprintf("sse%s", clientID))
-}

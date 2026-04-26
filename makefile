@@ -1,15 +1,15 @@
 include .env
 
 build:
-	@tailwindcss --minify -i ./internals/web/tailwind_input.css -o ./internals/web/public/css/style.css
-	@sqlc generate
-	@go build -o ./bin/server ./cmd/server/
+	tailwindcss --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/public/css/style.css
+	sqlc generate
+	go build -o ./bin/server ./cmd/server/
 
 run: build
-	@./bin/server
+	./bin/server
 
 clean:
-	@rm -rf ./bin/
+	rm -rf ./bin/
 
 # WATCH_CMD = watchexec --ignore-nothing
 # watch:
