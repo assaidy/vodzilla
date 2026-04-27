@@ -9,10 +9,9 @@ import (
 
 func RegisterRoutes(app *fiber.App) {
 	app.Use(handlers.WithLogging)
-	app.Use(static.New("public/", static.Config{FS: web.PublicFS, MaxAge: 0}))
+	app.Use(static.New("assets/", static.Config{FS: web.AssetsFS, MaxAge: 0, Compress: true}))
 
 	app.Get("/health", handlers.HandleCheckHealth)
-	app.Get("/persistent_sse/:clientID", handlers.WithSseHelperData, handlers.HandleDatastarPersistentSse)
 	app.Get("/register", handlers.HandleRegisterPage)
 	app.Post("/register", handlers.HandleRegister)
 	app.Get("/login", handlers.HandleLoginPage)
@@ -22,7 +21,4 @@ func RegisterRoutes(app *fiber.App) {
 	app.Get("/verification_email/verify", handlers.HandleVerifyEmailPage)
 
 	app.Get("/", handlers.WithSessionToken, handlers.HandleHomePage)
-	app.Get("/test", func(c fiber.Ctx) error {
-		return fiber.ErrInternalServerError
-	})
 }

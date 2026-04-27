@@ -72,6 +72,7 @@ func main() {
 		AppName:      "video_streaming_app",
 		ErrorHandler: handlers.ErrorHandler,
 	})
+	routes.RegisterRoutes(app)
 
 	app.State().Set("logger", logger)
 	app.State().Set("redis", redisConectionn)
@@ -80,8 +81,6 @@ func main() {
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		routes.RegisterRoutes(app)
-
 		port, _ := utils.GetEnv("PORT", "8080")
 		if err := app.Listen(fmt.Sprintf(":%s", port), fiber.ListenConfig{
 			EnablePrefork: true,

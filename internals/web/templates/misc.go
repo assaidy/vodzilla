@@ -2,9 +2,9 @@ package templates
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/assaidy/hyper/v2"
-	"github.com/oklog/ulid/v2"
 )
 
 func page(title string, root HyperNode) HyperNode {
@@ -18,9 +18,9 @@ func page(title string, root HyperNode) HyperNode {
 				LINK(AttrRel("preconnect"), AttrHref("https://fonts.googleapis.com")),
 				LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
 				LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
-				LINK(AttrRel("stylesheet"), AttrHref("/public/css/style.css")),
-				SCRIPT(AttrType("module"), AttrSrc("/public/js/lib/datastar@v1.0.1.js"))(),
-				SCRIPT(AttrDefer(true), AttrSrc("/public/js/script.js"))(),
+				LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
+				SCRIPT(AttrType("module"), AttrSrc("/assets/js/lib/htmx@2.0.10.js"))(),
+				SCRIPT(AttrDefer(true), AttrSrc("/assets/js/script.js"))(),
 			),
 			BODY()(
 				DIV(AttrID("alertToast"), AttrClass("toast toast-top toast-center w-md"))(),
@@ -30,22 +30,8 @@ func page(title string, root HyperNode) HyperNode {
 	)
 }
 
-func pageWithSse(title string, root HyperNode) HyperNode {
-	clientID := ulid.Make()
-	return page(title, Group(
-		DIV(
-			AttrHidden(true),
-			Attr("data-init", fmt.Sprintf("@get('/persistent_sse/%s')", clientID)),
-			Attr("data-signals", fmt.Sprintf("{clientID: '%s'}", clientID)),
-		)(),
-		root,
-	))
-}
-
-func spinner(signal string) HyperNode {
-	return RawText(fmt.Sprintf(`<svg data-class:loading="%s" class="animate-spin ml-2 hidden [&.loading]:inline-block" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-circle-icon lucide-loader-circle"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`,
-		signal,
-	))
+func spinner() HyperNode {
+	return RawText(`<svg class="htmx-indicator animate-spin mx-auto hidden group-[.htmx-request]:inline-block" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-circle-icon lucide-loader-circle"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>`)
 }
 
 type AlertLevel string
@@ -57,7 +43,7 @@ const (
 	AlertError   AlertLevel = "error"
 )
 
-func Alert(level AlertLevel, message string) HyperNode {
+func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode {
 	var icon string
 	switch level {
 	case AlertInfo:
@@ -78,7 +64,16 @@ func Alert(level AlertLevel, message string) HyperNode {
   </svg>`
 	}
 
-	return DIV(AttrRole("alert"), AttrClass(fmt.Sprintf("alert alert-%s", level)))(
+	t := 5 * time.Second
+	if len(timeout) > 0 {
+		t = timeout[0]
+	}
+
+	return DIV(
+		AttrRole("alert"),
+		AttrClass(fmt.Sprintf("alert alert-%s", level)),
+		Attr("hx-on::load", fmt.Sprintf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
+	)(
 		RawText(icon), SPAN()(message),
 	)
 }

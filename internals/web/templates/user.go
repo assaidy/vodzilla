@@ -4,6 +4,8 @@ import (
 	. "github.com/assaidy/hyper/v2"
 )
 
+// TODO: adapt forms to daisy ui
+
 var registerPageCache NodeCache
 
 func RegisterPage() HyperNode {
@@ -41,10 +43,12 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 	}
 
 	return FORM(
-		AttrID("registerForm"),
+		AttrID("register-form"),
 		AttrClass("space-y-4"),
-		Attr("data-on:submit", "@post('/register', {contentType: 'form'})"),
-		Attr("data-indicator:register-fetch", true),
+		Attr("hx-post", "/register"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .register-button"),
+		Attr("hx-disabled-elt", "find button"),
 	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("name"))("Name"),
@@ -68,11 +72,11 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		),
 		DIV(AttrClass("pt-2"))(
 			BUTTON(
-				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover disabled:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
+				AttrClass("btn group register-button w-full font-medium"),
 				AttrType(TypeSubmit),
-				Attr("data-attr:disabled", "$registerFetch"),
 			)(
-				"Register", spinner("$registerFetch"),
+				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Register"),
+				spinner(),
 			),
 		),
 	)
@@ -172,10 +176,12 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 	}
 
 	return FORM(
-		AttrID("loginForm"),
+		AttrID("login-form"),
 		AttrClass("space-y-4"),
-		Attr("data-on:submit", "@post('/login', {contentType: 'form'})"),
-		Attr("data-indicator:login-fetch", true),
+		Attr("hx-post", "/login"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .login-button"),
+		Attr("hx-disabled-elt", "find button"),
 	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
@@ -187,11 +193,11 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		),
 		DIV(AttrClass("pt-2"))(
 			BUTTON(
-				AttrClass("w-full py-2 px-4 bg-yt-red hover:bg-yt-red-hover disabled:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
+				AttrClass("btn group login-button w-full font-medium"),
 				AttrType(TypeSubmit),
-				Attr("data-attr:disabled", "$loginFetch"),
 			)(
-				"Login", spinner("$loginFetch"),
+				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Login"),
+				spinner(),
 			),
 		),
 
