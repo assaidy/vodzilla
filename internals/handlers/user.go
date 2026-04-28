@@ -12,6 +12,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+// TODO: move form validation to handlers
+
 func HandleRegisterPage(c fiber.Ctx) error {
 	return render(c, templates.RegisterPage())
 }
@@ -24,7 +26,7 @@ func HandleRegister(c fiber.Ctx) error {
 
 	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
 
-	if err := userService.Register(c, email, password, name, username); err != nil {
+	if err := userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
 		if errors.Is(err, user.ErrValidation) {
 			if validationErrs, ok := errors.AsType[user.RegisterValidationErrors](err); !ok {
 				panic("expected user.RegisterValidationErrors")
@@ -66,11 +68,11 @@ func HandleRegister(c fiber.Ctx) error {
 	if err != nil {
 		return fmt.Errorf("failed to general email verification url")
 	}
-	if err := userService.SendVerificationEmail(c, email, url); err != nil {
+	if err := userService.SendVerificationEmail(c.RequestCtx(), email, url); err != nil {
 		return err
 	}
 
-	return c.Redirect().To("/verification_email/sent")
+	return redirect(c, "/verification_email/sent")
 }
 
 func HandleVerificationEmailSentPage(c fiber.Ctx) error {
@@ -81,7 +83,7 @@ func HandleVerifyEmailPage(c fiber.Ctx) error {
 	token := fiber.Query[string](c, "token")
 
 	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
-	if err := userService.VerifyEmail(c, token); err != nil {
+	if err := userService.VerifyEmail(c.RequestCtx(), token); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return render(c, templates.InvalidVerificationLinkPage())
 		}
@@ -99,7 +101,7 @@ func HandleLogin(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
 	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
-	session, err := userService.Login(c, email, password)
+	session, err := userService.Login(c.RequestCtx(), email, password)
 	if err != nil {
 		if errors.Is(err, user.ErrUnauthorized) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
@@ -119,57 +121,57 @@ func HandleLogin(c fiber.Ctx) error {
 	}
 
 	c.Cookie(&fiber.Cookie{
-		Name:     "sessionID",
+		Name:     "session_id",
 		Value:    session.ID,
 		Expires:  session.ExpiresAt,
 		HTTPOnly: true,
 	})
 	c.Cookie(&fiber.Cookie{
-		Name:     "sessionToken",
+		Name:     "session_token",
 		Value:    session.SessionToken,
 		Expires:  session.ExpiresAt,
 		HTTPOnly: true,
 	})
 	c.Cookie(&fiber.Cookie{
-		Name:    "csrfToken",
+		Name:    "csrf_token",
 		Value:   session.CsrfToken,
 		Expires: session.ExpiresAt,
 	})
 
-	return c.Redirect().To("/")
+	return redirect(c, "/")
 }
 
-func WithSessionToken(c fiber.Ctx) error {
-	sessionID := c.Cookies("sessionID")
-	sessionToken := c.Cookies("sessionToken")
+func WithSession(c fiber.Ctx) error {
+	sessionID := c.Cookies("session_id")
+	sessionToken := c.Cookies("session_token")
 
 	if sessionID == "" || sessionToken == "" {
-		return c.Redirect().To("/login")
+		return redirect(c, "/login")
 	}
 
 	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
-	session, err := userService.GetSession(c, sessionID)
+	session, err := userService.GetSession(c.RequestCtx(), sessionID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			return c.Redirect().To("/login")
+			return redirect(c, "/login")
 		}
 		return err
 	}
 	if !session.ExpiresAt.After(time.Now()) {
-		return c.Redirect().To("/login")
+		return redirect(c, "/login")
 	}
 
-	c.Locals("sessionID", session.ID)
-	c.Locals("sessionToken", session.SessionToken)
-	c.Locals("csrfToken", session.CsrfToken)
-	c.Locals("userID", session.OwnerID)
+	c.Locals("session_id", session.ID)
+	c.Locals("session_token", session.SessionToken)
+	c.Locals("csrf_token", session.CsrfToken)
+	c.Locals("user_id", session.OwnerID)
 
 	return c.Next()
 }
 
-// must go through [WithSessionToken] first
+// must go through [WithSession] first
 func WithCsrfToken(c fiber.Ctx) error {
-	if c.Locals("csrfToken").(string) != c.Get("X-CSRF-Token") {
+	if c.Locals("csrf_token").(string) != c.Get("X-CSRF-Token") {
 		return fiber.ErrForbidden
 	}
 

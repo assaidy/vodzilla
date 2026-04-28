@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/assaidy/hyper/v2"
 	"github.com/assaidy/video_streaming_app/internals/web/templates"
+	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
+	"github.com/redis/go-redis/v9"
 )
 
 func ErrorHandler(c fiber.Ctx, err error) error {
@@ -16,21 +20,16 @@ func ErrorHandler(c fiber.Ctx, err error) error {
 		code = e.Code
 	}
 
-	// Hide internal error from client; It has been logged by [WithLogging].
 	if code == fiber.StatusInternalServerError {
-		// TODO: use websocket per client to send these notifcations and return no content for the response,
-		// to avoid swapping the sender element when an error occures
-		// NOTE: you must send ws via a distributed mq.
-		if err := render(c,
-			hyper.DIV(hyper.AttrID("alertToast"), hyper.Attr("hx-swap-oob", "afterbegin"))(
-				templates.Alert(templates.AlertError, "We had a server error. Please try again later."),
-			),
+		// Hide internal error from client; It has been logged by [WithLogging].
+		if err := renderToWebsocket(c,
+			templates.Alert(templates.AlertError, "We had a server error. Please try again later."),
 		); err != nil {
 			fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
-				Error("couldn't render alert for internal server error", "error", err)
+				Error("failed to render alert for internal server error", "error", err)
 			return fiber.ErrInternalServerError
 		}
-		return nil
+		return c.SendStatus(fiber.StatusNoContent)
 	}
 
 	return c.Status(code).SendString(err.Error())
@@ -54,7 +53,101 @@ func WithLogging(c fiber.Ctx) error {
 	return err
 }
 
+func WithClientID(c fiber.Ctx) error {
+	clientID := c.Get("X-Client-ID")
+	if clientID == "" {
+		return c.Status(fiber.StatusForbidden).SendString("missing client id")
+	}
+
+	c.Locals("client_id", clientID)
+	return c.Next()
+}
+
+func HandleCheckHealth(c fiber.Ctx) error {
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func WithWebsocketEssentials(c fiber.Ctx) error {
+	if !c.IsWebSocket() {
+		return fiber.ErrUpgradeRequired
+	}
+
+	c.Locals("fiber_app", c.App())
+	return c.Next()
+}
+
+func HandleWebsocket(c *websocket.Conn) {
+	clientID := c.Params("client_id")
+	app := c.Locals("fiber_app").(*fiber.App)
+
+	sub := fiber.MustGetState[*redis.Client](app.State(), "redis").
+		Subscribe(context.Background(), fmt.Sprintf("ws:%s", clientID))
+	defer sub.Close()
+	subChan := sub.Channel()
+
+	wsReadChan := make(chan []byte, 100)
+	defer close(wsReadChan)
+	wsClosedChan := make(chan struct{})
+
+	go func() {
+		for {
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err) {
+					close(wsClosedChan)
+					return
+				} else {
+					fiber.MustGetState[*slog.Logger](app.State(), "logger").
+						Error("failed to read websocket message", "error", err)
+					continue
+				}
+			}
+			wsReadChan <- msg
+		}
+	}()
+
+	for {
+		select {
+		case <-wsClosedChan:
+			return
+		case msg := <-wsReadChan:
+			_ = msg
+		case msg, ok := <-subChan:
+			if !ok {
+				return
+			}
+			if err := c.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
+				fiber.MustGetState[*slog.Logger](app.State(), "logger").
+					Error("failed to write websocket message", "error", err)
+			}
+		}
+	}
+}
+
 func render(c fiber.Ctx, node hyper.HyperNode) error {
 	c.Set(fiber.HeaderContentType, fiber.MIMETextHTMLCharsetUTF8)
 	return hyper.Render(c, node)
+}
+
+func renderToWebsocket(c fiber.Ctx, node hyper.HyperNode) error {
+	clientID, ok := c.Locals("client_id").(string)
+	if !ok {
+		return fmt.Errorf("couldn't find client id in locals")
+	}
+
+	return hyper.RenderThen(node, func(data []byte) error {
+		return fiber.MustGetState[*redis.Client](c.App().State(), "redis").
+			Publish(c, fmt.Sprintf("ws:%s", clientID), data).Err()
+	})
+}
+
+func redirect(c fiber.Ctx, endpoint string) error {
+	if c.Get("HX-Request") == "true" {
+		c.Set("HX-Redirect", endpoint)
+	} else if c.Get("HX-Boosted") == "true" {
+		c.Set("HX-Location", endpoint)
+	} else {
+		return c.Redirect().To(endpoint)
+	}
+	return nil
 }

@@ -5,9 +5,12 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/oklog/ulid/v2"
 )
 
 func page(title string, root HyperNode) HyperNode {
+	clientID := ulid.Make().String()
+
 	return Group(
 		DOCTYPE(),
 		HTML(AttrLang("en"))(
@@ -19,11 +22,20 @@ func page(title string, root HyperNode) HyperNode {
 				LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
 				LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 				LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
-				SCRIPT(AttrType("module"), AttrSrc("/assets/js/lib/htmx@2.0.10.js"))(),
+				SCRIPT(AttrSrc("/assets/js/lib/htmx@2.0.10.js"))(),
+				SCRIPT(AttrSrc("/assets/js/lib/htmx_ext_ws@2.0.4.js"))(),
 				SCRIPT(AttrDefer(true), AttrSrc("/assets/js/script.js"))(),
 			),
-			BODY()(
-				DIV(AttrID("alertToast"), AttrClass("toast toast-top toast-center w-md"))(),
+			BODY(
+				Attr("hx-ext", "ws"),
+				Attr("ws-connect", fmt.Sprintf("/ws/%s", clientID)),
+				Attr("hx-on::load", fmt.Sprintf("window.clientId = '%s'", clientID)),
+				Attr("hx-on::config-request", fmt.Sprintf(`
+					event.detail.headers['X-CSRF-Token'] = getCookie('csrf_token');
+					event.detail.headers['X-Client-ID']  = '%s';
+				`, clientID)),
+			)(
+				DIV(AttrID("alert-toast"), AttrClass("toast toast-top toast-center w-md"))(),
 				root,
 			),
 		),
@@ -69,11 +81,13 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		t = timeout[0]
 	}
 
-	return DIV(
-		AttrRole("alert"),
-		AttrClass(fmt.Sprintf("alert alert-%s", level)),
-		Attr("hx-on::load", fmt.Sprintf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
-	)(
-		RawText(icon), SPAN()(message),
+	return DIV(AttrID("alert-toast"), Attr("hx-swap-oob", "afterbegin"))(
+		DIV(
+			AttrRole("alert"),
+			AttrClass(fmt.Sprintf("alert alert-%s", level)),
+			Attr("hx-on::load", fmt.Sprintf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
+		)(
+			RawText(icon), SPAN()(message),
+		),
 	)
 }
