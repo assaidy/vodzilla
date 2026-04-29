@@ -53,18 +53,18 @@ func WithLogging(c fiber.Ctx) error {
 	return err
 }
 
-func WithClientID(c fiber.Ctx) error {
-	clientID := c.Get("X-Client-ID")
-	if clientID == "" {
-		return c.Status(fiber.StatusForbidden).SendString("missing client id")
-	}
-
-	c.Locals("client_id", clientID)
-	return c.Next()
-}
-
 func HandleCheckHealth(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func WithPassClientIDToLocals(c fiber.Ctx) error {
+	if clientID := c.Get("X-Client-ID"); clientID != "" {
+		c.Locals("client_id", clientID)
+	} else {
+		fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
+			Warn("request with not client id", "path", c.Path())
+	}
+	return c.Next()
 }
 
 func WithWebsocketEssentials(c fiber.Ctx) error {
