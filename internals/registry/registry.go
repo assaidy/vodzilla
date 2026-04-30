@@ -1,31 +1,45 @@
-package services
+package registry
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/assaidy/video_streaming_app/internals/services"
+	"github.com/gofiber/fiber/v3"
 )
 
 type Registry struct {
-	services        map[string]Service
-	startedServices map[string]Service
 	logger          *slog.Logger
+	app             *fiber.App
+	services        map[string]services.Service
+	startedServices map[string]services.Service
 }
 
-func NewRegistry(logger *slog.Logger) *Registry {
+func NewRegistry(logger *slog.Logger, app *fiber.App) *Registry {
 	return &Registry{
-		services:        make(map[string]Service),
-		startedServices: make(map[string]Service),
-		logger:          logger,
+		logger:          logger.WithGroup("registry"),
+		app:             app,
+		services:        make(map[string]services.Service),
+		startedServices: make(map[string]services.Service),
 	}
 }
 
-func (me *Registry) Add(name string, s Service) {
+func (me *Registry) AddService(name string, service services.Service) {
 	if _, ok := me.services[name]; ok {
 		panic(fmt.Sprintf("double registration of service: %s", name))
 	}
-	me.services[name] = s
+	me.services[name] = service
+}
+
+func (me *Registry) AddServiceWithInjection(name string, service services.Service) {
+	me.AddService(name, service)
+	me.Inject(name, service)
+}
+
+func (me *Registry) Inject(name string, dependency any) {
+	me.app.State().Set(name, dependency)
 }
 
 func (me *Registry) Start(ctx context.Context) {

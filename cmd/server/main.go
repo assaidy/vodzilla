@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/assaidy/video_streaming_app/internals/handlers"
+	"github.com/assaidy/video_streaming_app/internals/registry"
 	"github.com/assaidy/video_streaming_app/internals/routes"
-	"github.com/assaidy/video_streaming_app/internals/services"
 	"github.com/assaidy/video_streaming_app/internals/services/feed"
 	"github.com/assaidy/video_streaming_app/internals/services/history"
 	"github.com/assaidy/video_streaming_app/internals/services/media"
@@ -31,6 +31,12 @@ import (
 // TODO: put all config in a package?
 
 func main() {
+	app := fiber.New(fiber.Config{
+		AppName:      "video_streaming_app",
+		ErrorHandler: handlers.ErrorHandler,
+	})
+	routes.RegisterRoutes(app)
+
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
 		Formatter:       log.TextFormatter,
 		ReportTimestamp: true,
@@ -44,47 +50,27 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	userService := user.New(postgresConnection, redisConectionn, mailer, logger)
-	videoService := video.New()
-	mediaService := media.New()
-	reactionService := reaction.New()
-	socialService := social.New()
-	searchService := search.New()
-	feedService := feed.New()
-	historyService := history.New()
-	moderationService := moderation.New()
-
-	registry := services.NewRegistry(logger)
-	registry.Add(user.Name, userService)
-	registry.Add(video.Name, videoService)
-	registry.Add(media.Name, mediaService)
-	registry.Add(reaction.Name, reactionService)
-	registry.Add(social.Name, socialService)
-	registry.Add(search.Name, searchService)
-	registry.Add(feed.Name, feedService)
-	registry.Add(history.Name, historyService)
-	registry.Add(moderation.Name, moderationService)
+	registry := registry.NewRegistry(logger, app)
+	registry.Inject("logger", logger)
+	registry.Inject("redis", redisConectionn)
+	registry.AddServiceWithInjection(user.Name, user.New(postgresConnection, redisConectionn, mailer, logger))
+	registry.AddServiceWithInjection(video.Name, video.New())
+	registry.AddServiceWithInjection(media.Name, media.New())
+	registry.AddServiceWithInjection(reaction.Name, reaction.New())
+	registry.AddServiceWithInjection(social.Name, social.New())
+	registry.AddServiceWithInjection(search.Name, search.New())
+	registry.AddServiceWithInjection(feed.Name, feed.New())
+	registry.AddServiceWithInjection(history.Name, history.New())
+	registry.AddServiceWithInjection(moderation.Name, moderation.New())
 
 	registry.Start(context.Background())
 	defer registry.Stop(context.Background())
-
-	app := fiber.New(fiber.Config{
-		AppName:      "video_streaming_app",
-		ErrorHandler: handlers.ErrorHandler,
-	})
-	routes.RegisterRoutes(app)
-
-	app.State().Set("logger", logger)
-	app.State().Set("redis", redisConectionn)
-	app.State().Set(user.Name, userService)
 
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		port, _ := utils.GetEnv("PORT", "8080")
-		if err := app.Listen(fmt.Sprintf(":%s", port), fiber.ListenConfig{
-			EnablePrefork: true,
-		}); err != nil {
+		if err := app.Listen(fmt.Sprintf(":%s", port), fiber.ListenConfig{EnablePrefork: true}); err != nil {
 			logger.Error("failed to start server", "error", err, "pid", os.Getpid())
 			os.Exit(1)
 		}

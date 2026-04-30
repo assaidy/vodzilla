@@ -62,7 +62,7 @@ func WithPassClientIDToLocals(c fiber.Ctx) error {
 		c.Locals("client_id", clientID)
 	} else {
 		fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
-			Warn("request with not client id", "path", c.Path())
+			Warn("request with not client id", "method", c.Method(), "path", c.Path())
 	}
 	return c.Next()
 }

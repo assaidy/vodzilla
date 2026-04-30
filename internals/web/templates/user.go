@@ -110,9 +110,9 @@ func EmailVerifiedPage() HyperNode {
 					DIV(AttrClass("mb-4"))(RawText(`<svg class="w-16 h-16 mx-auto text-green-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`)),
 					H1(AttrClass("text-2xl font-bold text-yt-text mb-4"))("Email Verified"),
 					P(AttrClass("text-yt-text-secondary mb-6"))("Your email has been verified successfully. You can now log in to your account."),
-					BUTTON(
-						AttrClass("py-2 px-6 bg-yt-red hover:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"),
-					)(A(AttrClass("text-white no-underline"), AttrHref("/login"))("Go to Login")),
+					BUTTON(AttrClass("py-2 px-6 bg-yt-red hover:bg-yt-red-hover text-white font-medium rounded transition-colors duration-200"))(
+						A(AttrClass("text-white no-underline"), AttrHref("/login"))("Go to Login"),
+					),
 				),
 			),
 		)),
