@@ -19,20 +19,14 @@ func ErrorHandler(c fiber.Ctx, err error) error {
 	if e, ok := errors.AsType[*fiber.Error](err); ok {
 		code = e.Code
 	}
+	c.Status(code)
 
 	if code == fiber.StatusInternalServerError {
 		// Hide internal error from client; It has been logged by [WithLogging].
-		if err := renderToWebsocket(c,
-			templates.Alert(templates.AlertError, "We had a server error. Please try again later."),
-		); err != nil {
-			fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
-				Error("failed to render alert for internal server error", "error", err)
-			return fiber.ErrInternalServerError
-		}
-		return c.SendStatus(fiber.StatusNoContent)
+		return render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
 	}
 
-	return c.Status(code).SendString(err.Error())
+	return c.SendString(err.Error())
 }
 
 func WithLogging(c fiber.Ctx) error {

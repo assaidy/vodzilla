@@ -48,7 +48,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		Attr("hx-post", "/register"),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "find .register-button"),
-		Attr("hx-disabled-elt", "find button"),
+		Attr("hx-disable", "find button"),
 	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("name"))("Name"),
@@ -181,7 +181,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		Attr("hx-post", "/login"),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "find .login-button"),
-		Attr("hx-disabled-elt", "find button"),
+		Attr("hx-disable", "find button"),
 	)(
 		DIV()(
 			LABEL(AttrClass("block text-sm font-medium text-yt-text mb-1"), AttrFor("email"))("Email"),
