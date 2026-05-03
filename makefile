@@ -49,6 +49,7 @@ goose-new: validate-goose-service validate-goose-name
 	@$(GOOSE_ENV) goose create -s $(name) sql
 
 pg-cli:
+	@echo  "$(POSTGRES_URL)"
 	@pgcli "$(POSTGRES_URL)"
 
 redis-cli:
