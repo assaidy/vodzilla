@@ -3,7 +3,7 @@ package history
 import (
 	"context"
 
-	"github.com/assaidy/video_streaming_app/internals/services"
+	"github.com/assaidy/vodzilla/internals/services"
 )
 
 const Name = "history"

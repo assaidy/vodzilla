@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/assaidy/hyper/v2"
-	"github.com/assaidy/video_streaming_app/internals/web/templates"
+	"github.com/assaidy/vodzilla/internals/web/templates"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"

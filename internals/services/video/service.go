@@ -3,7 +3,7 @@ package video
 import (
 	"context"
 
-	"github.com/assaidy/video_streaming_app/internals/services"
+	"github.com/assaidy/vodzilla/internals/services"
 )
 
 // creat video safely:      Call User Service API + cache

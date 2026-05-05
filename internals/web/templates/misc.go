@@ -37,7 +37,7 @@ func page(title string, root HyperNode) HyperNode {
 				`, clientID))),
 			),
 			BODY(
-				AttrClass("bg-base-200"),
+				AttrClass("min-h-screen bg-base-200"),
 				Attr("hx-status:5xx:inherited", "swap:none"),
 			)(
 				DIV(AttrID("alert-toast"), AttrClass("toast toast-top toast-center w-md"))(),

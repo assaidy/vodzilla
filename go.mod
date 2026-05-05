@@ -1,4 +1,4 @@
-module github.com/assaidy/video_streaming_app
+module github.com/assaidy/vodzilla
 
 go 1.26.1
 

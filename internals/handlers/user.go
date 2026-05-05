@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/assaidy/video_streaming_app/internals/services/user"
-	"github.com/assaidy/video_streaming_app/internals/utils"
-	"github.com/assaidy/video_streaming_app/internals/web/templates"
+	user_service "github.com/assaidy/vodzilla/internals/services/user"
+	"github.com/assaidy/vodzilla/internals/utils"
+	"github.com/assaidy/vodzilla/internals/web/templates"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -24,11 +24,11 @@ func HandleRegister(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
 
-	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
 	if err := userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
-		if errors.Is(err, user.ErrValidation) {
-			if validationErrs, ok := errors.AsType[user.RegisterValidationErrors](err); !ok {
+		if errors.Is(err, user_service.ErrValidation) {
+			if validationErrs, ok := errors.AsType[user_service.RegisterValidationErrors](err); !ok {
 				panic("expected user.RegisterValidationErrors")
 			} else {
 				return render(c, templates.RegisterForm(templates.RegisterFormParams{
@@ -43,7 +43,7 @@ func HandleRegister(c fiber.Ctx) error {
 				}))
 			}
 		}
-		if errors.Is(err, user.ErrEmailConflict) {
+		if errors.Is(err, user_service.ErrEmailConflict) {
 			return render(c, templates.RegisterForm(templates.RegisterFormParams{
 				Name:     name,
 				Username: username,
@@ -52,7 +52,7 @@ func HandleRegister(c fiber.Ctx) error {
 				Password: password,
 			}))
 		}
-		if errors.Is(err, user.ErrUsernameConflict) {
+		if errors.Is(err, user_service.ErrUsernameConflict) {
 			return render(c, templates.RegisterForm(templates.RegisterFormParams{
 				Name:        name,
 				Username:    username,
@@ -82,9 +82,9 @@ func HandleVerificationEmailSentPage(c fiber.Ctx) error {
 func HandleVerifyEmailPage(c fiber.Ctx) error {
 	token := fiber.Query[string](c, "token")
 
-	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	if err := userService.VerifyEmail(c.RequestCtx(), token); err != nil {
-		if errors.Is(err, user.ErrNotFound) {
+		if errors.Is(err, user_service.ErrNotFound) {
 			return render(c, templates.InvalidVerificationLinkPage())
 		}
 		return err
@@ -100,17 +100,17 @@ func HandleLoginPage(c fiber.Ctx) error {
 func HandleLogin(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
-	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	session, err := userService.Login(c.RequestCtx(), email, password)
 	if err != nil {
-		if errors.Is(err, user.ErrUnauthorized) {
+		if errors.Is(err, user_service.ErrUnauthorized) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
 				Email:    email,
 				Password: password,
 				Err:      templates.ErrInvalidCredentials,
 			}))
 		}
-		if errors.Is(err, user.ErrUnverified) {
+		if errors.Is(err, user_service.ErrUnverified) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
 				Email:    email,
 				Password: password,
@@ -149,10 +149,10 @@ func WithSession(c fiber.Ctx) error {
 		return redirect(c, "/login")
 	}
 
-	userService := fiber.MustGetState[*user.Service](c.App().State(), user.Name)
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	session, err := userService.GetSession(c.RequestCtx(), sessionID)
 	if err != nil {
-		if errors.Is(err, user.ErrNotFound) {
+		if errors.Is(err, user_service.ErrNotFound) {
 			return redirect(c, "/login")
 		}
 		return err

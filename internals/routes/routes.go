@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"github.com/assaidy/video_streaming_app/internals/handlers"
-	"github.com/assaidy/video_streaming_app/internals/web"
+	"github.com/assaidy/vodzilla/internals/handlers"
+	"github.com/assaidy/vodzilla/internals/web"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"

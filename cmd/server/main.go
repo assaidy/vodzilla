@@ -9,20 +9,20 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/assaidy/video_streaming_app/internals/handlers"
-	"github.com/assaidy/video_streaming_app/internals/registry"
-	"github.com/assaidy/video_streaming_app/internals/routes"
-	"github.com/assaidy/video_streaming_app/internals/services/feed"
-	"github.com/assaidy/video_streaming_app/internals/services/history"
-	"github.com/assaidy/video_streaming_app/internals/services/media"
-	"github.com/assaidy/video_streaming_app/internals/services/moderation"
-	"github.com/assaidy/video_streaming_app/internals/services/reaction"
-	"github.com/assaidy/video_streaming_app/internals/services/search"
-	"github.com/assaidy/video_streaming_app/internals/services/social"
-	"github.com/assaidy/video_streaming_app/internals/services/user"
-	"github.com/assaidy/video_streaming_app/internals/services/video"
-	"github.com/assaidy/video_streaming_app/internals/utils"
-	"github.com/assaidy/video_streaming_app/internals/utils/mailer"
+	"github.com/assaidy/vodzilla/internals/handlers"
+	"github.com/assaidy/vodzilla/internals/registry"
+	"github.com/assaidy/vodzilla/internals/routes"
+	"github.com/assaidy/vodzilla/internals/services/feed"
+	"github.com/assaidy/vodzilla/internals/services/history"
+	"github.com/assaidy/vodzilla/internals/services/media"
+	"github.com/assaidy/vodzilla/internals/services/moderation"
+	"github.com/assaidy/vodzilla/internals/services/reaction"
+	"github.com/assaidy/vodzilla/internals/services/search"
+	"github.com/assaidy/vodzilla/internals/services/social"
+	user_service "github.com/assaidy/vodzilla/internals/services/user"
+	"github.com/assaidy/vodzilla/internals/services/video"
+	"github.com/assaidy/vodzilla/internals/utils"
+	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/charmbracelet/log"
 	"github.com/gofiber/fiber/v3"
 	_ "github.com/joho/godotenv/autoload"
@@ -32,7 +32,7 @@ import (
 
 func main() {
 	app := fiber.New(fiber.Config{
-		AppName:      "video_streaming_app",
+		AppName:      "Vodzilla",
 		ErrorHandler: handlers.ErrorHandler,
 	})
 	routes.RegisterRoutes(app)
@@ -53,7 +53,7 @@ func main() {
 	registry := registry.NewRegistry(logger, app)
 	registry.Inject("logger", logger)
 	registry.Inject("redis", redisConectionn)
-	registry.AddServiceWithInjection(user.Name, user.New(postgresConnection, redisConectionn, mailer, logger))
+	registry.AddServiceWithInjection(user_service.Name, user_service.New(postgresConnection, redisConectionn, mailer, logger))
 	registry.AddServiceWithInjection(video.Name, video.New())
 	registry.AddServiceWithInjection(media.Name, media.New())
 	registry.AddServiceWithInjection(reaction.Name, reaction.New())

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/assaidy/video_streaming_app/internals/services"
+	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/gofiber/fiber/v3"
 )
 
