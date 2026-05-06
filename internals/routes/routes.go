@@ -23,5 +23,11 @@ func RegisterRoutes(app *fiber.App) {
 	app.Get("/verification_email/sent", handlers.HandleVerificationEmailSentPage)
 	app.Get("/verification_email/verify", handlers.HandleVerifyEmailPage)
 
-	app.Get("/", handlers.WithSession, handlers.HandleHomePage)
+	app.Get("/", handlers.HandleHomePage)
+	app.Get("/feed", handlers.WithSession, handlers.HandleFeedPage)
+	app.Get("/discover", handlers.WithSession, handlers.HandleDiscoverPage)
+	app.Get("/watch_later", handlers.WithSession, handlers.HandleWatchLaterPage)
+	app.Get("/playlists", handlers.WithSession, handlers.HandlePlaylistsPage)
+	app.Get("/notifications", handlers.WithSession, handlers.HandleNotificationsPage)
+	app.Get("/:user_id", handlers.WithSession, handlers.HandleProfilePage)
 }

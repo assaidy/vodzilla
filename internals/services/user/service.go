@@ -376,3 +376,27 @@ func (me *Service) DeleteAccount(ctx context.Context, userID string) error {
 
 	return nil
 }
+
+type User struct {
+	Name     string
+	Username string
+	Email    string
+}
+
+func (me *Service) GetUserByID(ctx context.Context, userID string) (*User, error) {
+	q := queries.New(me.db)
+
+	user, err := q.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	return &User{
+		Name: user.Name,
+		Username: user.Username,
+		Email: user.Email,
+	}, nil
+}

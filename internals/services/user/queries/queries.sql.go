@@ -98,6 +98,25 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 	return i, err
 }
 
+const getUserByID = `-- name: GetUserByID :one
+select id, email, password_hash, name, username, created_at, is_verified from user_service.users where id = $1 for update
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id string) (UserServiceUser, error) {
+	row := q.queryRow(ctx, q.getUserByIDStmt, getUserByID, id)
+	var i UserServiceUser
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Username,
+		&i.CreatedAt,
+		&i.IsVerified,
+	)
+	return i, err
+}
+
 const insertEmailVerificationToken = `-- name: InsertEmailVerificationToken :exec
 insert into user_service.email_verification_tokens (id, owner_id, token, expires_at)
 values ($1, $2, $3, $4)

@@ -11,6 +11,9 @@ values ($1, $2, $3, $4, $5);
 -- name: GetUserByEmail :one
 select * from user_service.users where email = $1 for update;
 
+-- name: GetUserByID :one
+select * from user_service.users where id = $1 for update;
+
 -- name: InsertSession :exec
 insert into user_service.sessions (id, owner_id, session_token, csrf_token, expires_at)
 values ($1, $2, $3, $4, $5);

@@ -42,6 +42,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
 	}
+	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
+	}
 	if q.insertEmailVerificationTokenStmt, err = db.PrepareContext(ctx, insertEmailVerificationToken); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertEmailVerificationToken: %w", err)
 	}
@@ -87,6 +90,11 @@ func (q *Queries) Close() error {
 	if q.getUserByEmailStmt != nil {
 		if cerr := q.getUserByEmailStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getUserByEmailStmt: %w", cerr)
+		}
+	}
+	if q.getUserByIDStmt != nil {
+		if cerr := q.getUserByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByIDStmt: %w", cerr)
 		}
 	}
 	if q.insertEmailVerificationTokenStmt != nil {
@@ -154,6 +162,7 @@ type Queries struct {
 	deleteUserStmt                   *sql.Stmt
 	getSessionByIDStmt               *sql.Stmt
 	getUserByEmailStmt               *sql.Stmt
+	getUserByIDStmt                  *sql.Stmt
 	insertEmailVerificationTokenStmt *sql.Stmt
 	insertSessionStmt                *sql.Stmt
 	insertUserStmt                   *sql.Stmt
@@ -170,6 +179,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteUserStmt:                   q.deleteUserStmt,
 		getSessionByIDStmt:               q.getSessionByIDStmt,
 		getUserByEmailStmt:               q.getUserByEmailStmt,
+		getUserByIDStmt:                  q.getUserByIDStmt,
 		insertEmailVerificationTokenStmt: q.insertEmailVerificationTokenStmt,
 		insertSessionStmt:                q.insertSessionStmt,
 		insertUserStmt:                   q.insertUserStmt,

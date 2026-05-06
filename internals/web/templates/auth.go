@@ -8,9 +8,9 @@ var registerPageCache NodeCache
 
 func RegisterPage() HyperNode {
 	return Cache(&registerPageCache,
-		page("Register", Group(
+		basicPageLayout("Register", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-xl"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
 						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Create Your Account"),
 						RegisterForm(),
@@ -145,9 +145,9 @@ var verificationEmailSentPageCache NodeCache
 
 func VerificationEmailSentPage() HyperNode {
 	return Cache(&verificationEmailSentPageCache,
-		page("Verification Email Sent", Group(
+		basicPageLayout("Verification Email Sent", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-xl"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-warning mb-4"))(
 							RawText(`<svg class="w-16 h-16 mx-auto" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-icon lucide-mail"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>`),
@@ -167,9 +167,9 @@ var emailVerifiedPageCache NodeCache
 
 func EmailVerifiedPage() HyperNode {
 	return Cache(&emailVerifiedPageCache,
-		page("Email Verified", Group(
+		basicPageLayout("Email Verified", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-xl"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-success mb-4"))(
 							RawText(`<svg class="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`),
@@ -192,9 +192,9 @@ var invalidVerificationLinkPageCache NodeCache
 
 func InvalidVerificationLinkPage() HyperNode {
 	return Cache(&invalidVerificationLinkPageCache,
-		page("Invalid Verification Link", Group(
+		basicPageLayout("Invalid Verification Link", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-xl"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-error mb-4"))(
 							RawText(`<svg class="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`),
@@ -214,9 +214,9 @@ var loginPageCache NodeCache
 
 func LoginPage() HyperNode {
 	return Cache(&loginPageCache,
-		page("Login", Group(
+		basicPageLayout("Login", Group(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-xl"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
 						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Login"),
 						LoginForm(),
