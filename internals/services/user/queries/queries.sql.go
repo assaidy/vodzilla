@@ -7,6 +7,7 @@ package queries
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -80,7 +81,7 @@ func (q *Queries) GetSessionByID(ctx context.Context, id string) (UserServiceSes
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-select id, email, password_hash, name, username, created_at, is_verified from user_service.users where email = $1 for update
+select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where email = $1 for update
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserServiceUser, error) {
@@ -94,12 +95,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 		&i.Username,
 		&i.CreatedAt,
 		&i.IsVerified,
+		&i.Bio,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-select id, email, password_hash, name, username, created_at, is_verified from user_service.users where id = $1 for update
+select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where id = $1 for update
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id string) (UserServiceUser, error) {
@@ -113,6 +115,27 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (UserServiceUser, 
 		&i.Username,
 		&i.CreatedAt,
 		&i.IsVerified,
+		&i.Bio,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where username = $1 for update
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserServiceUser, error) {
+	row := q.queryRow(ctx, q.getUserByUsernameStmt, getUserByUsername, username)
+	var i UserServiceUser
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Username,
+		&i.CreatedAt,
+		&i.IsVerified,
+		&i.Bio,
 	)
 	return i, err
 }
@@ -164,8 +187,8 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 }
 
 const insertUser = `-- name: InsertUser :exec
-insert into user_service.users (id, email, password_hash, name, username)
-values ($1, $2, $3, $4, $5)
+insert into user_service.users (id, email, password_hash, name, username, bio)
+values ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertUserParams struct {
@@ -174,6 +197,7 @@ type InsertUserParams struct {
 	PasswordHash string
 	Name         string
 	Username     string
+	Bio          sql.NullString
 }
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
@@ -183,6 +207,33 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 		arg.PasswordHash,
 		arg.Name,
 		arg.Username,
+		arg.Bio,
+	)
+	return err
+}
+
+const updateProfile = `-- name: UpdateProfile :exec
+update user_service.users
+set
+  name = $1,
+  username = $2,
+  bio = $3
+where id = $4
+`
+
+type UpdateProfileParams struct {
+	Name     string
+	Username string
+	Bio      sql.NullString
+	UserID   string
+}
+
+func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) error {
+	_, err := q.exec(ctx, q.updateProfileStmt, updateProfile,
+		arg.Name,
+		arg.Username,
+		arg.Bio,
+		arg.UserID,
 	)
 	return err
 }

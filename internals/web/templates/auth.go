@@ -53,7 +53,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		Attr("hx-indicator", "find .register-button"),
 		Attr("hx-disable", "find button"),
 	)(
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("name"))(
 				SPAN(AttrClass("label-text"))("Name"),
 			),
@@ -72,7 +72,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 		),
 
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("username"))(
 				SPAN(AttrClass("label-text"))("Username"),
 			),
@@ -91,7 +91,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 		),
 
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("email"))(
 				SPAN(AttrClass("label-text"))("Email"),
 			),
@@ -110,7 +110,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 		),
 
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("password"))(
 				SPAN(AttrClass("label-text"))("Password"),
 			),
@@ -262,7 +262,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		Attr("hx-indicator", "find .login-button"),
 		Attr("hx-disable", "find button"),
 	)(
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("email"))(
 				SPAN(AttrClass("label-text"))("Email"),
 			),
@@ -276,7 +276,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 			),
 		),
 
-		DIV(AttrClass("form-control"))(
+		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("password"))(
 				SPAN(AttrClass("label-text"))("Password"),
 			),

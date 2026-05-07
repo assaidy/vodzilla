@@ -10,10 +10,18 @@ import (
 
 func RegisterRoutes(app *fiber.App) {
 	app.Use(handlers.WithLogging)
-	app.Use(static.New("assets/", static.Config{FS: web.AssetsFS, Compress: true}))
 	app.Use(handlers.WithPassClientIDToLocals)
 
+	app.Use(static.New("assets/", static.Config{
+		FS:       web.AssetsFS,
+		Compress: true,
+		ModifyResponse: func(c fiber.Ctx) error {
+			c.Set(fiber.HeaderCacheControl, "no-cache, no-store")
+			return nil
+		},
+	}))
 	app.Get("/health", handlers.HandleCheckHealth)
+
 	app.Get("/ws/:client_id", handlers.WithWebsocketEssentials, websocket.New(handlers.HandleWebsocket))
 	app.Get("/register", handlers.HandleRegisterPage)
 	app.Post("/register", handlers.HandleRegister)
@@ -29,5 +37,6 @@ func RegisterRoutes(app *fiber.App) {
 	app.Get("/watch_later", handlers.WithSession, handlers.HandleWatchLaterPage)
 	app.Get("/playlists", handlers.WithSession, handlers.HandlePlaylistsPage)
 	app.Get("/notifications", handlers.WithSession, handlers.HandleNotificationsPage)
-	app.Get("/:user_id", handlers.WithSession, handlers.HandleProfilePage)
+	app.Get("/profiles/:username", handlers.WithSession, handlers.HandleProfilePage)
+	app.Put("/profiles", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleEditProfile)
 }

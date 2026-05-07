@@ -5,6 +5,7 @@
 package queries
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -33,4 +34,5 @@ type UserServiceUser struct {
 	Username     string
 	CreatedAt    time.Time
 	IsVerified   bool
+	Bio          sql.NullString
 }

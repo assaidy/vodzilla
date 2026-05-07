@@ -378,9 +378,11 @@ func (me *Service) DeleteAccount(ctx context.Context, userID string) error {
 }
 
 type User struct {
+	ID       string
 	Name     string
 	Username string
 	Email    string
+	Bio      string
 }
 
 func (me *Service) GetUserByID(ctx context.Context, userID string) (*User, error) {
@@ -395,8 +397,70 @@ func (me *Service) GetUserByID(ctx context.Context, userID string) (*User, error
 	}
 
 	return &User{
-		Name: user.Name,
+		ID:       user.ID,
+		Name:     user.Name,
 		Username: user.Username,
-		Email: user.Email,
+		Email:    user.Email,
+		Bio:      user.Bio.String,
 	}, nil
+}
+
+func (me *Service) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	q := queries.New(me.db)
+
+	user, err := q.GetUserByUsername(ctx, username)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	return &User{
+		ID:       user.ID,
+		Name:     user.Name,
+		Username: user.Username,
+		Email:    user.Email,
+		Bio:      user.Bio.String,
+	}, nil
+}
+
+func (me *Service) EditProfile(ctx context.Context, userID, name, username, bio string) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := queries.New(me.db).WithTx(tx)
+
+	user, err := qtx.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if user.Username != username {
+		if ok, err := qtx.CheckUsername(ctx, username); err != nil {
+			return fmt.Errorf("failed to check username: %w", err)
+		} else if ok {
+			return ErrUsernameConflict
+		}
+	}
+
+	if err := qtx.UpdateProfile(ctx, queries.UpdateProfileParams{
+		UserID:   userID,
+		Name:     name,
+		Username: username,
+		Bio:      sql.NullString{Valid: true, String: bio},
+	}); err != nil {
+		return fmt.Errorf("failed to update profile: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return nil
 }

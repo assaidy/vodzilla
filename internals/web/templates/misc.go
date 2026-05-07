@@ -37,10 +37,10 @@ func basicPageLayout(title string, root HyperNode) HyperNode {
 				`, clientID))),
 			),
 			BODY(
-				AttrClass("min-h-screen bg-gradient-to-b from-base-300 to-base-300/10"),
+				AttrClass("min-h-screen bg-base-300"),
 				Attr("hx-status:5xx:inherited", "swap:none"),
 			)(
-				DIV(AttrID("alert-toast"), AttrClass("toast toast-top toast-center w-md"))(),
+				DIV(AttrID("alert-toast"), AttrClass("toast toast-top w-md"))(),
 				root,
 			),
 		),
