@@ -68,13 +68,13 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col lg:flex-row overflow-hidden"))(
 			DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box bg-gradient-to-r from-info to-error shrink-0"))(),
 			DIV(AttrClass("p-4"))(
-				H1(AttrID("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
-				P(AttrID("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
+				H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
+				P(AttrId("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
 				DIV(AttrClass("mt-2 flex gap-6"))(
 					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" following")),
 					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" followers")),
 				),
-				P(AttrID("PROFILE_CARD_BIO"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
+				P(AttrId("PROFILE_CARD_BIO"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
 			),
 		),
 
@@ -84,12 +84,12 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 				// edit profile
 				BUTTON(
 					AttrClass("btn btn-soft"),
-					AttrOnClick("EDIT_PROFILE_MODAL.showModal()"),
+					AttrOnClick("EDIT_PROFILE_MODAL.show()"),
 				)(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-pen-icon lucide-user-pen"><path d="M11.5 15H7a4 4 0 0 0-4 4v2"/><path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/></svg>`),
 					"edit profile",
 				),
-				DIALOG(AttrID("EDIT_PROFILE_MODAL"), AttrClass("modal"))(
+				DIALOG(AttrId("EDIT_PROFILE_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						EditProfileFrom(EditProfileFromParams{
 							Name:     params.Name,
@@ -104,12 +104,12 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 				// post video
 				BUTTON(
 					AttrClass("btn btn-soft"),
-					AttrOnClick("UPLOAD_VIDEO_MODAL.showModal()"),
+					AttrOnClick("UPLOAD_VIDEO_MODAL.show()"),
 				)(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`),
 					"post a video",
 				),
-				DIALOG(AttrID("UPLOAD_VIDEO_MODAL"), AttrClass("modal"))(
+				DIALOG(AttrId("UPLOAD_VIDEO_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						UploadVideoForm(),
 					),
@@ -141,7 +141,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 	erroredInputClass := "input input-error w-full"
 
 	return FORM(
-		AttrID("EDIT_PROFILE_FORM"),
+		AttrId("EDIT_PROFILE_FORM"),
 		AttrClass("space-y-4"),
 		Attr("hx-put", "/profiles"),
 		Attr("hx-swap", "outerHTML"),
@@ -153,7 +153,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Name"),
 			),
 			INPUT(
-				AttrID("FORM_NAME"),
+				AttrId("FORM_NAME"),
 				AttrClass(IfElse(params.NameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
 				AttrName("name"),
@@ -172,7 +172,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Username"),
 			),
 			INPUT(
-				AttrID("FORM_USERNAME"),
+				AttrId("FORM_USERNAME"),
 				AttrClass(IfElse(params.UsernameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
 				AttrName("username"),
@@ -191,8 +191,8 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Bio"),
 			),
 			TEXTAREA(
-				AttrID("FORM_BIO"),
-				AttrClass("block w-full "+IfElse(params.BioErr == nil, "textarea", "textarea textarea-error")),
+				AttrId("FORM_BIO"),
+				AttrClass("block w-full textarea "+IfElseZero(params.BioErr != nil, "textarea-error")),
 				AttrName("bio"),
 			)(
 				params.Bio,
@@ -243,7 +243,7 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Title"),
 			),
 			INPUT(
-				AttrID("FORM_TITLE"),
+				AttrId("FORM_TITLE"),
 				AttrClass(IfElse(p.TitleErr == nil, "input w-full", "input input-error w-full")),
 				AttrType(TypeText),
 				AttrName("title"),
@@ -262,8 +262,8 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Description"),
 			),
 			TEXTAREA(
-				AttrID("FORM_DESCRIPTION"),
-				AttrClass("block textarea w-full "+IfElse(p.DescriptionErr != nil, "textarea-error", "")),
+				AttrId("FORM_DESCRIPTION"),
+				AttrClass("block w-full textarea"+IfElseZero(p.DescriptionErr != nil, " textarea-error")),
 				AttrName("description"),
 			)(
 				p.Description,
@@ -281,8 +281,8 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Thumbnail"),
 			),
 			INPUT(
-				AttrID("FORM_THUMBNAIL"),
-				AttrClass("file-input w-full "+IfElse(p.ThumbnailErr != nil, "file-input-error", "")),
+				AttrId("FORM_THUMBNAIL"),
+				AttrClass("file-input w-full "+IfElseZero(p.ThumbnailErr != nil, "file-input-error")),
 				AttrType(TypeFile),
 				AttrName("thumbnail"),
 				AttrAccept("image/*"),
@@ -300,8 +300,8 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 				SPAN(AttrClass("label-text"))("Video"),
 			),
 			INPUT(
-				AttrID("FORM_VIDEO"),
-				AttrClass("file-input w-full "+IfElse(p.VideoErr != nil, "file-input-error", "")),
+				AttrId("FORM_VIDEO"),
+				AttrClass("file-input w-full "+IfElseZero(p.VideoErr != nil, "file-input-error")),
 				AttrType(TypeFile),
 				AttrName("video"),
 				AttrAccept("video/*"),
@@ -410,7 +410,7 @@ type appPageButtonParams struct {
 
 func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
-		BUTTON(AttrClass("p-2 btn " + IfElse(params.isActive, "btn-primary", "")))(
+		BUTTON(AttrClass("p-2 btn " + IfElseZero(params.isActive, "btn-primary")))(
 			A(AttrHref(params.link))(RawText(params.icon)),
 		),
 	)

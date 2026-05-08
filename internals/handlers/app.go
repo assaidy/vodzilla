@@ -143,9 +143,9 @@ func HandleEditProfile(c fiber.Ctx) error {
 			Bio:      bio,
 		}),
 
-		hyper.H1(hyper.AttrID("PROFILE_CARD_NAME"), hyper.Attr("hx-swap-oob", "innerHTML"))(name),
-		hyper.P(hyper.AttrID("PROFILE_CARD_USERNAME"), hyper.Attr("hx-swap-oob", "innerHTML"))("@"+username),
-		hyper.P(hyper.AttrID("PROFILE_CARD_BIO"), hyper.Attr("hx-swap-oob", "innerHTML"))(bio),
+		hyper.H1(hyper.AttrId("PROFILE_CARD_NAME"), hyper.Attr("hx-swap-oob", "innerHTML"))(name),
+		hyper.P(hyper.AttrId("PROFILE_CARD_USERNAME"), hyper.Attr("hx-swap-oob", "innerHTML"))("@"+username),
+		hyper.P(hyper.AttrId("PROFILE_CARD_BIO"), hyper.Attr("hx-swap-oob", "innerHTML"))(bio),
 		templates.Alert(templates.AlertInfo, "Profile was updated successfully."),
 	))
 }

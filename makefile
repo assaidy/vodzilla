@@ -13,12 +13,11 @@ clean:
 
 WATCH_CMD = watchexec --ignore-nothing
 watch:
-	@tailwindcss --watch --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css &
-	# @$(WATCH_CMD) -w ./internals/web/tailwind_input.css \
-	# 							-w ./internals/web/assets/js/   -e js \
-	# 							-w ./internals/web/templates/   -e go \
-	# 							-w ./internals/handlers/        -e go \
-	# 							-- tailwindcss --minify -i ./internals/web/tailwind_input.css -o ./internals/web/assets/css/style.css &
+	@$(WATCH_CMD) -w ./internals/web/tailwind/tailwind_input.css \
+								-w ./internals/web/assets/js/   -e js \
+								-w ./internals/web/templates/   -e go \
+								-w ./internals/handlers/        -e go \
+								-- tailwindcss --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css &
 	@$(WATCH_CMD) -w ./internals/services/ -e sql -- sqlc generate &
 	@$(WATCH_CMD) -r --stop-timeout=0        \
 								-w ./internals/      -e go \

@@ -3,7 +3,7 @@ module github.com/assaidy/vodzilla
 go 1.26.1
 
 require (
-	github.com/assaidy/hyper/v2 v2.2.1
+	github.com/assaidy/hyper/v2 v2.3.0
 	github.com/assaidy/workers v1.2.3
 	github.com/charmbracelet/log v1.0.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0

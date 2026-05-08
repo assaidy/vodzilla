@@ -40,7 +40,7 @@ func basicPageLayout(title string, root HyperNode) HyperNode {
 				AttrClass("min-h-screen bg-base-300"),
 				Attr("hx-status:5xx:inherited", "swap:none"),
 			)(
-				DIV(AttrID("ALERT_TOAST"), AttrClass("toast toast-top w-md"))(),
+				DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]"))(),
 				root,
 			),
 		),
@@ -86,7 +86,7 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		t = timeout[0]
 	}
 
-	return DIV(AttrID("ALERT_TOAST"), Attr("hx-swap-oob", "prepend"))(
+	return DIV(AttrId("ALERT_TOAST"), Attr("hx-swap-oob", "prepend"))(
 		DIV(
 			AttrRole("alert"),
 			AttrClass(fmt.Sprintf("alert alert-%s", level)),
