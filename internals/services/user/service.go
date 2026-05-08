@@ -31,6 +31,7 @@ var _ services.Service = (*Service)(nil)
 
 type Service struct {
 	db            *sql.DB
+	queries       *queries.Queries
 	redis         *redis.Client
 	mailer        *mailer.Mailer
 	logger        *slog.Logger
@@ -41,6 +42,7 @@ func New(db *sql.DB, redis *redis.Client, mailer *mailer.Mailer, logger *slog.Lo
 	logger = logger.WithGroup("user service")
 	service := &Service{
 		db:            db,
+		queries:       queries.New(db),
 		redis:         redis,
 		mailer:        mailer,
 		logger:        logger,
@@ -158,7 +160,7 @@ func (me *Service) Register(ctx context.Context, email, password, name, username
 		return fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := queries.New(me.db).WithTx(tx)
+	qtx := me.queries.WithTx(tx)
 
 	if ok, err := qtx.CheckEmail(ctx, email); err != nil {
 		return fmt.Errorf("failed to check email: %w", err)
@@ -210,7 +212,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 		return fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := queries.New(me.db).WithTx(tx)
+	qtx := me.queries.WithTx(tx)
 
 	user, err := qtx.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -251,9 +253,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 }
 
 func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) error {
-	q := queries.New(me.db)
-
-	if n, err := q.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
+	if n, err := me.queries.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
 		return fmt.Errorf("failed to verify email: %w", err)
 	} else if n == 0 {
 		return ErrNotFound
@@ -278,7 +278,7 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := queries.New(me.db).WithTx(tx)
+	qtx := me.queries.WithTx(tx)
 
 	user, err := qtx.GetUserByEmail(ctx, email)
 	if err != nil {
@@ -331,9 +331,7 @@ func generateCryptoRandomHex(nBytes uint) string {
 }
 
 func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, error) {
-	q := queries.New(me.db)
-
-	session, err := q.GetSessionById(ctx, sessionId)
+	session, err := me.queries.GetSessionById(ctx, sessionId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -351,9 +349,7 @@ func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, 
 }
 
 func (me *Service) Logout(ctx context.Context, userId string, sessionId string) error {
-	q := queries.New(me.db)
-
-	if nDeleted, err := q.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
+	if nDeleted, err := me.queries.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
 		SessionId: sessionId,
 		UserId:    userId,
 	}); err != nil {
@@ -366,9 +362,7 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 }
 
 func (me *Service) DeleteAccount(ctx context.Context, userId string) error {
-	q := queries.New(me.db)
-
-	if nDeleted, err := q.DeleteUser(ctx, userId); err != nil {
+	if nDeleted, err := me.queries.DeleteUser(ctx, userId); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	} else if nDeleted == 0 {
 		return ErrNotFound
@@ -386,9 +380,7 @@ type User struct {
 }
 
 func (me *Service) GetUserById(ctx context.Context, userId string) (*User, error) {
-	q := queries.New(me.db)
-
-	user, err := q.GetUserById(ctx, userId)
+	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -406,9 +398,7 @@ func (me *Service) GetUserById(ctx context.Context, userId string) (*User, error
 }
 
 func (me *Service) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	q := queries.New(me.db)
-
-	user, err := q.GetUserByUsername(ctx, username)
+	user, err := me.queries.GetUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -431,7 +421,7 @@ func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio 
 		return fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
-	qtx := queries.New(me.db).WithTx(tx)
+	qtx := me.queries.WithTx(tx)
 
 	user, err := qtx.GetUserById(ctx, userId)
 	if err != nil {
