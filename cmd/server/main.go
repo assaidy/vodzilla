@@ -12,15 +12,15 @@ import (
 	"github.com/assaidy/vodzilla/internals/handlers"
 	"github.com/assaidy/vodzilla/internals/registry"
 	"github.com/assaidy/vodzilla/internals/routes"
-	"github.com/assaidy/vodzilla/internals/services/feed"
-	"github.com/assaidy/vodzilla/internals/services/history"
-	"github.com/assaidy/vodzilla/internals/services/media"
-	"github.com/assaidy/vodzilla/internals/services/moderation"
-	"github.com/assaidy/vodzilla/internals/services/reaction"
-	"github.com/assaidy/vodzilla/internals/services/search"
-	"github.com/assaidy/vodzilla/internals/services/social"
+	feed_service "github.com/assaidy/vodzilla/internals/services/feed"
+	history_service "github.com/assaidy/vodzilla/internals/services/history"
+	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	moderation_service "github.com/assaidy/vodzilla/internals/services/moderation"
+	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
+	search_service "github.com/assaidy/vodzilla/internals/services/search"
+	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
-	"github.com/assaidy/vodzilla/internals/services/video"
+	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/charmbracelet/log"
@@ -41,27 +41,35 @@ func main() {
 		Formatter:       log.TextFormatter,
 		ReportTimestamp: true,
 	}))
-	postgresConnection := utils.ConnectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
-	redisConectionn := utils.ConnectToRedis(utils.MustGetEnv("REDIS_ADDR"))
+	postgres := utils.ConnectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
+	redis := utils.ConnectToRedis(utils.MustGetEnv("REDIS_ADDR"))
 	mailer := mailer.New(
 		utils.MustGetEnv("PAPERCUT_HOST"),
 		utils.MustGetEnv("PAPERCUT_PORT"),
 		utils.MustGetEnv("PAPERCUT_USERNAME"),
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
+	s3 := utils.ConnectToS3(
+		utils.MustGetEnv("RUSTFS_URL"),
+		utils.MustGetEnv("RUSTFS_ACCESS_KEY"),
+		utils.MustGetEnv("RUSTFS_SECRET_KEY"),
+	)
 
 	registry := registry.NewRegistry(logger, app)
 	registry.Inject("logger", logger)
-	registry.Inject("redis", redisConectionn)
-	registry.AddServiceWithInjection(user_service.Name, user_service.New(postgresConnection, redisConectionn, mailer, logger))
-	registry.AddServiceWithInjection(video.Name, video.New())
-	registry.AddServiceWithInjection(media.Name, media.New())
-	registry.AddServiceWithInjection(reaction.Name, reaction.New())
-	registry.AddServiceWithInjection(social.Name, social.New())
-	registry.AddServiceWithInjection(search.Name, search.New())
-	registry.AddServiceWithInjection(feed.Name, feed.New())
-	registry.AddServiceWithInjection(history.Name, history.New())
-	registry.AddServiceWithInjection(moderation.Name, moderation.New())
+	registry.Inject("redis", redis)
+	registry.AddServiceWithInjection(
+		user_service.Name,
+		user_service.New(postgres, redis, s3, mailer, logger),
+	)
+	registry.AddServiceWithInjection(video_service.Name, video_service.New())
+	registry.AddServiceWithInjection(media_service.Name, media_service.New())
+	registry.AddServiceWithInjection(reaction_service.Name, reaction_service.New())
+	registry.AddServiceWithInjection(social_service.Name, social_service.New())
+	registry.AddServiceWithInjection(search_service.Name, search_service.New())
+	registry.AddServiceWithInjection(feed_service.Name, feed_service.New())
+	registry.AddServiceWithInjection(history_service.Name, history_service.New())
+	registry.AddServiceWithInjection(moderation_service.Name, moderation_service.New())
 
 	registry.Start(context.Background())
 	defer registry.Stop(context.Background())

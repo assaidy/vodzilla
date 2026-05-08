@@ -18,6 +18,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/oklog/ulid/v2"
@@ -33,17 +34,19 @@ type Service struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
+	s3            *s3.Client
 	mailer        *mailer.Mailer
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
 	logger = logger.WithGroup("user service")
 	service := &Service{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
+		s3:            s3,
 		mailer:        mailer,
 		logger:        logger,
 		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
