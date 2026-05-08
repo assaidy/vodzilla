@@ -10,16 +10,16 @@ import (
 )
 
 type UserServiceEmailVerificationToken struct {
-	ID        string
-	OwnerID   string
+	Id        string
+	OwnerId   string
 	Token     string
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
 
 type UserServiceSession struct {
-	ID           string
-	OwnerID      string
+	Id           string
+	OwnerId      string
 	SessionToken string
 	CsrfToken    string
 	CreatedAt    time.Time
@@ -27,7 +27,7 @@ type UserServiceSession struct {
 }
 
 type UserServiceUser struct {
-	ID           string
+	Id           string
 	Email        string
 	PasswordHash string
 	Name         string

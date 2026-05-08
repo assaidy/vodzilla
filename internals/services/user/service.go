@@ -172,14 +172,14 @@ func (me *Service) Register(ctx context.Context, email, password, name, username
 		return ErrUsernameConflict
 	}
 
-	userID := ulid.Make().String()
+	userId := ulid.Make().String()
 	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	if err := qtx.InsertUser(ctx, queries.InsertUserParams{
-		ID:           userID,
+		Id:           userId,
 		Email:        email,
 		PasswordHash: string(password_hash),
 		Name:         name,
@@ -220,12 +220,12 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 		return fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	verificationTokenID := ulid.Make().String()
-	verificationToken := fmt.Sprintf("%s_%s", verificationTokenID, generateCryptoRandomHex(32))
+	verificationTokenId := ulid.Make().String()
+	verificationToken := fmt.Sprintf("%s_%s", verificationTokenId, generateCryptoRandomHex(32))
 
 	if err := qtx.InsertEmailVerificationToken(ctx, queries.InsertEmailVerificationTokenParams{
-		ID:        verificationTokenID,
-		OwnerID:   user.ID,
+		Id:        verificationTokenId,
+		OwnerId:   user.Id,
 		Token:     verificationToken,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}); err != nil {
@@ -263,8 +263,8 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) er
 }
 
 type Session struct {
-	ID           string
-	OwnerID      string
+	Id           string
+	OwnerId      string
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -295,16 +295,16 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 		return nil, ErrUnverified
 	}
 
-	sessionID := ulid.Make().String()
+	sessionId := ulid.Make().String()
 	// session id prefix ensures uniqueness
-	sessionToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
-	csrfToken := fmt.Sprintf("%s_%s", sessionID, generateCryptoRandomHex(32))
+	sessionToken := fmt.Sprintf("%s_%s", sessionId, generateCryptoRandomHex(32))
+	csrfToken := fmt.Sprintf("%s_%s", sessionId, generateCryptoRandomHex(32))
 	// Set cookie max-age to 400 days: https://developer.chrome.com/blog/cookie-max-age-expires
 	sessionExpirationDate := time.Now().Add(400 * 24 * time.Hour)
 
 	if err := qtx.InsertSession(ctx, queries.InsertSessionParams{
-		ID:           sessionID,
-		OwnerID:      user.ID,
+		Id:           sessionId,
+		OwnerId:      user.Id,
 		SessionToken: sessionToken,
 		CsrfToken:    csrfToken,
 		ExpiresAt:    sessionExpirationDate,
@@ -317,7 +317,7 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 	}
 
 	return &Session{
-		ID:           sessionID,
+		Id:           sessionId,
 		SessionToken: sessionToken,
 		CsrfToken:    csrfToken,
 		ExpiresAt:    sessionExpirationDate,
@@ -330,10 +330,10 @@ func generateCryptoRandomHex(nBytes uint) string {
 	return hex.EncodeToString(buf)
 }
 
-func (me *Service) GetSession(ctx context.Context, sessionID string) (*Session, error) {
+func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, error) {
 	q := queries.New(me.db)
 
-	session, err := q.GetSessionByID(ctx, sessionID)
+	session, err := q.GetSessionById(ctx, sessionId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -342,20 +342,20 @@ func (me *Service) GetSession(ctx context.Context, sessionID string) (*Session, 
 	}
 
 	return &Session{
-		ID:           session.ID,
-		OwnerID:      session.OwnerID,
+		Id:           session.Id,
+		OwnerId:      session.OwnerId,
 		SessionToken: session.SessionToken,
 		CsrfToken:    session.CsrfToken,
 		ExpiresAt:    session.ExpiresAt,
 	}, nil
 }
 
-func (me *Service) Logout(ctx context.Context, userID string, sessionID string) error {
+func (me *Service) Logout(ctx context.Context, userId string, sessionId string) error {
 	q := queries.New(me.db)
 
 	if nDeleted, err := q.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
-		SessionID: sessionID,
-		UserID:    userID,
+		SessionId: sessionId,
+		UserId:    userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	} else if nDeleted == 0 {
@@ -365,10 +365,10 @@ func (me *Service) Logout(ctx context.Context, userID string, sessionID string) 
 	return nil
 }
 
-func (me *Service) DeleteAccount(ctx context.Context, userID string) error {
+func (me *Service) DeleteAccount(ctx context.Context, userId string) error {
 	q := queries.New(me.db)
 
-	if nDeleted, err := q.DeleteUser(ctx, userID); err != nil {
+	if nDeleted, err := q.DeleteUser(ctx, userId); err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
 	} else if nDeleted == 0 {
 		return ErrNotFound
@@ -378,17 +378,17 @@ func (me *Service) DeleteAccount(ctx context.Context, userID string) error {
 }
 
 type User struct {
-	ID       string
+	Id       string
 	Name     string
 	Username string
 	Email    string
 	Bio      string
 }
 
-func (me *Service) GetUserByID(ctx context.Context, userID string) (*User, error) {
+func (me *Service) GetUserById(ctx context.Context, userId string) (*User, error) {
 	q := queries.New(me.db)
 
-	user, err := q.GetUserByID(ctx, userID)
+	user, err := q.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -397,7 +397,7 @@ func (me *Service) GetUserByID(ctx context.Context, userID string) (*User, error
 	}
 
 	return &User{
-		ID:       user.ID,
+		Id:       user.Id,
 		Name:     user.Name,
 		Username: user.Username,
 		Email:    user.Email,
@@ -417,7 +417,7 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	}
 
 	return &User{
-		ID:       user.ID,
+		Id:       user.Id,
 		Name:     user.Name,
 		Username: user.Username,
 		Email:    user.Email,
@@ -425,7 +425,7 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	}, nil
 }
 
-func (me *Service) EditProfile(ctx context.Context, userID, name, username, bio string) error {
+func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -433,7 +433,7 @@ func (me *Service) EditProfile(ctx context.Context, userID, name, username, bio 
 	defer tx.Rollback()
 	qtx := queries.New(me.db).WithTx(tx)
 
-	user, err := qtx.GetUserByID(ctx, userID)
+	user, err := qtx.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -450,7 +450,7 @@ func (me *Service) EditProfile(ctx context.Context, userID, name, username, bio 
 	}
 
 	if err := qtx.UpdateProfile(ctx, queries.UpdateProfileParams{
-		UserID:   userID,
+		UserId:   userId,
 		Name:     name,
 		Username: username,
 		Bio:      sql.NullString{Valid: true, String: bio},

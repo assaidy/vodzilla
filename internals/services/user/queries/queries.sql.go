@@ -38,12 +38,12 @@ delete from user_service.sessions where id = $1 and owner_id = $2
 `
 
 type DeleteSessionForUserParams struct {
-	SessionID string
-	UserID    string
+	SessionId string
+	UserId    string
 }
 
 func (q *Queries) DeleteSessionForUser(ctx context.Context, arg DeleteSessionForUserParams) (int64, error) {
-	result, err := q.exec(ctx, q.deleteSessionForUserStmt, deleteSessionForUser, arg.SessionID, arg.UserID)
+	result, err := q.exec(ctx, q.deleteSessionForUserStmt, deleteSessionForUser, arg.SessionId, arg.UserId)
 	if err != nil {
 		return 0, err
 	}
@@ -62,16 +62,16 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected()
 }
 
-const getSessionByID = `-- name: GetSessionByID :one
+const getSessionById = `-- name: GetSessionById :one
 select id, owner_id, session_token, csrf_token, created_at, expires_at from user_service.sessions where id = $1
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, id string) (UserServiceSession, error) {
-	row := q.queryRow(ctx, q.getSessionByIDStmt, getSessionByID, id)
+func (q *Queries) GetSessionById(ctx context.Context, id string) (UserServiceSession, error) {
+	row := q.queryRow(ctx, q.getSessionByIdStmt, getSessionById, id)
 	var i UserServiceSession
 	err := row.Scan(
-		&i.ID,
-		&i.OwnerID,
+		&i.Id,
+		&i.OwnerId,
 		&i.SessionToken,
 		&i.CsrfToken,
 		&i.CreatedAt,
@@ -88,7 +88,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 	row := q.queryRow(ctx, q.getUserByEmailStmt, getUserByEmail, email)
 	var i UserServiceUser
 	err := row.Scan(
-		&i.ID,
+		&i.Id,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Name,
@@ -100,15 +100,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 	return i, err
 }
 
-const getUserByID = `-- name: GetUserByID :one
+const getUserById = `-- name: GetUserById :one
 select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where id = $1 for update
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id string) (UserServiceUser, error) {
-	row := q.queryRow(ctx, q.getUserByIDStmt, getUserByID, id)
+func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, error) {
+	row := q.queryRow(ctx, q.getUserByIdStmt, getUserById, id)
 	var i UserServiceUser
 	err := row.Scan(
-		&i.ID,
+		&i.Id,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Name,
@@ -128,7 +128,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserS
 	row := q.queryRow(ctx, q.getUserByUsernameStmt, getUserByUsername, username)
 	var i UserServiceUser
 	err := row.Scan(
-		&i.ID,
+		&i.Id,
 		&i.Email,
 		&i.PasswordHash,
 		&i.Name,
@@ -146,16 +146,16 @@ values ($1, $2, $3, $4)
 `
 
 type InsertEmailVerificationTokenParams struct {
-	ID        string
-	OwnerID   string
+	Id        string
+	OwnerId   string
 	Token     string
 	ExpiresAt time.Time
 }
 
 func (q *Queries) InsertEmailVerificationToken(ctx context.Context, arg InsertEmailVerificationTokenParams) error {
 	_, err := q.exec(ctx, q.insertEmailVerificationTokenStmt, insertEmailVerificationToken,
-		arg.ID,
-		arg.OwnerID,
+		arg.Id,
+		arg.OwnerId,
 		arg.Token,
 		arg.ExpiresAt,
 	)
@@ -168,8 +168,8 @@ values ($1, $2, $3, $4, $5)
 `
 
 type InsertSessionParams struct {
-	ID           string
-	OwnerID      string
+	Id           string
+	OwnerId      string
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -177,8 +177,8 @@ type InsertSessionParams struct {
 
 func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) error {
 	_, err := q.exec(ctx, q.insertSessionStmt, insertSession,
-		arg.ID,
-		arg.OwnerID,
+		arg.Id,
+		arg.OwnerId,
 		arg.SessionToken,
 		arg.CsrfToken,
 		arg.ExpiresAt,
@@ -192,7 +192,7 @@ values ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertUserParams struct {
-	ID           string
+	Id           string
 	Email        string
 	PasswordHash string
 	Name         string
@@ -202,7 +202,7 @@ type InsertUserParams struct {
 
 func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 	_, err := q.exec(ctx, q.insertUserStmt, insertUser,
-		arg.ID,
+		arg.Id,
 		arg.Email,
 		arg.PasswordHash,
 		arg.Name,
@@ -225,7 +225,7 @@ type UpdateProfileParams struct {
 	Name     string
 	Username string
 	Bio      sql.NullString
-	UserID   string
+	UserId   string
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) error {
@@ -233,7 +233,7 @@ func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) er
 		arg.Name,
 		arg.Username,
 		arg.Bio,
-		arg.UserID,
+		arg.UserId,
 	)
 	return err
 }

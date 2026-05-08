@@ -46,7 +46,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 	erroredInputClass := "input input-error w-full"
 
 	return FORM(
-		AttrID("register-form"),
+		AttrID("REGISTER_FORM"),
 		AttrClass("space-y-4"),
 		Attr("hx-post", "/register"),
 		Attr("hx-swap", "outerHTML"),
@@ -54,13 +54,13 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		Attr("hx-disable", "find button"),
 	)(
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("name"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_NAME"))(
 				SPAN(AttrClass("label-text"))("Name"),
 			),
 			INPUT(
+				AttrID("FORM_NAME"),
 				AttrClass(IfElse(p.NameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
-				AttrID("name"),
 				AttrName("name"),
 				AttrValue(p.Name),
 				AttrRequired(true),
@@ -73,13 +73,13 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("username"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_USERNAME"))(
 				SPAN(AttrClass("label-text"))("Username"),
 			),
 			INPUT(
+				AttrID("FORM_USERNAME"),
 				AttrClass(IfElse(p.UsernameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
-				AttrID("username"),
 				AttrName("username"),
 				AttrValue(p.Username),
 				AttrRequired(true),
@@ -92,13 +92,13 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("email"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_EMAIL"))(
 				SPAN(AttrClass("label-text"))("Email"),
 			),
 			INPUT(
+				AttrID("FORM_EMAIL"),
 				AttrClass(IfElse(p.EmailErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeEmail),
-				AttrID("email"),
 				AttrName("email"),
 				AttrValue(p.Email),
 				AttrRequired(true),
@@ -111,13 +111,13 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("password"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_PASSWORD"))(
 				SPAN(AttrClass("label-text"))("Password"),
 			),
 			INPUT(
+				AttrID("FORM_PASSWORD"),
 				AttrClass(IfElse(p.PasswordErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypePassword),
-				AttrID("password"),
 				AttrName("password"),
 				AttrValue(p.Password),
 				AttrRequired(true),
@@ -255,7 +255,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 	erroredInputClass := "input input-error w-full"
 
 	return FORM(
-		AttrID("login-form"),
+		AttrID("LOGIN_FORM"),
 		AttrClass("space-y-4"),
 		Attr("hx-post", "/login"),
 		Attr("hx-swap", "outerHTML"),
@@ -263,13 +263,13 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		Attr("hx-disable", "find button"),
 	)(
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("email"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_EMAIL"))(
 				SPAN(AttrClass("label-text"))("Email"),
 			),
 			INPUT(
+				AttrID("FORM_EMAIL"),
 				AttrClass(IfElse(p.Err != ErrInvalidCredentials, inputClass, erroredInputClass)),
 				AttrType(TypeEmail),
-				AttrID("email"),
 				AttrName("email"),
 				AttrValue(p.Email),
 				AttrRequired(true),
@@ -277,13 +277,13 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("password"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_PASSWORD"))(
 				SPAN(AttrClass("label-text"))("Password"),
 			),
 			INPUT(
+				AttrID("FORM_PASSWORD"),
 				AttrClass(IfElse(p.Err != ErrInvalidCredentials, inputClass, erroredInputClass)),
 				AttrType(TypePassword),
-				AttrID("password"),
 				AttrName("password"),
 				AttrValue(p.Password),
 				AttrRequired(true),

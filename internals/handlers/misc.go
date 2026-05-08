@@ -51,9 +51,9 @@ func HandleCheckHealth(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func WithPassClientIDToLocals(c fiber.Ctx) error {
-	if clientID := c.Get("X-Client-ID"); clientID != "" {
-		c.Locals("client_id", clientID)
+func WithPassClientIdToLocals(c fiber.Ctx) error {
+	if clientId := c.Get("X-Client-ID"); clientId != "" {
+		c.Locals("client_id", clientId)
 	} else {
 		fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
 			Warn("request with not client id", "method", c.Method(), "path", c.Path())
@@ -71,11 +71,11 @@ func WithWebsocketEssentials(c fiber.Ctx) error {
 }
 
 func HandleWebsocket(c *websocket.Conn) {
-	clientID := c.Params("client_id")
+	clientId := c.Params("client_id")
 	app := c.Locals("fiber_app").(*fiber.App)
 
 	sub := fiber.MustGetState[*redis.Client](app.State(), "redis").
-		Subscribe(context.Background(), fmt.Sprintf("ws:%s", clientID))
+		Subscribe(context.Background(), fmt.Sprintf("ws:%s", clientId))
 	defer sub.Close()
 	subChan := sub.Channel()
 
@@ -124,14 +124,14 @@ func render(c fiber.Ctx, node hyper.HyperNode) error {
 }
 
 func renderToWebsocket(c fiber.Ctx, node hyper.HyperNode) error {
-	clientID, ok := c.Locals("client_id").(string)
+	clientId, ok := c.Locals("client_id").(string)
 	if !ok {
 		return fmt.Errorf("couldn't find client id in locals")
 	}
 
 	return hyper.RenderThen(node, func(data []byte) error {
 		return fiber.MustGetState[*redis.Client](c.App().State(), "redis").
-			Publish(c, fmt.Sprintf("ws:%s", clientID), data).Err()
+			Publish(c, fmt.Sprintf("ws:%s", clientId), data).Err()
 	})
 }
 

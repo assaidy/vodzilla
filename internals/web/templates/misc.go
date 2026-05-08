@@ -9,7 +9,7 @@ import (
 )
 
 func basicPageLayout(title string, root HyperNode) HyperNode {
-	clientID := ulid.Make()
+	clientId := ulid.Make()
 
 	return Group(
 		DOCTYPE(),
@@ -34,13 +34,13 @@ func basicPageLayout(title string, root HyperNode) HyperNode {
 							?.map(decodeURIComponent)[1] || null;
 						event.detail.ctx.request.headers['X-Client-ID']  = window.clientId;
 					});
-				`, clientID))),
+				`, clientId))),
 			),
 			BODY(
 				AttrClass("min-h-screen bg-base-300"),
 				Attr("hx-status:5xx:inherited", "swap:none"),
 			)(
-				DIV(AttrID("alert-toast"), AttrClass("toast toast-top w-md"))(),
+				DIV(AttrID("ALERT_TOAST"), AttrClass("toast toast-top w-md"))(),
 				root,
 			),
 		),
@@ -86,7 +86,7 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		t = timeout[0]
 	}
 
-	return DIV(AttrID("alert-toast"), Attr("hx-swap-oob", "prepend"))(
+	return DIV(AttrID("ALERT_TOAST"), Attr("hx-swap-oob", "prepend"))(
 		DIV(
 			AttrRole("alert"),
 			AttrClass(fmt.Sprintf("alert alert-%s", level)),

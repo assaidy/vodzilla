@@ -36,14 +36,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteUserStmt, err = db.PrepareContext(ctx, deleteUser); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteUser: %w", err)
 	}
-	if q.getSessionByIDStmt, err = db.PrepareContext(ctx, getSessionByID); err != nil {
-		return nil, fmt.Errorf("error preparing query GetSessionByID: %w", err)
+	if q.getSessionByIdStmt, err = db.PrepareContext(ctx, getSessionById); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSessionById: %w", err)
 	}
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
 	}
-	if q.getUserByIDStmt, err = db.PrepareContext(ctx, getUserByID); err != nil {
-		return nil, fmt.Errorf("error preparing query GetUserByID: %w", err)
+	if q.getUserByIdStmt, err = db.PrepareContext(ctx, getUserById); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserById: %w", err)
 	}
 	if q.getUserByUsernameStmt, err = db.PrepareContext(ctx, getUserByUsername); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByUsername: %w", err)
@@ -88,9 +88,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deleteUserStmt: %w", cerr)
 		}
 	}
-	if q.getSessionByIDStmt != nil {
-		if cerr := q.getSessionByIDStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getSessionByIDStmt: %w", cerr)
+	if q.getSessionByIdStmt != nil {
+		if cerr := q.getSessionByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionByIdStmt: %w", cerr)
 		}
 	}
 	if q.getUserByEmailStmt != nil {
@@ -98,9 +98,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getUserByEmailStmt: %w", cerr)
 		}
 	}
-	if q.getUserByIDStmt != nil {
-		if cerr := q.getUserByIDStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getUserByIDStmt: %w", cerr)
+	if q.getUserByIdStmt != nil {
+		if cerr := q.getUserByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByIdStmt: %w", cerr)
 		}
 	}
 	if q.getUserByUsernameStmt != nil {
@@ -176,9 +176,9 @@ type Queries struct {
 	checkUsernameStmt                *sql.Stmt
 	deleteSessionForUserStmt         *sql.Stmt
 	deleteUserStmt                   *sql.Stmt
-	getSessionByIDStmt               *sql.Stmt
+	getSessionByIdStmt               *sql.Stmt
 	getUserByEmailStmt               *sql.Stmt
-	getUserByIDStmt                  *sql.Stmt
+	getUserByIdStmt                  *sql.Stmt
 	getUserByUsernameStmt            *sql.Stmt
 	insertEmailVerificationTokenStmt *sql.Stmt
 	insertSessionStmt                *sql.Stmt
@@ -195,9 +195,9 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		checkUsernameStmt:                q.checkUsernameStmt,
 		deleteSessionForUserStmt:         q.deleteSessionForUserStmt,
 		deleteUserStmt:                   q.deleteUserStmt,
-		getSessionByIDStmt:               q.getSessionByIDStmt,
+		getSessionByIdStmt:               q.getSessionByIdStmt,
 		getUserByEmailStmt:               q.getUserByEmailStmt,
-		getUserByIDStmt:                  q.getUserByIDStmt,
+		getUserByIdStmt:                  q.getUserByIdStmt,
 		getUserByUsernameStmt:            q.getUserByUsernameStmt,
 		insertEmailVerificationTokenStmt: q.insertEmailVerificationTokenStmt,
 		insertSessionStmt:                q.insertSessionStmt,

@@ -11,7 +11,7 @@ values ($1, $2, $3, $4, $5, $6);
 -- name: GetUserByEmail :one
 select * from user_service.users where email = $1 for update;
 
--- name: GetUserByID :one
+-- name: GetUserById :one
 select * from user_service.users where id = $1 for update;
 
 -- name: GetUserByUsername :one
@@ -40,7 +40,7 @@ where id in (
   where token = $1 and expires_at > now()
 );
 
--- name: GetSessionByID :one
+-- name: GetSessionById :one
 select * from user_service.sessions where id = $1;
 
 -- name: UpdateProfile :exec

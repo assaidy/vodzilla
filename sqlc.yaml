@@ -1,11 +1,5 @@
 version: "2"
-# overrides:
-#   go:
-#     overrides:
-#       - db_type: "uuid"
-#         go_type:
-#           import: "github.com/oklog/ulid/v2"
-#           type: "ULID"
+
 sql:
   - engine: "postgresql"
     schema: "./internals/services/user/db/migrations/"
@@ -16,3 +10,4 @@ sql:
         out: "./internals/services/user/queries/"
         emit_prepared_queries: true
         emit_empty_slices: true
+        initialisms: []

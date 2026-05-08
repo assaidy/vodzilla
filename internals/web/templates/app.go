@@ -68,13 +68,13 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col lg:flex-row overflow-hidden"))(
 			DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box bg-gradient-to-r from-info to-error shrink-0"))(),
 			DIV(AttrClass("p-4"))(
-				H1(AttrID("profileCardName"), AttrClass("text-2xl font-bold"))(params.Name),
-				P(AttrID("profileCardUsername"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
+				H1(AttrID("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
+				P(AttrID("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
 				DIV(AttrClass("mt-2 flex gap-6"))(
 					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" following")),
 					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" followers")),
 				),
-				P(AttrID("profileCardBio"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
+				P(AttrID("PROFILE_CARD_BIO"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
 			),
 		),
 
@@ -84,12 +84,12 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 				// edit profile
 				BUTTON(
 					AttrClass("btn btn-soft"),
-					AttrOnClick("editProfileModal.showModal()"),
+					AttrOnClick("EDIT_PROFILE_MODAL.showModal()"),
 				)(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-pen-icon lucide-user-pen"><path d="M11.5 15H7a4 4 0 0 0-4 4v2"/><path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/></svg>`),
 					"edit profile",
 				),
-				DIALOG(AttrID("editProfileModal"), AttrClass("modal"))(
+				DIALOG(AttrID("EDIT_PROFILE_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						EditProfileFrom(EditProfileFromParams{
 							Name:     params.Name,
@@ -104,12 +104,12 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 				// post video
 				BUTTON(
 					AttrClass("btn btn-soft"),
-					AttrOnClick("uploadVideoModal.showModal()"),
+					AttrOnClick("UPLOAD_VIDEO_MODAL.showModal()"),
 				)(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`),
 					"post a video",
 				),
-				DIALOG(AttrID("uploadVideoModal"), AttrClass("modal"))(
+				DIALOG(AttrID("UPLOAD_VIDEO_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						UploadVideoForm(),
 					),
@@ -141,7 +141,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 	erroredInputClass := "input input-error w-full"
 
 	return FORM(
-		AttrID("editProfileForm"),
+		AttrID("EDIT_PROFILE_FORM"),
 		AttrClass("space-y-4"),
 		Attr("hx-put", "/profiles"),
 		Attr("hx-swap", "outerHTML"),
@@ -149,13 +149,13 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 		Attr("hx-disable", "find .submit-button"),
 	)(
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("name"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_NAME"))(
 				SPAN(AttrClass("label-text"))("Name"),
 			),
 			INPUT(
+				AttrID("FORM_NAME"),
 				AttrClass(IfElse(params.NameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
-				AttrID("name"),
 				AttrName("name"),
 				AttrValue(params.Name),
 				AttrRequired(true),
@@ -168,13 +168,13 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("username"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_USERNAME"))(
 				SPAN(AttrClass("label-text"))("Username"),
 			),
 			INPUT(
+				AttrID("FORM_USERNAME"),
 				AttrClass(IfElse(params.UsernameErr == nil, inputClass, erroredInputClass)),
 				AttrType(TypeText),
-				AttrID("username"),
 				AttrName("username"),
 				AttrValue(params.Username),
 				AttrRequired(true),
@@ -187,12 +187,12 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("bio"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_BIO"))(
 				SPAN(AttrClass("label-text"))("Bio"),
 			),
 			TEXTAREA(
+				AttrID("FORM_BIO"),
 				AttrClass("block w-full "+IfElse(params.BioErr == nil, "textarea", "textarea textarea-error")),
-				AttrID("bio"),
 				AttrName("bio"),
 			)(
 				params.Bio,
@@ -239,13 +239,13 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 		Attr("hx-disable", "find .submit-button"),
 	)(
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("title"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_TITLE"))(
 				SPAN(AttrClass("label-text"))("Title"),
 			),
 			INPUT(
+				AttrID("FORM_TITLE"),
 				AttrClass(IfElse(p.TitleErr == nil, "input w-full", "input input-error w-full")),
 				AttrType(TypeText),
-				AttrID("title"),
 				AttrName("title"),
 				AttrValue(p.Title),
 				AttrRequired(true),
@@ -258,12 +258,12 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("description"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_DESCRIPTION"))(
 				SPAN(AttrClass("label-text"))("Description"),
 			),
 			TEXTAREA(
+				AttrID("FORM_DESCRIPTION"),
 				AttrClass("block textarea w-full "+IfElse(p.DescriptionErr != nil, "textarea-error", "")),
-				AttrID("description"),
 				AttrName("description"),
 			)(
 				p.Description,
@@ -277,13 +277,13 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 
 		// FIX: do not upload the file; send the metadat only
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("thumbnail"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_THUMBNAIL"))(
 				SPAN(AttrClass("label-text"))("Thumbnail"),
 			),
 			INPUT(
+				AttrID("FORM_THUMBNAIL"),
 				AttrClass("file-input w-full "+IfElse(p.ThumbnailErr != nil, "file-input-error", "")),
 				AttrType(TypeFile),
-				AttrID("thumbnail"),
 				AttrName("thumbnail"),
 				AttrAccept("image/*"),
 			),
@@ -296,13 +296,13 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 
 		// FIX: do not upload the file; send the metadat only
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("video"))(
+			LABEL(AttrClass("label"), AttrFor("FORM_VIDEO"))(
 				SPAN(AttrClass("label-text"))("Video"),
 			),
 			INPUT(
+				AttrID("FORM_VIDEO"),
 				AttrClass("file-input w-full "+IfElse(p.VideoErr != nil, "file-input-error", "")),
 				AttrType(TypeFile),
-				AttrID("video"),
 				AttrName("video"),
 				AttrAccept("video/*"),
 				AttrRequired(true),

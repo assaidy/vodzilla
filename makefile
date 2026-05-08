@@ -11,20 +11,20 @@ run: build
 clean:
 	rm -rf ./bin/
 
-# WATCH_CMD = watchexec --ignore-nothing
-# watch:
-# 	# tailwind watch mode didn't work when i put '&' at the end
-# 	@$(WATCH_CMD) -w ./internals/web/tailwind_input.css \
-# 								-w ./internals/web/public/js/   -e js \
-# 								-w ./internals/web/components/  -e go \
-# 								-w ./internals/handlers/        -e go \
-# 								-- tailwindcss --minify -i ./internals/web/tailwind_input.css -o ./internals/web/public/css/style.css &
-# 	@$(WATCH_CMD) -w ./internals/services/postgres/ -e sql -- sqlc generate &
-# 	@$(WATCH_CMD) -r --stop-timeout=0        \
-# 								-w ./internals/      -e go \
-# 								-w ./cmd/server/     -e go \
-# 								-w ./internals/web/public/ \
-# 								-- "go build -o ./bin/server ./cmd/server/ && ./bin/server"
+WATCH_CMD = watchexec --ignore-nothing
+watch:
+	@tailwindcss --watch --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css &
+	# @$(WATCH_CMD) -w ./internals/web/tailwind_input.css \
+	# 							-w ./internals/web/assets/js/   -e js \
+	# 							-w ./internals/web/templates/   -e go \
+	# 							-w ./internals/handlers/        -e go \
+	# 							-- tailwindcss --minify -i ./internals/web/tailwind_input.css -o ./internals/web/assets/css/style.css &
+	@$(WATCH_CMD) -w ./internals/services/ -e sql -- sqlc generate &
+	@$(WATCH_CMD) -r --stop-timeout=0        \
+								-w ./internals/      -e go \
+								-w ./cmd/server/     -e go \
+								-w ./internals/web/assets/ \
+								-- "go build -o ./bin/server ./cmd/server/ && ./bin/server"
 
 validate-goose-service:
 	@if [ -z "$(service)" ]; then \

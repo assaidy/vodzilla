@@ -89,7 +89,7 @@ func HandleProfilePage(c fiber.Ctx) error {
 		Name:     user.Name,
 		Username: user.Username,
 		Bio:      user.Bio,
-		IsOwner:  user.ID == c.Locals("user_id"),
+		IsOwner:  user.Id == c.Locals("user_id"),
 	}))
 }
 
@@ -116,10 +116,10 @@ func HandleEditProfile(c fiber.Ctx) error {
 		}))
 	}
 
-	userID := c.Locals("user_id").(string)
+	userId := c.Locals("user_id").(string)
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
-	if err := userService.EditProfile(c.RequestCtx(), userID, name, username, bio); err != nil {
+	if err := userService.EditProfile(c.RequestCtx(), userId, name, username, bio); err != nil {
 		switch {
 		case errors.Is(err, fiber.ErrNotFound):
 			return redirect(c, "/login")
@@ -143,18 +143,18 @@ func HandleEditProfile(c fiber.Ctx) error {
 			Bio:      bio,
 		}),
 
-		hyper.H1(hyper.AttrID("profileCardName"), hyper.Attr("hx-swap-oob", "innerHTML"))(name),
-		hyper.P(hyper.AttrID("profileCardUsername"), hyper.Attr("hx-swap-oob", "innerHTML"))("@"+username),
-		hyper.P(hyper.AttrID("profileCardBio"), hyper.Attr("hx-swap-oob", "innerHTML"))(bio),
+		hyper.H1(hyper.AttrID("PROFILE_CARD_NAME"), hyper.Attr("hx-swap-oob", "innerHTML"))(name),
+		hyper.P(hyper.AttrID("PROFILE_CARD_USERNAME"), hyper.Attr("hx-swap-oob", "innerHTML"))("@"+username),
+		hyper.P(hyper.AttrID("PROFILE_CARD_BIO"), hyper.Attr("hx-swap-oob", "innerHTML"))(bio),
 		templates.Alert(templates.AlertInfo, "Profile was updated successfully."),
 	))
 }
 
 func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
-	userID := c.Locals("user_id").(string)
+	userId := c.Locals("user_id").(string)
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
-	user, err := userService.GetUserByID(c.RequestCtx(), userID)
+	user, err := userService.GetUserById(c.RequestCtx(), userId)
 	if err != nil {
 		switch {
 		case errors.Is(err, user_service.ErrNotFound):

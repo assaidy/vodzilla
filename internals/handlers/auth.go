@@ -122,7 +122,7 @@ func HandleLogin(c fiber.Ctx) error {
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session_id",
-		Value:    session.ID,
+		Value:    session.Id,
 		Expires:  session.ExpiresAt,
 		HTTPOnly: true,
 	})
@@ -142,15 +142,15 @@ func HandleLogin(c fiber.Ctx) error {
 }
 
 func WithSession(c fiber.Ctx) error {
-	sessionID := c.Cookies("session_id")
+	sessionId := c.Cookies("session_id")
 	sessionToken := c.Cookies("session_token")
 
-	if sessionID == "" || sessionToken == "" {
+	if sessionId == "" || sessionToken == "" {
 		return redirect(c, "/login")
 	}
 
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	session, err := userService.GetSession(c.RequestCtx(), sessionID)
+	session, err := userService.GetSession(c.RequestCtx(), sessionId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrNotFound) {
 			return redirect(c, "/login")
@@ -161,10 +161,10 @@ func WithSession(c fiber.Ctx) error {
 		return redirect(c, "/login")
 	}
 
-	c.Locals("session_id", session.ID)
+	c.Locals("session_id", session.Id)
 	c.Locals("session_token", session.SessionToken)
 	c.Locals("csrf_token", session.CsrfToken)
-	c.Locals("user_id", session.OwnerID)
+	c.Locals("user_id", session.OwnerId)
 
 	return c.Next()
 }
