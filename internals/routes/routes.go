@@ -37,6 +37,6 @@ func RegisterRoutes(app *fiber.App) {
 	app.Get("/watch_later", handlers.WithSession, handlers.HandleWatchLaterPage)
 	app.Get("/playlists", handlers.WithSession, handlers.HandlePlaylistsPage)
 	app.Get("/notifications", handlers.WithSession, handlers.HandleNotificationsPage)
-	app.Get("/profiles/:username", handlers.WithSession, handlers.HandleProfilePage) // TODO: use  /@username for profile pages instead
+	app.Get("/@:username", handlers.WithSession, handlers.HandleProfilePage)
 	app.Put("/profiles", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleEditProfile)
 }

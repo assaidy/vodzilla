@@ -149,6 +149,8 @@ func (me RegisterValidationErrors) Error() string {
 	return fmt.Sprintf("email: %v, password: %v", me.Email, me.Password)
 }
 
+// TODO: move validation to handlers
+
 func (me *Service) Register(ctx context.Context, email, password, name, username string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	name = strings.TrimSpace(name)

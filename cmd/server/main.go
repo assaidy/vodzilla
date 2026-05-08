@@ -28,8 +28,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: put all config in a package?
-
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Vodzilla",

@@ -12,8 +12,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// TODO: move form validation to handlers
-
 func HandleRegisterPage(c fiber.Ctx) error {
 	return render(c, templates.RegisterPage())
 }

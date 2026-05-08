@@ -135,7 +135,7 @@ func HandleEditProfile(c fiber.Ctx) error {
 		}
 	}
 
-	c.Set("HX-Replace-Url", fmt.Sprintf("/profiles/%s", username))
+	c.Set("HX-Replace-Url", fmt.Sprintf("/@%s", username))
 	return render(c, hyper.Group(
 		templates.EditProfileFrom(templates.EditProfileFromParams{
 			Name:     name,
