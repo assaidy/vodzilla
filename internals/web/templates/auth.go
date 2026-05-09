@@ -8,7 +8,7 @@ var registerPageCache NodeCache
 
 func RegisterPage() HyperNode {
 	return Cache(&registerPageCache,
-		basicPageLayout("Register", Group(
+		basicPageLayout(basicLayoutParams{title: "Register"})(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
@@ -21,7 +21,7 @@ func RegisterPage() HyperNode {
 					),
 				),
 			),
-		)),
+		),
 	)
 }
 
@@ -145,7 +145,7 @@ var verificationEmailSentPageCache NodeCache
 
 func VerificationEmailSentPage() HyperNode {
 	return Cache(&verificationEmailSentPageCache,
-		basicPageLayout("Verification Email Sent", Group(
+		basicPageLayout(basicLayoutParams{title: "Verification Email Sent"})(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -159,7 +159,7 @@ func VerificationEmailSentPage() HyperNode {
 					),
 				),
 			),
-		)),
+		),
 	)
 }
 
@@ -167,7 +167,7 @@ var emailVerifiedPageCache NodeCache
 
 func EmailVerifiedPage() HyperNode {
 	return Cache(&emailVerifiedPageCache,
-		basicPageLayout("Email Verified", Group(
+		basicPageLayout(basicLayoutParams{title: "Email Verified"})(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -184,7 +184,7 @@ func EmailVerifiedPage() HyperNode {
 					),
 				),
 			),
-		)),
+		),
 	)
 }
 
@@ -192,7 +192,7 @@ var invalidVerificationLinkPageCache NodeCache
 
 func InvalidVerificationLinkPage() HyperNode {
 	return Cache(&invalidVerificationLinkPageCache,
-		basicPageLayout("Invalid Verification Link", Group(
+		basicPageLayout(basicLayoutParams{title: "Invalid Verification Link"})(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -206,7 +206,7 @@ func InvalidVerificationLinkPage() HyperNode {
 					),
 				),
 			),
-		)),
+		),
 	)
 }
 
@@ -214,7 +214,7 @@ var loginPageCache NodeCache
 
 func LoginPage() HyperNode {
 	return Cache(&loginPageCache,
-		basicPageLayout("Login", Group(
+		basicPageLayout(basicLayoutParams{title: "Login"})(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
@@ -227,7 +227,7 @@ func LoginPage() HyperNode {
 					),
 				),
 			),
-		)),
+		),
 	)
 }
 

@@ -41,16 +41,16 @@ func main() {
 	}))
 	postgres := utils.ConnectToPostgres(utils.MustGetEnv("POSTGRES_URL"))
 	redis := utils.ConnectToRedis(utils.MustGetEnv("REDIS_ADDR"))
+	s3 := utils.ConnectToS3(
+		utils.MustGetEnv("RUSTFS_URL"),
+		utils.MustGetEnv("RUSTFS_ACCESS_KEY"),
+		utils.MustGetEnv("RUSTFS_SECRET_KEY"),
+	)
 	mailer := mailer.New(
 		utils.MustGetEnv("PAPERCUT_HOST"),
 		utils.MustGetEnv("PAPERCUT_PORT"),
 		utils.MustGetEnv("PAPERCUT_USERNAME"),
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
-	)
-	s3 := utils.ConnectToS3(
-		utils.MustGetEnv("RUSTFS_URL"),
-		utils.MustGetEnv("RUSTFS_ACCESS_KEY"),
-		utils.MustGetEnv("RUSTFS_SECRET_KEY"),
 	)
 
 	registry := registry.NewRegistry(logger, app)

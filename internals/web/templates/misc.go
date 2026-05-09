@@ -8,22 +8,27 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func basicPageLayout(title string, root HyperNode) HyperNode {
+type basicLayoutParams struct {
+	title string
+}
+
+func basicPageLayout(params basicLayoutParams) ElementBuilder {
 	clientId := ulid.Make()
 
-	return Group(
-		DOCTYPE(),
-		HTML(AttrLang("en"))(
-			HEAD()(
-				META(AttrCharset("UTF-8")),
-				META(AttrName("viewport"), AttrContent("width=device-width, initial-scale=1.0")),
-				TITLE()(title),
-				LINK(AttrRel("preconnect"), AttrHref("https://fonts.googleapis.com")),
-				LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
-				LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
-				LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
-				SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
-				SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
+	return func(children ...any) Element {
+		return Group(
+			DOCTYPE(),
+			HTML(AttrLang("en"))(
+				HEAD()(
+					META(AttrCharset("UTF-8")),
+					META(AttrName("viewport"), AttrContent("width=device-width, initial-scale=1.0")),
+					TITLE()(params.title),
+					LINK(AttrRel("preconnect"), AttrHref("https://fonts.googleapis.com")),
+					LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
+					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
+					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
+					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
+					SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
 					window.clientId = '%s';
 
 					htmx.on('htmx:config:request', (event) => {
@@ -35,16 +40,17 @@ func basicPageLayout(title string, root HyperNode) HyperNode {
 						event.detail.ctx.request.headers['X-Client-ID']  = window.clientId;
 					});
 				`, clientId))),
+				),
+				BODY(
+					AttrClass("min-h-screen bg-base-300"),
+					Attr("hx-status:5xx:inherited", "swap:none"),
+				)(
+					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]"))(),
+					Group(children...),
+				),
 			),
-			BODY(
-				AttrClass("min-h-screen bg-base-300"),
-				Attr("hx-status:5xx:inherited", "swap:none"),
-			)(
-				DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]"))(),
-				root,
-			),
-		),
-	)
+		).(Element)
+	}
 }
 
 func spinner() HyperNode {
