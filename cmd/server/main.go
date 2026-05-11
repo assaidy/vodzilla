@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/assaidy/vodzilla/internals/handlers"
 	"github.com/assaidy/vodzilla/internals/registry"
 	"github.com/assaidy/vodzilla/internals/routes"
 	feed_service "github.com/assaidy/vodzilla/internals/services/feed"
@@ -31,7 +30,7 @@ import (
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Vodzilla",
-		ErrorHandler: handlers.ErrorHandler,
+		ErrorHandler: nil, // overriden in logger middelware
 	})
 	routes.RegisterRoutes(app)
 
@@ -53,12 +52,12 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	registry := registry.NewRegistry(logger, app)
-	registry.Inject("logger", logger)
+	registry := registry.NewRegistry(logger.WithGroup("registry"), app)
+	registry.Inject("logger", logger.WithGroup("handler"))
 	registry.Inject("redis", redis)
 	registry.AddServiceWithInjection(
 		user_service.Name,
-		user_service.New(postgres, redis, s3, mailer, logger),
+		user_service.New(postgres, redis, s3, mailer, logger.WithGroup("user service")),
 	)
 	registry.AddServiceWithInjection(video_service.Name, video_service.New())
 	registry.AddServiceWithInjection(media_service.Name, media_service.New())

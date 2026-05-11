@@ -12,7 +12,7 @@ type basicLayoutParams struct {
 	title string
 }
 
-func basicPageLayout(params basicLayoutParams) ElementBuilder {
+func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 	clientId := ulid.Make()
 
 	return func(children ...any) Element {

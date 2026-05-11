@@ -19,7 +19,7 @@ type Registry struct {
 
 func NewRegistry(logger *slog.Logger, app *fiber.App) *Registry {
 	return &Registry{
-		logger:          logger.WithGroup("registry"),
+		logger:          logger,
 		app:             app,
 		services:        make(map[string]services.Service),
 		startedServices: make(map[string]services.Service),

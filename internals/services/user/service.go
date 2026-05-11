@@ -41,7 +41,6 @@ type Service struct {
 }
 
 func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
-	logger = logger.WithGroup("user service")
 	service := &Service{
 		db:            db,
 		queries:       queries.New(db),

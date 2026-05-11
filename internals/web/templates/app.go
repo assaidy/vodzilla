@@ -4,8 +4,6 @@ import (
 	. "github.com/assaidy/hyper/v2"
 )
 
-// TODO: use hyper.ElementBuilder in all layouts
-
 func FeedPage(profile NavbarProfile) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		currentPage: PageFeed,
@@ -222,7 +220,6 @@ type UploadVideoFormParams struct {
 	TitleErr       error
 	Description    string
 	DescriptionErr error
-	ThumbnailErr   error
 	VideoErr       error
 }
 
@@ -233,6 +230,7 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 	}
 
 	return FORM(
+		AttrId("UPLOAD_VIDEO_FORM"),
 		AttrClass("space-y-4"),
 		Attr("hx-post", "/videos"),
 		Attr("hx-swap", "outerHTML"),
@@ -307,6 +305,24 @@ func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
 	)
 }
 
+type VideoUploaderParams struct {
+	UploadUrl string
+	ObjectKey string
+}
+
+func VideoUploader(params VideoUploaderParams) HyperNode {
+	// TODO: start with the backend first
+	//
+	// this will replace the #UPLOAD_VIDEO_FORM
+	// it will upload the video immediatly after load
+	// after uploading it will issue a request to server to commit the upload using the ETag from the uploading response
+	// it will send it to a route with the object key as parameter
+	// then close the dialog modal
+	// a ws connection will publish the video to all sessions
+	// to insert if in the profile page (it will use an htmx oob swap with the posts container id)
+	return nil
+}
+
 type appPageLayoutParams struct {
 	currentPage AppPageKind
 	profile     NavbarProfile
@@ -316,7 +332,7 @@ type NavbarProfile struct {
 	Username string
 }
 
-func appPageLayout(params appPageLayoutParams) ElementBuilder {
+func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 	return func(children ...any) Element {
 		return basicPageLayout(basicLayoutParams{title: "Vidzilla"})(
 			DIV(AttrClass("flex flex-col min-h-screen"))(

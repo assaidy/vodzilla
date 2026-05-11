@@ -14,24 +14,12 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func ErrorHandler(c fiber.Ctx, err error) error {
-	code := fiber.StatusInternalServerError
-	if e, ok := errors.AsType[*fiber.Error](err); ok {
-		code = e.Code
-	}
-	c.Status(code)
-
-	if code == fiber.StatusInternalServerError {
-		// Hide internal error from client; It has been logged by [WithLogging].
-		return render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
-	}
-
-	return c.SendString(err.Error())
-}
-
 func WithLogging(c fiber.Ctx) error {
 	start := time.Now()
 	err := c.Next()
+	if err != nil {
+		errorHandler(c, err)
+	}
 	took := time.Since(start)
 
 	fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
@@ -44,7 +32,22 @@ func WithLogging(c fiber.Ctx) error {
 			"error", err,
 		)
 
-	return err
+	return nil
+}
+
+func errorHandler(c fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+	if e, ok := errors.AsType[*fiber.Error](err); ok {
+		code = e.Code
+	}
+	c.Status(code)
+
+	if code == fiber.StatusInternalServerError {
+		// Hide internal error from client; It has been catched by [WithLogging].
+		return render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
+	}
+
+	return c.SendString(err.Error())
 }
 
 func HandleCheckHealth(c fiber.Ctx) error {
