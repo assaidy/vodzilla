@@ -31,12 +31,13 @@ const Name = "user"
 var _ services.Service = (*Service)(nil)
 
 type Service struct {
-	db            *sql.DB
-	queries       *queries.Queries
-	redis         *redis.Client
-	s3            *s3.Client
-	mailer        *mailer.Mailer
-	logger        *slog.Logger
+	db      *sql.DB
+	queries *queries.Queries
+	redis   *redis.Client
+	s3      *s3.Client
+	mailer  *mailer.Mailer
+	logger  *slog.Logger
+	// TODO: implement workers manully; keep workers package for cron jobs only
 	workerManager *workers.WorkerManager
 }
 

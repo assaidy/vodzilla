@@ -277,7 +277,7 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 					Group(children...),
 				),
 				videoUploadersContainer(),
-				uploadIndicator(),
+				videoUploadIndicator(),
 			),
 		)
 	}

@@ -48,5 +48,5 @@ func RegisterRoutes(app *fiber.App) {
 	// TODO: edit account: email, password, delete account
 
 	app.Post("/videos", handlers.WithSession, handlers.WithCsrfToken, handlers.HandlePostVideo)
-	app.Post("/videos/:video_id/complete_uplaod", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleCompleteVideoUpload)
+	app.Post("/videos/complete_upload", handlers.WithSession, handlers.HandleCompleteVideoUpload)
 }

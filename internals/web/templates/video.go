@@ -38,10 +38,10 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
 		Attr("hx-on::before:request", fmt.Sprintf(`
-			window._pendingVideos[%q] = FORM_VIDEO.files[0].file;
+			window._pendingVideos[%q] = FORM_VIDEO.files[0];
 		`, pendingVideoId)),
 		Attr("hx-on::after:request", fmt.Sprintf(`
-			if (!event.detail.ctx.response.ok) delete window._pendingVideos[%q];
+			if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q];
 		`, pendingVideoId)),
 	)(
 		DIV(AttrClass("fieldset"))(
@@ -121,10 +121,11 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 
 type VideoUploaderParams struct {
 	PendingVideoId string
-	VideoId        string
-	UploadId       string
-	UploadUrls     []string
 	VideoTitle     string
+	ObjectKey      string
+	UploadId       string
+	PartSize       int64
+	UploadUrls     []string
 }
 
 func VideoUploader(params VideoUploaderParams) HyperNode {
@@ -132,83 +133,46 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 
 	return SCRIPT()(RawText(fmt.Sprintf(`
 		(async () => {
+			const script = document.currentScript;
 			const pendingVideoId = %q;
-			const videoId = %q;
 			const videoTitle = %q;
+			const objectKey = %q;
 			const uploadId = %q;
+			const partSize = %d;
 			const uploadUrls = %s;
-			const completeUploadUrl = %q;
-
-			window._videoUploadManager.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
 
 			try {
-				const file = window._pendingVideos[pendingVideoId];
-				if (!file) {
-					throw new Error("pending video not found");
-				}
-
-				const chunkSize = Math.ceil(file.size / uploadUrls.length);
-				const completedParts = [];
-
-				const uploads = uploadUrls.map(async (url, i) => {
-					const start = i * chunkSize;
-					const end = i === uploadUrls.length - 1
-						? file.size
-						: start + chunkSize;
-					const blob = file.slice(start, end);
-
-					const response = await fetch(url, {
-						method: 'PUT',
-						body: blob,
-					});
-
-					if (!response.ok) {
-						throw new Error("upload failed");
-					}
-
-					completedParts.push({
-						etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
-						partNumber: i + 1,
-					});
-
-					window._videoUploadManager.markChunkComplete(pendingVideoId);
+				await window._videoUploadManager.upload({
+					pendingVideoId,
+					videoTitle,
+					objectKey,
+					uploadId,
+					partSize,
+					uploadUrls,
+					completeUploadUrl: "/videos/complete_upload",
 				});
-
-				await Promise.all(uploads);
-
-				await fetch(
-					completeUploadUrl,
-					{
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							uploadId,
-							parts: completedParts,
-						}),
-					},
-				);
-
-				delete window._pendingVideos[pendingVideoId];
 			} catch (err) {
 				console.error(err);
 				window._videoUploadManager.removeUpload(pendingVideoId);
 			} finally {
-				document.currentScript.remove();
+				script.remove();
 			}
 		})();
 	`,
 		params.PendingVideoId,
-		params.VideoId,
 		params.VideoTitle,
+		params.ObjectKey,
 		params.UploadId,
+		params.PartSize,
 		string(encodedUrls),
-		fmt.Sprintf("/videos/%s/complete_upload", params.VideoId),
 	)))
 }
 
 func videoUploadersContainer() HyperNode {
 	return DIV(AttrId("VIDEO_UPLOADERS_CONTAINER"))(
 		SCRIPT()(RawText(`
+			window._pendingVideos = {};
+
 			window._videoUploadManager = {
 				_uploads: {},
 				addUpload(id, title, totalChunks) {
@@ -228,18 +192,51 @@ func videoUploadersContainer() HyperNode {
 				},
 				_updateIndicator() {
 					const count = Object.keys(this._uploads).length;
-					UPLOAD_INDICATOR_COUNT?.textContent = count;
-					UPLOAD_INDICATOR?.classList.toggle('hidden', count === 0);
-				}
+					UPLOAD_INDICATOR_COUNT.textContent = count;
+					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0);
+				},
+			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, objectKey, uploadId, completeUploadUrl }) {
+					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
+
+					const file = window._pendingVideos[pendingVideoId];
+					if (!file) throw new Error("pending video not found");
+
+					const completedParts = [];
+					const uploads = uploadUrls.map(async (url, i) => {
+					 	const start = i * partSize;
+					 	const end = i === uploadUrls.length - 1 ? file.size : start + partSize;
+					 	const blob = file.slice(start, end);
+
+					 	const response = await fetch(url, { method: 'PUT', body: blob });
+					 	if (!response.ok) throw new Error("upload failed");
+
+					 	completedParts.push({
+					 	 	etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
+					 	 	partNumber: i + 1,
+					 	});
+
+					 	this.markChunkComplete(pendingVideoId);
+					});
+
+					await Promise.all(uploads);
+
+					await fetch(completeUploadUrl, {
+					 	method: 'POST',
+					 	headers: { 'Content-Type': 'application/json' },
+					 	body: JSON.stringify({ objectKey, uploadId, parts: completedParts }),
+					});
+
+					delete window._pendingVideos[pendingVideoId];
+			 	}
 			};
 	`)),
 	)
 }
 
-func uploadIndicator() HyperNode {
+func videoUploadIndicator() HyperNode {
 	return DIV(
 		AttrId("UPLOAD_INDICATOR"),
-		AttrClass("fixed bottom-6 right-6 z-50"),
+		AttrClass("hidden fixed bottom-6 right-6 z-50"),
 	)(
 		DIV(AttrClass("indicator"))(
 			BUTTON(AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"))(

@@ -63,8 +63,9 @@ func HandlePostVideo(c fiber.Ctx) error {
 		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
-				VideoId:        createVideoResult.VideoId,
+				ObjectKey:      createVideoResult.ObjectKey,
 				UploadId:       presignedUpload.UploadId,
+				PartSize:       presignedUpload.PartSize,
 				UploadUrls:     presignedUpload.Urls,
 				VideoTitle:     title,
 			}),
@@ -73,5 +74,34 @@ func HandlePostVideo(c fiber.Ctx) error {
 }
 
 func HandleCompleteVideoUpload(c fiber.Ctx) error {
-	panic("unimplemented")
+	var request struct {
+		ObjectKey string `json:"objectKey"`
+		UploadId  string `json:"uploadId"`
+		Parts     []struct {
+			ETag       string `json:"etag"`
+			PartNumber int    `json:"partNumber"`
+		} `json:"parts"`
+	}
+
+	if err := c.Bind().Body(&request); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+	}
+
+	parts := make([]media_service.CompleteUploadPart, 0, len(request.Parts))
+	for _, p := range request.Parts {
+		parts = append(parts, media_service.CompleteUploadPart{
+			ETag:       p.ETag,
+			PartNumber: p.PartNumber,
+		})
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	if err := mediaService.CompleteUpload(c.RequestCtx(), request.UploadId, request.ObjectKey, parts); err != nil {
+		if errors.Is(err, media_service.ErrInvalidCompleteUploadData) {
+			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
+		}
+		return err
+	}
+
+	return nil
 }

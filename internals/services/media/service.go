@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 )
 
 const Name = "media"
@@ -46,6 +48,7 @@ const (
 
 type PresignedUpload struct {
 	UploadId string
+	PartSize int64
 	Urls     []string
 }
 
@@ -89,12 +92,13 @@ func (me *Service) GeneratePresignedPutUrls(ctx context.Context, objectKey, cont
 	return &PresignedUpload{
 		UploadId: uploadId,
 		Urls:     urls,
+		PartSize: partSize,
 	}, nil
 }
 
 type CompleteUploadPart struct {
-	PartNumber int32
 	ETag       string
+	PartNumber int
 }
 
 func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKey string, parts []CompleteUploadPart) error {
@@ -102,7 +106,7 @@ func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKe
 	for _, part := range parts {
 		completedParts = append(completedParts, types.CompletedPart{
 			ETag:       aws.String(part.ETag),
-			PartNumber: aws.Int32(part.PartNumber),
+			PartNumber: aws.Int32(int32(part.PartNumber)),
 		})
 	}
 
@@ -122,7 +126,10 @@ func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKe
 			},
 		},
 	); err != nil {
-		return fmt.Errorf("faield to complete multipart upload: %w", err)
+		if e, ok := errors.AsType[smithy.APIError](err); ok {
+			return fmt.Errorf("%w: %w", ErrInvalidCompleteUploadData, e)
+		}
+		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
 	// TODO: publish video_uploaded event so video service can change video status
