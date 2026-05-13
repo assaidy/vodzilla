@@ -193,7 +193,26 @@ func videoUploadersContainer() HyperNode {
 				_updateIndicator() {
 					const count = Object.keys(this._uploads).length;
 					UPLOAD_INDICATOR_COUNT.textContent = count;
+					this._renderUploadList();
 					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0);
+				},
+				_renderUploadList() {
+						const entries = Object.entries(this._uploads);
+						if (entries.length === 0) {
+								UPLOAD_LIST_DIALOG.close();
+								return;
+						}
+						let html = '';
+						for (const [, u] of entries) {
+								html += '<div class="flex flex-col gap-1 py-2">'
+										 +  '<div class="flex justify-between text-sm">'
+										 +  '<span class="truncate">' + u.title + '</span>'
+										 +  '<span class="shrink-0">' + u.completedChunks + '/' + u.totalChunks + '</span>'
+										 +  '</div>'
+										 +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
+										 +  '</div>';
+						}
+						UPLOAD_LIST_BODY.innerHTML = html;
 				},
 			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, objectKey, uploadId, completeUploadUrl }) {
 					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
@@ -215,7 +234,7 @@ func videoUploadersContainer() HyperNode {
 					 	 	partNumber: i + 1,
 					 	});
 
-					 	this.markChunkComplete(pendingVideoId);
+						this.markChunkComplete(pendingVideoId);
 					});
 
 					await Promise.all(uploads);
@@ -239,10 +258,22 @@ func videoUploadIndicator() HyperNode {
 		AttrClass("hidden fixed bottom-6 right-6 z-50"),
 	)(
 		DIV(AttrClass("indicator"))(
-			BUTTON(AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"))(
+			BUTTON(
+				AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"),
+				AttrOnClick("UPLOAD_LIST_DIALOG.showModal()"),
+			)(
 				RawText(`<svg class="w-5 h-5 animate-bounce" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-from-line-icon lucide-arrow-up-from-line"><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>`),
 			),
 			SPAN(AttrId("UPLOAD_INDICATOR_COUNT"), AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"))("0"),
+		),
+		DIALOG(AttrId("UPLOAD_LIST_DIALOG"), AttrClass("modal"))(
+			DIV(AttrClass("modal-box"))(
+				H3(AttrClass("text-lg font-bold"))("Uploading Videos"),
+				DIV(AttrId("UPLOAD_LIST_BODY"), AttrClass("mt-4 space-y-2"))(),
+			),
+			FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
+				BUTTON()("close"),
+			),
 		),
 	)
 }
