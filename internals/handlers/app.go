@@ -23,9 +23,25 @@ func HandleFeedPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.FeedPage(templates.NavbarProfile{
-		Username: user.Username,
-	}))
+	return render(c, templates.FeedPage(user.Username))
+}
+
+func HandleFeedPageContent(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.FeedPageContent(),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    user.Username,
+				CurrentPage: templates.PageFeed,
+			}),
+		),
+	))
 }
 
 func HandleDiscoverPage(c fiber.Ctx) error {
@@ -34,9 +50,25 @@ func HandleDiscoverPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.DiscoverPage(templates.NavbarProfile{
-		Username: user.Username,
-	}))
+	return render(c, templates.DiscoverPage(user.Username))
+}
+
+func HandleDiscoverPageContent(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.DiscoverPageContent(),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    user.Username,
+				CurrentPage: templates.PageDiscover,
+			}),
+		),
+	))
 }
 
 func HandleWatchLaterPage(c fiber.Ctx) error {
@@ -45,9 +77,25 @@ func HandleWatchLaterPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.WatchLaterPage(templates.NavbarProfile{
-		Username: user.Username,
-	}))
+	return render(c, templates.WatchLaterPage(user.Username))
+}
+
+func HandleWatchLaterPageContent(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.WatchLaterPageContent(),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    user.Username,
+				CurrentPage: templates.PageWatchLater,
+			}),
+		),
+	))
 }
 
 func HandlePlaylistsPage(c fiber.Ctx) error {
@@ -56,9 +104,25 @@ func HandlePlaylistsPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.PlaylistsPage(templates.NavbarProfile{
-		Username: user.Username,
-	}))
+	return render(c, templates.PlaylistsPage(user.Username))
+}
+
+func HandlePlaylistsPageContent(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.PlaylistsPageContent(),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    user.Username,
+				CurrentPage: templates.PagePlaylists,
+			}),
+		),
+	))
 }
 
 func HandleNotificationsPage(c fiber.Ctx) error {
@@ -67,30 +131,80 @@ func HandleNotificationsPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.NotificationsPage(templates.NavbarProfile{
-		Username: user.Username,
-	}))
+	return render(c, templates.NotificationsPage(user.Username))
+}
+
+func HandleNotificationsPageContent(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.NotificationsPageContent(),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    user.Username,
+				CurrentPage: templates.PageNotifications,
+			}),
+		),
+	))
 }
 
 func HandleProfilePage(c fiber.Ctx) error {
+	user, currentUser, err := getProfileUserAndCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, templates.ProfilePage(templates.ProfilePageContentParams{
+		Username: user.Username,
+		Name:     user.Name,
+		Bio:      user.Bio,
+		IsOwner:  user.Username == currentUser.Username,
+	}))
+}
+
+func HandleProfilePageContent(c fiber.Ctx) error {
+	user, currentUser, err := getProfileUserAndCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.ProfilePageContent(templates.ProfilePageContentParams{
+			Username: user.Username,
+			Name:     user.Name,
+			Bio:      user.Bio,
+			IsOwner:  user.Username == currentUser.Username,
+		}),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    currentUser.Username,
+				CurrentPage: templates.PageProfile,
+			}),
+		),
+	))
+}
+
+func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	user, err := userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
 	if err != nil {
 		if errors.Is(err, user_service.ErrNotFound) {
-			return fiber.ErrNotFound
+			return nil, nil, fiber.ErrNotFound
 		}
-		return err
+		return nil, nil, fmt.Errorf("failed to get profile user: %w", err)
 	}
 
-	return render(c, templates.ProfilePage(templates.ProfilePageParams{
-		NavbarProfile: templates.NavbarProfile{
-			Username: user.Username,
-		},
-		Name:     user.Name,
-		Username: user.Username,
-		Bio:      user.Bio,
-		IsOwner:  user.Id == c.Locals("user_id"),
-	}))
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	return user, currentUser, nil
 }
 
 var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
@@ -156,12 +270,10 @@ func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 
 	user, err := userService.GetUserById(c.RequestCtx(), userId)
 	if err != nil {
-		switch {
-		case errors.Is(err, user_service.ErrNotFound):
+		if errors.Is(err, user_service.ErrNotFound) {
 			return nil, redirect(c, "/login")
-		default:
-			return nil, err
 		}
+		return nil, err
 	}
 
 	return user, nil

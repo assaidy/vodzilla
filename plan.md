@@ -128,7 +128,7 @@ A staged, event-driven backend using schema-per-service architecture.
 
 * [ ] Events:
 
-  * [ ] video_created
+  * [ ] ~video_created~
   * [ ] video_deleted
 
 ---
@@ -139,8 +139,8 @@ A staged, event-driven backend using schema-per-service architecture.
 
   ```go
   type MediaService interface {
-      GenerateUploadURL(videoID string) (string, error)
-      ProcessVideo(videoID string, sourceURL string) error
+      GenerateUploadUrls(videoID string, input GenerateUploadURLsInput) (string, error)
+      ConfirmUpload(videoID string, input ConfirmUploadInput) error
   }
   ```
 
@@ -153,6 +153,7 @@ A staged, event-driven backend using schema-per-service architecture.
 * [ ] Events:
 
   * [ ] video_uploaded
+  * [ ] video_processing_started
   * [ ] video_processed
 
 ---
@@ -196,7 +197,7 @@ A staged, event-driven backend using schema-per-service architecture.
 
 * [ ] Schema:
 
-  * [ ] reactions
+  * [ ] reactions (watch/like/dislike counts)
   * [ ] comments
   * [ ] watch_later
 

@@ -59,8 +59,14 @@ func main() {
 		user_service.Name,
 		user_service.New(postgres, redis, s3, mailer, logger.WithGroup("user service")),
 	)
-	registry.AddServiceWithInjection(video_service.Name, video_service.New())
-	registry.AddServiceWithInjection(media_service.Name, media_service.New())
+	registry.AddServiceWithInjection(
+		video_service.Name,
+		video_service.New(postgres, logger.WithGroup("video service")),
+	)
+	registry.AddServiceWithInjection(
+		media_service.Name,
+		media_service.New(postgres, s3, logger.WithGroup("media service")),
+	)
 	registry.AddServiceWithInjection(reaction_service.Name, reaction_service.New())
 	registry.AddServiceWithInjection(social_service.Name, social_service.New())
 	registry.AddServiceWithInjection(search_service.Name, search_service.New())

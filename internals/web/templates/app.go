@@ -1,67 +1,116 @@
 package templates
 
 import (
+	"fmt"
+
 	. "github.com/assaidy/hyper/v2"
 )
 
-func FeedPage(profile NavbarProfile) HyperNode {
+func FeedPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
-		currentPage: PageFeed,
-		profile:     profile,
+		navbarParams: NavbarParams{
+			CurrentPage: PageFeed,
+			Username:    username,
+		},
 	})(
+		FeedPageContent(),
+	)
+}
+
+func FeedPageContent() HyperNode {
+	return Group(
 		"Feed Page",
 	)
 }
 
-func DiscoverPage(profile NavbarProfile) HyperNode {
+func DiscoverPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
-		currentPage: PageDiscover,
-		profile:     profile,
+		navbarParams: NavbarParams{
+			CurrentPage: PageDiscover,
+			Username:    username,
+		},
 	})(
+		DiscoverPageContent(),
+	)
+}
+
+func DiscoverPageContent() HyperNode {
+	return Group(
 		"Discover Page",
 	)
 }
 
-func WatchLaterPage(profile NavbarProfile) HyperNode {
+func WatchLaterPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
-		currentPage: PageWatchLater,
-		profile:     profile,
+		navbarParams: NavbarParams{
+			CurrentPage: PageWatchLater,
+			Username:    username,
+		},
 	})(
+		WatchLaterPageContent(),
+	)
+}
+
+func WatchLaterPageContent() HyperNode {
+	return Group(
 		"Watch Later Page",
 	)
 }
 
-func PlaylistsPage(profile NavbarProfile) HyperNode {
+func PlaylistsPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
-		currentPage: PagePlaylists,
-		profile:     profile,
+		navbarParams: NavbarParams{
+			CurrentPage: PagePlaylists,
+			Username:    username,
+		},
 	})(
+		PlaylistsPageContent(),
+	)
+}
+
+func PlaylistsPageContent() HyperNode {
+	return Group(
 		"Playlists Page",
 	)
 }
 
-func NotificationsPage(profile NavbarProfile) HyperNode {
+func NotificationsPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
-		currentPage: PageNotifications,
-		profile:     profile,
+		navbarParams: NavbarParams{
+			CurrentPage: PageProfile,
+			Username:    username,
+		},
 	})(
+		NotificationsPageContent(),
+	)
+}
+
+func NotificationsPageContent() HyperNode {
+	return Group(
 		"Notifications Page",
 	)
 }
 
-type ProfilePageParams struct {
-	NavbarProfile NavbarProfile
-	Name          string
-	Username      string
-	Bio           string
-	IsOwner       bool
+func ProfilePage(params ProfilePageContentParams) HyperNode {
+	return appPageLayout(appPageLayoutParams{
+		navbarParams: NavbarParams{
+			CurrentPage: PageProfile,
+			Username:    params.Username,
+		},
+	})(
+		ProfilePageContent(params),
+	)
 }
 
-func ProfilePage(params ProfilePageParams) HyperNode {
-	return appPageLayout(appPageLayoutParams{
-		currentPage: PageProfile,
-		profile:     params.NavbarProfile,
-	})(
+type ProfilePageContentParams struct {
+	Name     string
+	Username string
+	Bio      string
+	IsOwner  bool
+}
+
+func ProfilePageContent(params ProfilePageContentParams) HyperNode {
+	return Group(
 		// profile card ==================================================
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col lg:flex-row overflow-hidden"))(
 			DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box bg-gradient-to-r from-info to-error shrink-0"))(),
@@ -103,14 +152,14 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 				// post video ==================================================
 				BUTTON(
 					AttrClass("btn btn-soft"),
-					AttrOnClick("UPLOAD_VIDEO_MODAL.show()"),
+					AttrOnClick("POST_VIDEO_MODAL.show()"),
 				)(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`),
 					"post a video",
 				),
-				DIALOG(AttrId("UPLOAD_VIDEO_MODAL"), AttrClass("modal"))(
+				DIALOG(AttrId("POST_VIDEO_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
-						UploadVideoForm(),
+						PostVideoForm(),
 					),
 					FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
 						BUTTON()("close"),
@@ -122,7 +171,7 @@ func ProfilePage(params ProfilePageParams) HyperNode {
 			Group(),
 		),
 
-		// profile posts (videos) ==================================================
+	// profile posts (videos) ==================================================
 	)
 }
 
@@ -215,178 +264,76 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 	)
 }
 
-type UploadVideoFormParams struct {
-	Title          string
-	TitleErr       error
-	Description    string
-	DescriptionErr error
-	VideoErr       error
-}
-
-func UploadVideoForm(params ...UploadVideoFormParams) HyperNode {
-	var p UploadVideoFormParams
-	if len(params) > 0 {
-		p = params[0]
-	}
-
-	return FORM(
-		AttrId("UPLOAD_VIDEO_FORM"),
-		AttrClass("space-y-4"),
-		Attr("hx-post", "/videos"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .submit-button"),
-		Attr("hx-disable", "find .submit-button"),
-	)(
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_TITLE"))(
-				SPAN(AttrClass("label-text"))("Title"),
-			),
-			INPUT(
-				AttrId("FORM_TITLE"),
-				AttrClass(IfElse(p.TitleErr == nil, "input w-full", "input input-error w-full")),
-				AttrType(TypeText),
-				AttrName("title"),
-				AttrValue(p.Title),
-				AttrRequired(true),
-			),
-			If(p.TitleErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.TitleErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_DESCRIPTION"))(
-				SPAN(AttrClass("label-text"))("Description"),
-			),
-			TEXTAREA(
-				AttrId("FORM_DESCRIPTION"),
-				AttrClass("block w-full textarea"+IfElseZero(p.DescriptionErr != nil, " textarea-error")),
-				AttrName("description"),
-			)(
-				p.Description,
-			),
-			If(p.DescriptionErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.DescriptionErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_VIDEO"))(
-				SPAN(AttrClass("label-text"))("Video"),
-			),
-			INPUT(
-				AttrId("FORM_VIDEO"),
-				AttrClass("file-input w-full "+IfElseZero(p.VideoErr != nil, "file-input-error")),
-				AttrType(TypeFile),
-				AttrName("video"),
-				AttrAccept("video/*"),
-				AttrRequired(true),
-			),
-			If(p.VideoErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.VideoErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("pt-2"))(
-			BUTTON(
-				AttrClass("btn btn-primary w-full submit-button group"),
-				AttrType(TypeSubmit),
-			)(
-				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Upload"),
-				spinner(),
-			),
-		),
-	)
-}
-
-type VideoUploaderParams struct {
-	UploadUrl string
-	ObjectKey string
-}
-
-func VideoUploader(params VideoUploaderParams) HyperNode {
-	// TODO: start with the backend first
-	//
-	// this will replace the #UPLOAD_VIDEO_FORM
-	// it will upload the video immediatly after load
-	// after uploading it will issue a request to server to commit the upload using the ETag from the uploading response
-	// it will send it to a route with the object key as parameter
-	// then close the dialog modal
-	// a ws connection will publish the video to all sessions
-	// to insert if in the profile page (it will use an htmx oob swap with the posts container id)
-	return nil
-}
-
 type appPageLayoutParams struct {
-	currentPage AppPageKind
-	profile     NavbarProfile
-}
-
-type NavbarProfile struct {
-	Username string
+	navbarParams NavbarParams
 }
 
 func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 	return func(children ...any) Element {
 		return basicPageLayout(basicLayoutParams{title: "Vidzilla"})(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
-				NAV(AttrClass("w-full sticky py-2 flex justify-center"))(
-					DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
-						appPageButton(appPageButtonParams{
-							tab:      PageFeed,
-							link:     "/feed",
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timeline-icon lucide-timeline"><path d="M4 12h.01"/><path d="M4 16h.01"/><path d="M4 20h.01"/><path d="M4 4h.01"/><path d="M4 8h.01"/><path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z"/><path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z"/><path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z"/></svg>`,
-							isActive: params.currentPage == PageFeed,
-						}),
-						appPageButton(appPageButtonParams{
-							tab:      PageDiscover,
-							link:     "/discover",
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-binoculars-icon lucide-binoculars"><path d="M10 10h4"/><path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/><path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/><path d="M 22 16 L 2 16"/><path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/><path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/></svg>`,
-							isActive: params.currentPage == PageDiscover,
-						}),
-						DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", "Search"))(
-							BUTTON(AttrClass("p-2 btn"))(
-								RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`),
-							),
-						),
-						appPageButton(appPageButtonParams{
-							tab:      PageWatchLater,
-							link:     "/watch_later",
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-icon lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
-							isActive: params.currentPage == PageWatchLater,
-						}),
-						appPageButton(appPageButtonParams{
-							tab:      PagePlaylists,
-							link:     "/playlists",
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-video-icon lucide-list-video"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`,
-							isActive: params.currentPage == PagePlaylists,
-						}),
-						appPageButton(appPageButtonParams{
-							tab:      PageNotifications,
-							link:     "/notifications",
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell-icon lucide-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>`,
-							isActive: params.currentPage == PageNotifications,
-						}),
-						appPageButton(appPageButtonParams{
-							tab:      PageProfile,
-							link:     "/@" + params.profile.Username,
-							icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-icon lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-							isActive: params.currentPage == PageProfile,
-						}),
-					),
-				),
-				MAIN(AttrClass("flex-1 p-6 overflow-y-auto"))(
+				Navbar(params.navbarParams),
+				MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("flex-1 p-6 overflow-y-auto"))(
 					Group(children...),
 				),
+				videoUploadersContainer(),
+				uploadIndicator(),
 			),
 		)
 	}
+}
+
+type NavbarParams struct {
+	Username    string
+	CurrentPage AppPageKind
+}
+
+func Navbar(params NavbarParams) HyperNode {
+	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky py-2 flex justify-center"))(
+		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
+			appPageButton(appPageButtonParams{
+				tab:      PageFeed,
+				pageLink: "/feed",
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timeline-icon lucide-timeline"><path d="M4 12h.01"/><path d="M4 16h.01"/><path d="M4 20h.01"/><path d="M4 4h.01"/><path d="M4 8h.01"/><path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z"/><path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z"/><path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z"/></svg>`,
+				isActive: params.CurrentPage == PageFeed,
+			}),
+			appPageButton(appPageButtonParams{
+				tab:      PageDiscover,
+				pageLink: "/discover",
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-binoculars-icon lucide-binoculars"><path d="M10 10h4"/><path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/><path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/><path d="M 22 16 L 2 16"/><path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/><path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/></svg>`,
+				isActive: params.CurrentPage == PageDiscover,
+			}),
+			DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", "Search"))(
+				BUTTON(AttrClass("p-2 btn"))(
+					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`),
+				),
+			),
+			appPageButton(appPageButtonParams{
+				tab:      PageWatchLater,
+				pageLink: "/watch_later",
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-icon lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+				isActive: params.CurrentPage == PageWatchLater,
+			}),
+			appPageButton(appPageButtonParams{
+				tab:      PagePlaylists,
+				pageLink: "/playlists",
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-video-icon lucide-list-video"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`,
+				isActive: params.CurrentPage == PagePlaylists,
+			}),
+			appPageButton(appPageButtonParams{
+				tab:      PageNotifications,
+				pageLink: "/notifications",
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell-icon lucide-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>`,
+				isActive: params.CurrentPage == PageNotifications,
+			}),
+			appPageButton(appPageButtonParams{
+				tab:      PageProfile,
+				pageLink: "/@" + params.Username,
+				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-icon lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+				isActive: params.CurrentPage == PageProfile,
+			}),
+		),
+	)
 }
 
 type AppPageKind = string
@@ -402,15 +349,21 @@ const (
 
 type appPageButtonParams struct {
 	tab      AppPageKind
-	link     string
+	pageLink string
 	icon     string
 	isActive bool
 }
 
 func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
-		BUTTON(AttrClass("p-2 btn " + IfElseZero(params.isActive, "btn-primary")))(
-			A(AttrHref(params.link))(RawText(params.icon)),
+		BUTTON(
+			AttrClass("p-2 btn "+IfElseZero(params.isActive, "btn-primary")),
+			Attr("hx-get", fmt.Sprintf("%s/content", params.pageLink)),
+			Attr("hx-push-url", params.pageLink),
+			Attr("hx-target", "#APP_PAGE_CONTENT"),
+			Attr("hx-swap", "innerHTML"),
+		)(
+			RawText(params.icon),
 		),
 	)
 }

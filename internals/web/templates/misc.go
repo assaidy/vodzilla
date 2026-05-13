@@ -29,7 +29,7 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
 					SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
-					window.clientId = '%s';
+					window._clientId = %q;
 
 					htmx.on('htmx:config:request', (event) => {
 						event.detail.ctx.request.headers['X-CSRF-Token'] = document.cookie
@@ -37,7 +37,7 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 							.map((cookie) => cookie.split("="))
 							.find(([key]) => key === 'csrf_token')
 							?.map(decodeURIComponent)[1] || null;
-						event.detail.ctx.request.headers['X-Client-ID']  = window.clientId;
+						event.detail.ctx.request.headers['X-Client-ID']  = window._clientId;
 					});
 				`, clientId))),
 				),

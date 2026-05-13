@@ -27,16 +27,26 @@ func RegisterRoutes(app *fiber.App) {
 	app.Post("/register", handlers.HandleRegister)
 	app.Get("/login", handlers.HandleLoginPage)
 	app.Post("/login", handlers.HandleLogin)
-	// app.Post("/verification_email", handlers.HandleGetVerificationEmail)
+	// TODO: app.Post("/verification_email", handlers.HandleGetVerificationEmail)
 	app.Get("/verification_email/sent", handlers.HandleVerificationEmailSentPage)
 	app.Get("/verification_email/verify", handlers.HandleVerifyEmailPage)
 
 	app.Get("/", handlers.HandleHomePage)
 	app.Get("/feed", handlers.WithSession, handlers.HandleFeedPage)
+	app.Get("/feed/content", handlers.WithSession, handlers.HandleFeedPageContent)
 	app.Get("/discover", handlers.WithSession, handlers.HandleDiscoverPage)
+	app.Get("/discover/content", handlers.WithSession, handlers.HandleDiscoverPageContent)
 	app.Get("/watch_later", handlers.WithSession, handlers.HandleWatchLaterPage)
+	app.Get("/watch_later/content", handlers.WithSession, handlers.HandleWatchLaterPageContent)
 	app.Get("/playlists", handlers.WithSession, handlers.HandlePlaylistsPage)
+	app.Get("/playlists/content", handlers.WithSession, handlers.HandlePlaylistsPageContent)
 	app.Get("/notifications", handlers.WithSession, handlers.HandleNotificationsPage)
+	app.Get("/notifications/content", handlers.WithSession, handlers.HandleNotificationsPageContent)
 	app.Get("/@:username", handlers.WithSession, handlers.HandleProfilePage)
+	app.Get("/@:username/content", handlers.WithSession, handlers.HandleProfilePageContent)
 	app.Put("/profiles", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleEditProfile)
+	// TODO: edit account: email, password, delete account
+
+	app.Post("/videos", handlers.WithSession, handlers.WithCsrfToken, handlers.HandlePostVideo)
+	app.Post("/videos/:video_id/complete_uplaod", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleCompleteVideoUpload)
 }

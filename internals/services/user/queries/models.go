@@ -32,7 +32,7 @@ type UserServiceUser struct {
 	PasswordHash string
 	Name         string
 	Username     string
+	Bio          sql.NullString
 	CreatedAt    time.Time
 	IsVerified   bool
-	Bio          sql.NullString
 }

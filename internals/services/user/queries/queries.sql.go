@@ -81,7 +81,7 @@ func (q *Queries) GetSessionById(ctx context.Context, id string) (UserServiceSes
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where email = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where email = $1 for update
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserServiceUser, error) {
@@ -93,15 +93,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 		&i.PasswordHash,
 		&i.Name,
 		&i.Username,
+		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
-		&i.Bio,
 	)
 	return i, err
 }
 
 const getUserById = `-- name: GetUserById :one
-select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where id = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where id = $1 for update
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, error) {
@@ -113,15 +113,15 @@ func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, 
 		&i.PasswordHash,
 		&i.Name,
 		&i.Username,
+		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
-		&i.Bio,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-select id, email, password_hash, name, username, created_at, is_verified, bio from user_service.users where username = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where username = $1 for update
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserServiceUser, error) {
@@ -133,9 +133,9 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserS
 		&i.PasswordHash,
 		&i.Name,
 		&i.Username,
+		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
-		&i.Bio,
 	)
 	return i, err
 }

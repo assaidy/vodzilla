@@ -11,3 +11,25 @@ sql:
         emit_prepared_queries: true
         emit_empty_slices: true
         initialisms: []
+
+  - engine: "postgresql"
+    schema: "./internals/services/video/db/migrations/"
+    queries: "./internals/services/video/db/queries.sql"
+    gen:
+      go:
+        package: "queries"
+        out: "./internals/services/video/queries/"
+        emit_prepared_queries: true
+        emit_empty_slices: true
+        initialisms: []
+
+  - engine: "postgresql"
+    schema: "./internals/services/media/db/migrations/"
+    queries: "./internals/services/media/db/queries.sql"
+    gen:
+      go:
+        package: "queries"
+        out: "./internals/services/media/queries/"
+        emit_prepared_queries: true
+        emit_empty_slices: true
+        initialisms: []

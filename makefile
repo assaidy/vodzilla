@@ -45,7 +45,7 @@ goose-down: validate-goose-service
 goose-reset: validate-goose-service
 	@$(GOOSE_ENV) goose reset
 goose-new: validate-goose-service validate-goose-name
-	@$(GOOSE_ENV) goose create -s $(name) sql
+	@$(GOOSE_ENV) goose create $(name) sql
 
 pg-cli:
 	@echo  "$(POSTGRES_URL)"
