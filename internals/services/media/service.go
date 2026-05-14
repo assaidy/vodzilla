@@ -3,18 +3,21 @@ package media
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"time"
 
+	"github.com/assaidy/vodzilla/internals/events"
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/media/queries"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
+	"github.com/redis/go-redis/v9"
 )
 
 const Name = "media"
@@ -25,14 +28,16 @@ type Service struct {
 	db      *sql.DB
 	queries *queries.Queries
 	s3      *s3.Client
+	redis   *redis.Client
 	logger  *slog.Logger
 }
 
-func New(db *sql.DB, s3 *s3.Client, logger *slog.Logger) *Service {
+func New(db *sql.DB, s3 *s3.Client, redis *redis.Client, logger *slog.Logger) *Service {
 	return &Service{
 		db:      db,
 		queries: queries.New(db),
 		s3:      s3,
+		redis:   redis,
 		logger:  logger,
 	}
 }
@@ -132,7 +137,16 @@ func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKe
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	// TODO: publish video_uploaded event so video service can change video status
+	payload, err := json.Marshal(events.VideoUploadedEventPayload{
+		ObjectKey: objectKey,
+		Timestamp: time.Now(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoUploadedEvent, err)
+	}
+	if err := me.redis.Publish(ctx, events.VideoUploadedEvent, payload).Err(); err != nil {
+		return fmt.Errorf("failed to publish %q event: %w", events.VideoUploadedEvent, err)
+	}
 
 	return nil
 }

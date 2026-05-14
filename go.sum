@@ -2,10 +2,6 @@ github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eT
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 h1:zV3ejI06GQ59hwDQAvmK1qxOQGB3WuVTRoY0okPTAv0=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496/go.mod h1:oGkLhpf+kjZl6xBf758TQhh5XrAeiJv/7FRz/2spLIg=
-github.com/assaidy/hyper/v2 v2.3.0 h1:cFrkbuUniIPrDc8tO4s+gEjmnlHcrMV6hXNqsCNH8Sc=
-github.com/assaidy/hyper/v2 v2.3.0/go.mod h1:BT2+KTeIVtlgYOK6g14ZkmE3Xo5SEAKHwUM6m8rR1Es=
-github.com/assaidy/hyper/v2 v2.4.0 h1:0Ox2ITCzpd2UT4SiahDWHGNRnIzzkWtt9pJ81L1m3KU=
-github.com/assaidy/hyper/v2 v2.4.0/go.mod h1:BT2+KTeIVtlgYOK6g14ZkmE3Xo5SEAKHwUM6m8rR1Es=
 github.com/assaidy/hyper/v2 v2.5.0 h1:byKKIjFm0oPY1YU2VE8JsTbafiEcdWsFd4afO37ScvA=
 github.com/assaidy/hyper/v2 v2.5.0/go.mod h1:BT2+KTeIVtlgYOK6g14ZkmE3Xo5SEAKHwUM6m8rR1Es=
 github.com/assaidy/workers v1.2.3 h1:m/bp+nEWMvPNXYQpeIf6s+NE/qCD035hWSh2twXSfws=

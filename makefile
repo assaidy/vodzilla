@@ -39,13 +39,13 @@ validate-goose-name:
 	fi
 GOOSE_ENV = GOOSE_DRIVER="postgres" GOOSE_DBSTRING="$(POSTGRES_URL)" GOOSE_MIGRATION_DIR="./internals/services/$(service)/db/migrations/"
 goose-up: validate-goose-service
-	@$(GOOSE_ENV) goose up
+	@$(GOOSE_ENV) goose up -table="$(service)_goose_db_version"
 goose-down: validate-goose-service
-	@$(GOOSE_ENV) goose down
+	@$(GOOSE_ENV) goose down -table="$(service)_goose_db_version"
 goose-reset: validate-goose-service
-	@$(GOOSE_ENV) goose reset
+	@$(GOOSE_ENV) goose reset -table="$(service)_goose_db_version"
 goose-new: validate-goose-service validate-goose-name
-	@$(GOOSE_ENV) goose create $(name) sql
+	@$(GOOSE_ENV) goose create $(name) sql -table="$(service)_goose_db_version"
 
 pg-cli:
 	@echo  "$(POSTGRES_URL)"

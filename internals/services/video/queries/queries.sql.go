@@ -10,8 +10,27 @@ import (
 	"database/sql"
 )
 
+const getVideoByObjectKey = `-- name: GetVideoByObjectKey :one
+select id, object_key, owner_id, title, description, created_at, status from video_service.videos where object_key = $1 for update
+`
+
+func (q *Queries) GetVideoByObjectKey(ctx context.Context, objectKey string) (VideoServiceVideo, error) {
+	row := q.queryRow(ctx, q.getVideoByObjectKeyStmt, getVideoByObjectKey, objectKey)
+	var i VideoServiceVideo
+	err := row.Scan(
+		&i.Id,
+		&i.ObjectKey,
+		&i.OwnerId,
+		&i.Title,
+		&i.Description,
+		&i.CreatedAt,
+		&i.Status,
+	)
+	return i, err
+}
+
 const insertVideo = `-- name: InsertVideo :exec
-insert into video_service.videos (id, object_key, owner_id, title, description) values ($1, $2, $3, $4, $5)
+insert into video_service.videos (id, object_key, owner_id, title, description, status) values ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertVideoParams struct {
@@ -20,6 +39,7 @@ type InsertVideoParams struct {
 	OwnerId     string
 	Title       string
 	Description sql.NullString
+	Status      string
 }
 
 func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error {
@@ -29,6 +49,23 @@ func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error 
 		arg.OwnerId,
 		arg.Title,
 		arg.Description,
+		arg.Status,
 	)
+	return err
+}
+
+const updateVideoStatus = `-- name: UpdateVideoStatus :exec
+update video_service.videos
+set status = $1
+where id = $2
+`
+
+type UpdateVideoStatusParams struct {
+	Status string
+	Id     string
+}
+
+func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error {
+	_, err := q.exec(ctx, q.updateVideoStatusStmt, updateVideoStatus, arg.Status, arg.Id)
 	return err
 }

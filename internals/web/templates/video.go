@@ -128,6 +128,8 @@ type VideoUploaderParams struct {
 	UploadUrls     []string
 }
 
+// TODO: might move it to multiple chunks rendered on the server
+// with hx-trigger="load" for completion requests
 func VideoUploader(params VideoUploaderParams) HyperNode {
 	encodedUrls, _ := json.Marshal(params.UploadUrls)
 
@@ -168,6 +170,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 	)))
 }
 
+// TODO: move progress bars rendering to server
 func videoUploadersContainer() HyperNode {
 	return DIV(AttrId("VIDEO_UPLOADERS_CONTAINER"))(
 		SCRIPT()(RawText(`
@@ -276,4 +279,8 @@ func videoUploadIndicator() HyperNode {
 			),
 		),
 	)
+}
+
+func profileVideos(userId string) HyperNode {
+	return Group()
 }

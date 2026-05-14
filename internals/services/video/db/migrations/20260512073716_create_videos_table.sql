@@ -6,8 +6,7 @@ create table video_service.videos (
   title       varchar(256) not null,
   description varchar(500),
   created_at  timestamptz  not null default now(),
-  -- 'uploading', 'uploaded', 'processing', 'processed', 'deleted'
-  status      varchar(10)  not null default 'uploading'
+  status      varchar(10)  not null
 );
 
 -- +goose Down
