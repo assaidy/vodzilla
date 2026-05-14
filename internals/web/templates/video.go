@@ -3,6 +3,8 @@ package templates
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
 
 	. "github.com/assaidy/hyper/v2"
 	"github.com/oklog/ulid/v2"
@@ -281,6 +283,179 @@ func videoUploadIndicator() HyperNode {
 	)
 }
 
-func profileVideos(userId string) HyperNode {
-	return Group()
+type profileVideosParams struct {
+	videoCards []VideoCardParams
+}
+
+func profileVideosContainer(params profileVideosParams) HyperNode {
+	cards := params.videoCards
+	if len(cards) == 0 {
+		titles := []string{
+			"How to build a VOD platform in Go",
+			"Fiber v3 deep dive",
+			"HTMX tips & tricks",
+			"PostgreSQL performance tuning",
+			"Building real-time features with SSE",
+			"Go 1.26 new features",
+			"Docker compose for dev environments",
+			"SQLC vs GORM: which one to pick",
+		}
+		now := time.Now()
+		for _, title := range titles {
+			cards = append(cards, VideoCardParams{
+				VideoId:       ulid.Make().String(),
+				Title:         title,
+				Timestamp:     now.Add(-time.Duration(rand.Intn(720)+1) * time.Hour),
+				OwnerName:     "You",
+				OwnerUsername: "assaidy",
+				ViewsCount:    rand.Intn(50000),
+			})
+		}
+	}
+	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 lg:grid-cols-4 gap-4"))(
+		Range(cards, func(p VideoCardParams) HyperNode {
+			return VideoCard(p)
+		}),
+	)
+}
+
+type VideoCardParams struct {
+	VideoId       string
+	Title         string
+	Timestamp     time.Time
+	OwnerName     string
+	OwnerUsername string
+	ViewsCount    int
+	ThumbnailUrl  string
+	AvatarUrl     string
+}
+
+func VideoCard(params VideoCardParams) HyperNode {
+	ownerProfilePageLink := fmt.Sprintf("/@%s", params.OwnerUsername)
+	videoPageLink := fmt.Sprintf("/videos/%s", params.VideoId)
+
+	return DIV(
+		AttrClass("card bg-base-100 transition-shadow duration-200 cursor-pointer"),
+		Attr("hx-get", fmt.Sprintf("%s/content", videoPageLink)),
+		Attr("hx-push-url", videoPageLink),
+		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-swap", "innerHTML"),
+	)(
+		FIGURE(AttrClass("relative aspect-video overflow-hidden group"))(
+			DIV(AttrClass("w-full h-full transition-transform duration-200 group-hover:scale-105"))(
+				If(params.ThumbnailUrl != "",
+					IMG(
+						AttrClass("w-full h-full object-cover"),
+						AttrSrc(params.ThumbnailUrl),
+					),
+				).Else(
+					videoCardThumbnailPlaceholder(),
+				),
+			),
+			DIV(AttrClass("absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"))(
+				RawText(`<svg class="w-12 h-12 text-white drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`),
+			),
+		),
+		DIV(AttrClass("card-body flex flex-row gap-3 p-3"))(
+			DIV()(
+				DIV(
+					AttrClass("shrink-0 cursor-pointer"),
+					Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+					Attr("hx-push-url", ownerProfilePageLink),
+					Attr("hx-target", "#APP_PAGE_CONTENT"),
+					Attr("hx-swap", "innerHTML"),
+					Attr("hx-trigger", "click consume"),
+				)(
+					If(params.AvatarUrl != "",
+						IMG(AttrClass("w-9 h-9 rounded-full"), AttrSrc(params.AvatarUrl)),
+					).Else(
+						videoCardAvatarPlaceholder(),
+					),
+				),
+			),
+			DIV(AttrClass("min-w-0 flex-1"))(
+				H2(AttrClass("card-title text-base font-bold leading-tight line-clamp-2"))(params.Title),
+				A(
+					AttrClass("link link-hover text-xs text-base-content/60"),
+					Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+					Attr("hx-push-url", ownerProfilePageLink),
+					Attr("hx-target", "#APP_PAGE_CONTENT"),
+					Attr("hx-swap", "innerHTML"),
+					Attr("hx-trigger", "click consume"),
+				)(
+					params.OwnerName,
+				),
+				DIV(AttrClass("text-xs text-base-content/60"))(
+					normalizeViewsCount(params.ViewsCount), " views",
+					" . ",
+					normalizeTimestamp(params.Timestamp), " ago",
+				),
+			),
+		),
+	)
+}
+
+func normalizeTimestamp(t time.Time) any {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		if h == 1 {
+			return "1 hour"
+		}
+		return fmt.Sprintf("%d hours", h)
+	case d < 30*24*time.Hour:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "1 day"
+		}
+		return fmt.Sprintf("%d days", days)
+	case d < 365*24*time.Hour:
+		months := int(d.Hours() / (24 * 30))
+		if months == 1 {
+			return "1 month"
+		}
+		return fmt.Sprintf("%d months", months)
+	default:
+		years := int(d.Hours() / (24 * 365))
+		if years == 1 {
+			return "1 year"
+		}
+		return fmt.Sprintf("%d years", years)
+	}
+}
+
+func normalizeViewsCount(i int) any {
+	switch {
+	case i >= 1_000_000_000:
+		return fmt.Sprintf("%.1fB", float64(i)/1_000_000_000)
+	case i >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(i)/1_000_000)
+	case i >= 1_000:
+		return fmt.Sprintf("%.1fK", float64(i)/1_000)
+	default:
+		return fmt.Sprintf("%d", i)
+	}
+}
+
+func videoCardAvatarPlaceholder() HyperNode {
+	return DIV(AttrClass("avatar placeholder"))(
+		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-9 h-9 flex items-center justify-center text-xs"))(
+			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+		),
+	)
+}
+
+func videoCardThumbnailPlaceholder() HyperNode {
+	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
+		RawText(`<svg class="w-10 h-10 text-base-content/30" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clapperboard-icon lucide-clapperboard"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg>`),
+	)
 }

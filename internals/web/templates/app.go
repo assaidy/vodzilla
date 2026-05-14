@@ -114,7 +114,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 	return Group(
 		// profile card ==================================================
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col lg:flex-row overflow-hidden"))(
-			DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box bg-gradient-to-r from-info to-error shrink-0"))(),
+			profileCardAvatarPlaceholder(),
 			DIV(AttrClass("p-4"))(
 				H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
 				P(AttrId("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
@@ -173,7 +173,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 		),
 
 		// profile posts (videos) ==================================================
-		profileVideos(params.UserId),
+		profileVideosContainer(profileVideosParams{}),
 	)
 }
 
@@ -367,5 +367,11 @@ func appPageButton(params appPageButtonParams) HyperNode {
 		)(
 			RawText(params.icon),
 		),
+	)
+}
+
+func profileCardAvatarPlaceholder() HyperNode {
+	return DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
+		RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
 	)
 }
