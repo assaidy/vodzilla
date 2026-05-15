@@ -11,3 +11,6 @@ select * from video_service.videos where id = $1 for update;
 update video_service.videos
 set status = $1
 where id = $2;
+
+-- name: GetVideosByUserId :many
+select * from video_service.videos where owner_id = $1;

@@ -104,11 +104,11 @@ func ProfilePage(params ProfilePageContentParams) HyperNode {
 }
 
 type ProfilePageContentParams struct {
-	UserId   string
 	Name     string
 	Username string
 	Bio      string
 	IsOwner  bool
+	Videos   []VideoCardParams
 }
 
 func ProfilePageContent(params ProfilePageContentParams) HyperNode {
@@ -173,8 +173,10 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 			Group(),
 		),
 
-		// profile posts (videos) ==================================================
-		profileVideosContainer(profileVideosParams{}),
+		// profile videos ==================================================
+		profileVideosContainer(profileVideosParams{
+			videoCards: params.Videos,
+		}),
 	)
 }
 

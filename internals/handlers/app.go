@@ -160,11 +160,29 @@ func HandleProfilePage(c fiber.Ctx) error {
 		return err
 	}
 
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	videos, err := videoService.GetUserVideos(c.RequestCtx(), user.Id)
+	if err != nil {
+		return err
+	}
+
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     user.Name,
+			OwnerUsername: user.Username,
+		})
+	}
+
 	return render(c, templates.ProfilePage(templates.ProfilePageContentParams{
 		Username: user.Username,
 		Name:     user.Name,
 		Bio:      user.Bio,
 		IsOwner:  user.Username == currentUser.Username,
+		Videos:   templateVideos,
 	}))
 }
 
@@ -174,12 +192,30 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	videos, err := videoService.GetUserVideos(c.RequestCtx(), user.Id)
+	if err != nil {
+		return err
+	}
+
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     user.Name,
+			OwnerUsername: user.Username,
+		})
+	}
+
 	return render(c, hyper.Group(
 		templates.ProfilePageContent(templates.ProfilePageContentParams{
 			Username: user.Username,
 			Name:     user.Name,
 			Bio:      user.Bio,
 			IsOwner:  user.Username == currentUser.Username,
+			Videos:   templateVideos,
 		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(

@@ -48,6 +48,41 @@ func (q *Queries) GetVideoByObjectKey(ctx context.Context, objectKey string) (Vi
 	return i, err
 }
 
+const getVideosByUserId = `-- name: GetVideosByUserId :many
+select id, object_key, owner_id, title, description, created_at, status from video_service.videos where owner_id = $1
+`
+
+func (q *Queries) GetVideosByUserId(ctx context.Context, ownerID string) ([]VideoServiceVideo, error) {
+	rows, err := q.query(ctx, q.getVideosByUserIdStmt, getVideosByUserId, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VideoServiceVideo{}
+	for rows.Next() {
+		var i VideoServiceVideo
+		if err := rows.Scan(
+			&i.Id,
+			&i.ObjectKey,
+			&i.OwnerId,
+			&i.Title,
+			&i.Description,
+			&i.CreatedAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertVideo = `-- name: InsertVideo :exec
 insert into video_service.videos (id, object_key, owner_id, title, description, status) values ($1, $2, $3, $4, $5, $6)
 `

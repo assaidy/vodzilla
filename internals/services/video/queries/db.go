@@ -30,6 +30,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVideoByObjectKeyStmt, err = db.PrepareContext(ctx, getVideoByObjectKey); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoByObjectKey: %w", err)
 	}
+	if q.getVideosByUserIdStmt, err = db.PrepareContext(ctx, getVideosByUserId); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVideosByUserId: %w", err)
+	}
 	if q.insertVideoStmt, err = db.PrepareContext(ctx, insertVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertVideo: %w", err)
 	}
@@ -49,6 +52,11 @@ func (q *Queries) Close() error {
 	if q.getVideoByObjectKeyStmt != nil {
 		if cerr := q.getVideoByObjectKeyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVideoByObjectKeyStmt: %w", cerr)
+		}
+	}
+	if q.getVideosByUserIdStmt != nil {
+		if cerr := q.getVideosByUserIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVideosByUserIdStmt: %w", cerr)
 		}
 	}
 	if q.insertVideoStmt != nil {
@@ -102,6 +110,7 @@ type Queries struct {
 	tx                      *sql.Tx
 	getVideoByIdStmt        *sql.Stmt
 	getVideoByObjectKeyStmt *sql.Stmt
+	getVideosByUserIdStmt   *sql.Stmt
 	insertVideoStmt         *sql.Stmt
 	updateVideoStatusStmt   *sql.Stmt
 }
@@ -112,6 +121,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                      tx,
 		getVideoByIdStmt:        q.getVideoByIdStmt,
 		getVideoByObjectKeyStmt: q.getVideoByObjectKeyStmt,
+		getVideosByUserIdStmt:   q.getVideosByUserIdStmt,
 		insertVideoStmt:         q.insertVideoStmt,
 		updateVideoStatusStmt:   q.updateVideoStatusStmt,
 	}

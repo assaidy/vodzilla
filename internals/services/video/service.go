@@ -167,3 +167,25 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 		Description: video.Description.String,
 	}, nil
 }
+
+func (me *Service) GetUserVideos(ctx context.Context, id string) ([]Video, error) {
+	videos, err := me.queries.GetVideosByUserId(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get videos by user id: %w", err)
+	}
+
+	result := make([]Video, 0, len(videos))
+	for _, v := range videos {
+		result = append(result, Video{
+			Id:          v.Id,
+			OwnerId:     v.OwnerId,
+			ObjectKey:   v.ObjectKey,
+			Timestamp:   v.CreatedAt,
+			Title:       v.Title,
+			Description: v.Description.String,
+		})
+	}
+
+	return result, nil
+
+}
