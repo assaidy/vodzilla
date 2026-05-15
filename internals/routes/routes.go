@@ -49,4 +49,6 @@ func RegisterRoutes(app *fiber.App) {
 
 	app.Post("/videos", handlers.WithSession, handlers.WithCsrfToken, handlers.HandlePostVideo)
 	app.Post("/videos/complete_upload", handlers.WithSession, handlers.HandleCompleteVideoUpload)
+	app.Get("/videos/:video_id", handlers.WithSession, handlers.HandleVideoPage)
+	app.Get("/videos/:video_id/content", handlers.WithSession, handlers.HandleVideoPageContent)
 }

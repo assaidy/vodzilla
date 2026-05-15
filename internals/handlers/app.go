@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
+	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
+	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
@@ -277,4 +279,88 @@ func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 	}
 
 	return user, nil
+}
+
+func HandleVideoPage(c fiber.Ctx) error {
+	user, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	videoId := c.Params("video_id")
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	owner, err := userService.GetUserById(c.RequestCtx(), video.OwnerId)
+	if err != nil {
+		if errors.Is(err, user_service.ErrNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.ObjectKey)
+	if err != nil {
+		return err
+	}
+
+	return render(c, templates.VideoPage(templates.VideoPageParams{
+		Username: user.Username,
+		ContentParams: templates.VideoPageContentParams{
+			Id:            video.Id,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			SourceUrl:     sourceUrl,
+			Title:         video.Title,
+			Description:   video.Description,
+			Timestamp:     video.Timestamp,
+		},
+	}))
+}
+
+func HandleVideoPageContent(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	owner, err := userService.GetUserById(c.RequestCtx(), video.OwnerId)
+	if err != nil {
+		if errors.Is(err, user_service.ErrNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.ObjectKey)
+	if err != nil {
+		return err
+	}
+
+	return render(c, templates.VideoPageContent(templates.VideoPageContentParams{
+		Id:            video.Id,
+		OwnerName:     owner.Name,
+		OwnerUsername: owner.Username,
+		SourceUrl:     sourceUrl,
+		Title:         video.Title,
+		Description:   video.Description,
+		Timestamp:     video.Timestamp,
+	}))
 }

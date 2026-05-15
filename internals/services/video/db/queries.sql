@@ -4,6 +4,9 @@ insert into video_service.videos (id, object_key, owner_id, title, description, 
 -- name: GetVideoByObjectKey :one
 select * from video_service.videos where object_key = $1 for update;
 
+-- name: GetVideoById :one
+select * from video_service.videos where id = $1 for update;
+
 -- name: UpdateVideoStatus :exec
 update video_service.videos
 set status = $1

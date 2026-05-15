@@ -106,6 +106,20 @@ type CompleteUploadPart struct {
 	PartNumber int
 }
 
+func (me *Service) GeneratePresignedGetUrl(ctx context.Context, objectKey string) (string, error) {
+	presigner := s3.NewPresignClient(me.s3)
+	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(videosBucket),
+		Key:    aws.String(objectKey),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = 1 * time.Hour
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to presign get url: %w", err)
+	}
+	return request.URL, nil
+}
+
 func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKey string, parts []CompleteUploadPart) error {
 	completedParts := make([]types.CompletedPart, 0, len(parts))
 	for _, part := range parts {

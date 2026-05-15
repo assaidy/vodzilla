@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/assaidy/hyper/v2"
 )
@@ -291,7 +292,7 @@ type NavbarParams struct {
 }
 
 func Navbar(params NavbarParams) HyperNode {
-	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky py-2 flex justify-center"))(
+	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky top-0 py-2 flex justify-center"))(
 		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
@@ -373,5 +374,63 @@ func appPageButton(params appPageButtonParams) HyperNode {
 func profileCardAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
 		RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+	)
+}
+
+type VideoPageParams struct {
+	Username      string
+	ContentParams VideoPageContentParams
+}
+
+func VideoPage(params VideoPageParams) HyperNode {
+	return appPageLayout(appPageLayoutParams{
+		navbarParams: NavbarParams{
+			Username: params.Username,
+		},
+	})(
+		VideoPageContent(params.ContentParams),
+	)
+}
+
+type VideoPageContentParams struct {
+	Id            string
+	OwnerName     string
+	OwnerUsername string
+	SourceUrl     string
+	Title         string
+	Description   string
+	Timestamp     time.Time
+}
+
+func VideoPageContent(params VideoPageContentParams) HyperNode {
+	ownerProfileLink := fmt.Sprintf("/@%s", params.OwnerUsername)
+	visitProfileAttrs := []Attribute{
+		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfileLink)),
+		Attr("hx-push-url", ownerProfileLink),
+		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-swap", "innerHTML"),
+		Attr("hx-trigger", "click consume"),
+	}
+
+	return DIV(AttrClass("max-w-6xl mx-auto"))(
+		VIDEO(
+			AttrClass("w-full aspect-video bg-black rounded-box"),
+			AttrSrc(params.SourceUrl),
+			AttrControls(true),
+			AttrPlaysInline(true),
+		)(),
+		DIV(AttrClass("mt-4"))(
+			H1(AttrClass("text-2xl font-bold"))(params.Title),
+			DIV(AttrClass("mt-4 flex items-center gap-3"))(
+				DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
+					videoCardAvatarPlaceholder(),
+				),
+				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
+					params.OwnerName,
+				),
+			),
+			DIV(AttrClass("mt-1 text-sm text-base-content/60"))(params.Timestamp.Format(time.DateOnly)),
+			P(AttrClass("mt-4 text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
+		),
 	)
 }

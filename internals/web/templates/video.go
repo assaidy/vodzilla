@@ -3,7 +3,6 @@ package templates
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
@@ -288,32 +287,8 @@ type profileVideosParams struct {
 }
 
 func profileVideosContainer(params profileVideosParams) HyperNode {
-	cards := params.videoCards
-	if len(cards) == 0 {
-		titles := []string{
-			"How to build a VOD platform in Go",
-			"Fiber v3 deep dive",
-			"HTMX tips & tricks",
-			"PostgreSQL performance tuning",
-			"Building real-time features with SSE",
-			"Go 1.26 new features",
-			"Docker compose for dev environments",
-			"SQLC vs GORM: which one to pick",
-		}
-		now := time.Now()
-		for _, title := range titles {
-			cards = append(cards, VideoCardParams{
-				VideoId:       ulid.Make().String(),
-				Title:         title,
-				Timestamp:     now.Add(-time.Duration(rand.Intn(720)+1) * time.Hour),
-				OwnerName:     "You",
-				OwnerUsername: "assaidy",
-				ViewsCount:    rand.Intn(50000),
-			})
-		}
-	}
 	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 lg:grid-cols-4 gap-4"))(
-		Range(cards, func(p VideoCardParams) HyperNode {
+		Range(params.videoCards, func(p VideoCardParams) HyperNode {
 			return VideoCard(p)
 		}),
 	)
@@ -333,6 +308,13 @@ type VideoCardParams struct {
 func VideoCard(params VideoCardParams) HyperNode {
 	ownerProfilePageLink := fmt.Sprintf("/@%s", params.OwnerUsername)
 	videoPageLink := fmt.Sprintf("/videos/%s", params.VideoId)
+	visiteProfileAttrs := []Attribute{
+		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+		Attr("hx-push-url", ownerProfilePageLink),
+		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-swap", "innerHTML"),
+		Attr("hx-trigger", "click consume"),
+	}
 
 	return DIV(
 		AttrClass("card bg-base-100 transition-shadow duration-200 cursor-pointer"),
@@ -358,14 +340,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 		),
 		DIV(AttrClass("card-body flex flex-row gap-3 p-3"))(
 			DIV()(
-				DIV(
-					AttrClass("shrink-0 cursor-pointer"),
-					Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
-					Attr("hx-push-url", ownerProfilePageLink),
-					Attr("hx-target", "#APP_PAGE_CONTENT"),
-					Attr("hx-swap", "innerHTML"),
-					Attr("hx-trigger", "click consume"),
-				)(
+				DIV(append(visiteProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
 					If(params.AvatarUrl != "",
 						IMG(AttrClass("w-9 h-9 rounded-full"), AttrSrc(params.AvatarUrl)),
 					).Else(
@@ -375,14 +350,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 			),
 			DIV(AttrClass("min-w-0 flex-1"))(
 				H2(AttrClass("card-title text-base font-bold leading-tight line-clamp-2"))(params.Title),
-				A(
-					AttrClass("link link-hover text-xs text-base-content/60"),
-					Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
-					Attr("hx-push-url", ownerProfilePageLink),
-					Attr("hx-target", "#APP_PAGE_CONTENT"),
-					Attr("hx-swap", "innerHTML"),
-					Attr("hx-trigger", "click consume"),
-				)(
+				A(append(visiteProfileAttrs, AttrClass("link link-hover text-xs text-base-content/60"))...)(
 					params.OwnerName,
 				),
 				DIV(AttrClass("text-xs text-base-content/60"))(
@@ -448,7 +416,7 @@ func normalizeViewsCount(i int) any {
 
 func videoCardAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("avatar placeholder"))(
-		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-9 h-9 flex items-center justify-center text-xs"))(
+		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-10 h-10 flex items-center justify-center text-xs"))(
 			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
 		),
 	)

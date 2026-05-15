@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/assaidy/vodzilla/internals/events"
 	"github.com/assaidy/vodzilla/internals/services"
@@ -137,4 +138,32 @@ func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
 			return nil
 		}
 	}
+}
+
+type Video struct {
+	Id          string
+	OwnerId     string
+	ObjectKey   string
+	Timestamp   time.Time
+	Title       string
+	Description string
+}
+
+func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) {
+	video, err := me.queries.GetVideoById(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get video by id: %w", err)
+	}
+
+	return &Video{
+		Id:          video.Id,
+		OwnerId:     video.OwnerId,
+		ObjectKey:   video.ObjectKey,
+		Timestamp:   video.CreatedAt,
+		Title:       video.Title,
+		Description: video.Description.String,
+	}, nil
 }

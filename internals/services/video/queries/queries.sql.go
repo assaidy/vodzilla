@@ -10,6 +10,25 @@ import (
 	"database/sql"
 )
 
+const getVideoById = `-- name: GetVideoById :one
+select id, object_key, owner_id, title, description, created_at, status from video_service.videos where id = $1 for update
+`
+
+func (q *Queries) GetVideoById(ctx context.Context, id string) (VideoServiceVideo, error) {
+	row := q.queryRow(ctx, q.getVideoByIdStmt, getVideoById, id)
+	var i VideoServiceVideo
+	err := row.Scan(
+		&i.Id,
+		&i.ObjectKey,
+		&i.OwnerId,
+		&i.Title,
+		&i.Description,
+		&i.CreatedAt,
+		&i.Status,
+	)
+	return i, err
+}
+
 const getVideoByObjectKey = `-- name: GetVideoByObjectKey :one
 select id, object_key, owner_id, title, description, created_at, status from video_service.videos where object_key = $1 for update
 `
