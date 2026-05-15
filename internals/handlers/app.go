@@ -20,16 +20,16 @@ func HandleHomePage(c fiber.Ctx) error {
 }
 
 func HandleFeedPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.FeedPage(user.Username))
+	return render(c, templates.FeedPage(currentUser.Username))
 }
 
 func HandleFeedPageContent(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -39,7 +39,7 @@ func HandleFeedPageContent(c fiber.Ctx) error {
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
-				Username:    user.Username,
+				Username:    currentUser.Username,
 				CurrentPage: templates.PageFeed,
 			}),
 		),
@@ -47,16 +47,16 @@ func HandleFeedPageContent(c fiber.Ctx) error {
 }
 
 func HandleDiscoverPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.DiscoverPage(user.Username))
+	return render(c, templates.DiscoverPage(currentUser.Username))
 }
 
 func HandleDiscoverPageContent(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func HandleDiscoverPageContent(c fiber.Ctx) error {
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
-				Username:    user.Username,
+				Username:    currentUser.Username,
 				CurrentPage: templates.PageDiscover,
 			}),
 		),
@@ -74,16 +74,16 @@ func HandleDiscoverPageContent(c fiber.Ctx) error {
 }
 
 func HandleWatchLaterPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.WatchLaterPage(user.Username))
+	return render(c, templates.WatchLaterPage(currentUser.Username))
 }
 
 func HandleWatchLaterPageContent(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
-				Username:    user.Username,
+				Username:    currentUser.Username,
 				CurrentPage: templates.PageWatchLater,
 			}),
 		),
@@ -101,16 +101,16 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 }
 
 func HandlePlaylistsPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.PlaylistsPage(user.Username))
+	return render(c, templates.PlaylistsPage(currentUser.Username))
 }
 
 func HandlePlaylistsPageContent(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func HandlePlaylistsPageContent(c fiber.Ctx) error {
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
-				Username:    user.Username,
+				Username:    currentUser.Username,
 				CurrentPage: templates.PagePlaylists,
 			}),
 		),
@@ -128,16 +128,16 @@ func HandlePlaylistsPageContent(c fiber.Ctx) error {
 }
 
 func HandleNotificationsPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.NotificationsPage(user.Username))
+	return render(c, templates.NotificationsPage(currentUser.Username))
 }
 
 func HandleNotificationsPageContent(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func HandleNotificationsPageContent(c fiber.Ctx) error {
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
-				Username:    user.Username,
+				Username:    currentUser.Username,
 				CurrentPage: templates.PageNotifications,
 			}),
 		),
@@ -390,13 +390,26 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.VideoPageContent(templates.VideoPageContentParams{
-		Id:            video.Id,
-		OwnerName:     owner.Name,
-		OwnerUsername: owner.Username,
-		SourceUrl:     sourceUrl,
-		Title:         video.Title,
-		Description:   video.Description,
-		Timestamp:     video.Timestamp,
-	}))
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.VideoPageContent(templates.VideoPageContentParams{
+			Id:            video.Id,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			SourceUrl:     sourceUrl,
+			Title:         video.Title,
+			Description:   video.Description,
+			Timestamp:     video.Timestamp,
+		}),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username: currentUser.Username,
+			}),
+		),
+	))
 }

@@ -294,7 +294,7 @@ type NavbarParams struct {
 }
 
 func Navbar(params NavbarParams) HyperNode {
-	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky top-0 py-2 flex justify-center"))(
+	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky top-0 z-10 py-2 flex justify-center"))(
 		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
@@ -309,7 +309,7 @@ func Navbar(params NavbarParams) HyperNode {
 				isActive: params.CurrentPage == PageDiscover,
 			}),
 			DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", "Search"))(
-				BUTTON(AttrClass("p-2 btn"))(
+				BUTTON(AttrClass("p-2 btn btn-ghost"))(
 					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`),
 				),
 			),
@@ -362,7 +362,7 @@ type appPageButtonParams struct {
 func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
 		BUTTON(
-			AttrClass("p-2 btn "+IfElseZero(params.isActive, "btn-primary")),
+			AttrClass("p-2 btn btn-ghost "+IfElseZero(params.isActive, "btn-primary")),
 			Attr("hx-get", fmt.Sprintf("%s/content", params.pageLink)),
 			Attr("hx-push-url", params.pageLink),
 			Attr("hx-target", "#APP_PAGE_CONTENT"),
