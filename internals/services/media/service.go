@@ -58,7 +58,6 @@ type PresignedUpload struct {
 }
 
 func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
-	// FIX: handle abort on failure
 	createOut, err := me.s3.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(videosBucket),
 		Key:         aws.String(objectKey),
@@ -89,6 +88,7 @@ func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, object
 			},
 		)
 		if err != nil {
+			me.abortUpload(ctx, objectKey, uploadId)
 			return nil, fmt.Errorf("failed to presign url: %w", err)
 		}
 
@@ -99,6 +99,7 @@ func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, object
 		VideoId:   videoId,
 		ObjectKey: objectKey,
 	}); err != nil {
+		me.abortUpload(ctx, objectKey, uploadId)
 		return nil, fmt.Errorf("failed to insert object key: %w", err)
 	}
 
@@ -114,31 +115,7 @@ type CompleteUploadPart struct {
 	PartNumber int
 }
 
-func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) (string, error) {
-	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrNotFound
-		}
-		return "", fmt.Errorf("failed to get object key: %w", err)
-	}
-
-	presigner := s3.NewPresignClient(me.s3)
-	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket:                     aws.String(videosBucket),
-		Key:                        aws.String(objectKey),
-		ResponseContentDisposition: aws.String("inline"),
-	}, func(opts *s3.PresignOptions) {
-		opts.Expires = 1 * time.Hour // FIX: this might expire for long videos
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to presign get url: %w", err)
-	}
-	return request.URL, nil
-}
-
 func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string, parts []CompleteUploadPart) error {
-	// FIX: handle abort on failure
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -189,4 +166,38 @@ func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string,
 	}
 
 	return nil
+}
+
+func (me *Service) abortUpload(ctx context.Context, objectKey, uploadId string) {
+	if _, err := me.s3.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+		Bucket:   aws.String(videosBucket),
+		Key:      aws.String(objectKey),
+		UploadId: aws.String(uploadId),
+	}); err != nil {
+		me.logger.Error("failed to abort multipart upload",
+			"object_key", objectKey, "upload_id", uploadId, "error", err)
+	}
+}
+
+func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) (string, error) {
+	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("failed to get object key: %w", err)
+	}
+
+	presigner := s3.NewPresignClient(me.s3)
+	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(videosBucket),
+		Key:                        aws.String(objectKey),
+		ResponseContentDisposition: aws.String("inline"),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = 1 * time.Hour // FIX: this might expire for long videos
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to presign get url: %w", err)
+	}
+	return request.URL, nil
 }

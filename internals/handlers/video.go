@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -24,7 +23,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 	titleErr := validation.Validate(title, validation.Required, validation.Length(1, 256))
 	descriptionErr := validation.Validate(description, validation.Length(0, 500))
-	contentTypeErr := validation.Validate(fileSize, validation.Required, validation.By(func(value any) error {
+	contentTypeErr := validation.Validate(contentType, validation.Required, validation.By(func(value any) error {
 		if !strings.HasPrefix(value.(string), "video/") {
 			return fmt.Errorf("must be a video file")
 		}
@@ -32,7 +31,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 	}))
 	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30)) // 32 GB max
 
-	if errors.Join(titleErr, descriptionErr, fileSizeErr) != nil {
+	if errors.Join(titleErr, descriptionErr, contentTypeErr, fileSizeErr) != nil {
 		return render(c, templates.PostVideoForm(templates.PostVideoFormParams{
 			Title:          title,
 			TitleErr:       titleErr,
@@ -76,7 +75,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
-				ObjectKey:      objectKey,
+				VideoId:        videoId,
 				UploadId:       presignedUpload.UploadId,
 				PartSize:       presignedUpload.PartSize,
 				UploadUrls:     presignedUpload.Urls,
@@ -88,9 +87,9 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 func HandleCompleteVideoUpload(c fiber.Ctx) error {
 	var request struct {
-		ObjectKey string `json:"objectKey"`
-		UploadId  string `json:"uploadId"`
-		Parts     []struct {
+		VideoId  string `json:"videoId"`
+		UploadId string `json:"uploadId"`
+		Parts    []struct {
 			ETag       string `json:"etag"`
 			PartNumber int    `json:"partNumber"`
 		} `json:"parts"`
@@ -109,7 +108,7 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 	}
 
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	if err := mediaService.CompleteUpload(c.RequestCtx(), request.UploadId, request.ObjectKey, parts); err != nil {
+	if err := mediaService.CompleteUpload(c.RequestCtx(), request.VideoId, request.UploadId, parts); err != nil {
 		if errors.Is(err, media_service.ErrInvalidCompleteUploadData) {
 			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
 		}

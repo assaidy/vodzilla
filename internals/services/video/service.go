@@ -132,7 +132,7 @@ type Video struct {
 func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) {
 	video, err := me.queries.GetVideoById(ctx, id)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) || video.Status != string(VideoStatusReady) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get video by id: %w", err)

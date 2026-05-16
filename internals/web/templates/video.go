@@ -123,7 +123,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 type VideoUploaderParams struct {
 	PendingVideoId string
 	VideoTitle     string
-	ObjectKey      string
+	VideoId        string
 	UploadId       string
 	PartSize       int64
 	UploadUrls     []string
@@ -138,17 +138,17 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 		(async () => {
 			const script = document.currentScript;
 			const pendingVideoId = %q;
-			const videoTitle = %q;
-			const objectKey = %q;
-			const uploadId = %q;
-			const partSize = %d;
-			const uploadUrls = %s;
+			const videoTitle     = %q;
+			const videoId        = %q;
+			const uploadId       = %q;
+			const partSize       = %d;
+			const uploadUrls     = %s;
 
 			try {
 				await window._videoUploadManager.upload({
 					pendingVideoId,
 					videoTitle,
-					objectKey,
+					videoId,
 					uploadId,
 					partSize,
 					uploadUrls,
@@ -164,7 +164,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 	`,
 		params.PendingVideoId,
 		params.VideoTitle,
-		params.ObjectKey,
+		params.VideoId,
 		params.UploadId,
 		params.PartSize,
 		string(encodedUrls),
@@ -218,7 +218,7 @@ func videoUploadersContainer() HyperNode {
 						}
 						UPLOAD_LIST_BODY.innerHTML = html;
 				},
-			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, objectKey, uploadId, completeUploadUrl }) {
+			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, videoId, uploadId, completeUploadUrl }) {
 					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
 
 					const file = window._pendingVideos[pendingVideoId];
@@ -246,7 +246,7 @@ func videoUploadersContainer() HyperNode {
 					await fetch(completeUploadUrl, {
 					 	method: 'POST',
 					 	headers: { 'Content-Type': 'application/json' },
-					 	body: JSON.stringify({ objectKey, uploadId, parts: completedParts }),
+					 	body: JSON.stringify({ videoId, uploadId, parts: completedParts }),
 					});
 
 					delete window._pendingVideos[pendingVideoId];
