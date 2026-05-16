@@ -1,7 +1,6 @@
 -- +goose Up
 create table video_service.videos (
   id          varchar      primary key,
-  object_key  varchar      not null unique,
   owner_id    varchar      not null,
   title       varchar(256) not null,
   description varchar(500),

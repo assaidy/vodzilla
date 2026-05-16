@@ -57,7 +57,8 @@ type PresignedUpload struct {
 	Urls     []string
 }
 
-func (me *Service) GeneratePresignedPutUrls(ctx context.Context, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
+func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
+	// FIX: handle abort on failure
 	createOut, err := me.s3.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(videosBucket),
 		Key:         aws.String(objectKey),
@@ -94,6 +95,13 @@ func (me *Service) GeneratePresignedPutUrls(ctx context.Context, objectKey, cont
 		urls = append(urls, request.URL)
 	}
 
+	if err := me.queries.InsertObjectKey(ctx, queries.InsertObjectKeyParams{
+		VideoId:   videoId,
+		ObjectKey: objectKey,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to insert object key: %w", err)
+	}
+
 	return &PresignedUpload{
 		UploadId: uploadId,
 		Urls:     urls,
@@ -106,13 +114,22 @@ type CompleteUploadPart struct {
 	PartNumber int
 }
 
-func (me *Service) GeneratePresignedGetUrl(ctx context.Context, objectKey string) (string, error) {
+func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) (string, error) {
+	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", fmt.Errorf("failed to get object key: %w", err)
+	}
+
 	presigner := s3.NewPresignClient(me.s3)
 	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(videosBucket),
-		Key:    aws.String(objectKey),
+		Bucket:                     aws.String(videosBucket),
+		Key:                        aws.String(objectKey),
+		ResponseContentDisposition: aws.String("inline"),
 	}, func(opts *s3.PresignOptions) {
-		opts.Expires = 1 * time.Hour
+		opts.Expires = 1 * time.Hour // FIX: this might expire for long videos
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to presign get url: %w", err)
@@ -120,7 +137,16 @@ func (me *Service) GeneratePresignedGetUrl(ctx context.Context, objectKey string
 	return request.URL, nil
 }
 
-func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKey string, parts []CompleteUploadPart) error {
+func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string, parts []CompleteUploadPart) error {
+	// FIX: handle abort on failure
+	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("failed to get object key: %w", err)
+	}
+
 	completedParts := make([]types.CompletedPart, 0, len(parts))
 	for _, part := range parts {
 		completedParts = append(completedParts, types.CompletedPart{
@@ -152,7 +178,7 @@ func (me *Service) CompleteUpload(ctx context.Context, uploadId string, objectKe
 	}
 
 	payload, err := json.Marshal(events.VideoUploadedEventPayload{
-		ObjectKey: objectKey,
+		VideoId:   videoId,
 		Timestamp: time.Now(),
 	})
 	if err != nil {

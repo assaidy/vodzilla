@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -22,6 +24,12 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 	titleErr := validation.Validate(title, validation.Required, validation.Length(1, 256))
 	descriptionErr := validation.Validate(description, validation.Length(0, 500))
+	contentTypeErr := validation.Validate(fileSize, validation.Required, validation.By(func(value any) error {
+		if !strings.HasPrefix(value.(string), "video/") {
+			return fmt.Errorf("must be a video file")
+		}
+		return nil
+	}))
 	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30)) // 32 GB max
 
 	if errors.Join(titleErr, descriptionErr, fileSizeErr) != nil {
@@ -30,13 +38,15 @@ func HandlePostVideo(c fiber.Ctx) error {
 			TitleErr:       titleErr,
 			Description:    description,
 			DescriptionErr: descriptionErr,
-			VideoErr:       fileSizeErr,
+			VideoErr:       errors.Join(contentTypeErr, fileSizeErr),
 		}))
 	}
 
+	currentUser := c.Locals("user_id").(string)
+
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	createVideoResult, err := videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
-		OwnerId:     c.Locals("user_id").(string),
+	videoId, err := videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
+		OwnerId:     currentUser,
 		Title:       title,
 		Description: description,
 	})
@@ -44,10 +54,13 @@ func HandlePostVideo(c fiber.Ctx) error {
 		return err
 	}
 
+	objectKey := fmt.Sprintf("%s/%s", currentUser, videoId)
+
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	presignedUpload, err := mediaService.GeneratePresignedPutUrls(
 		c.RequestCtx(),
-		createVideoResult.ObjectKey,
+		videoId,
+		objectKey,
 		contentType,
 		fileSize,
 	)
@@ -63,7 +76,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
-				ObjectKey:      createVideoResult.ObjectKey,
+				ObjectKey:      objectKey,
 				UploadId:       presignedUpload.UploadId,
 				PartSize:       presignedUpload.PartSize,
 				UploadUrls:     presignedUpload.Urls,

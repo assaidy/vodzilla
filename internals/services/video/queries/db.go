@@ -27,11 +27,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVideoByIdStmt, err = db.PrepareContext(ctx, getVideoById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoById: %w", err)
 	}
-	if q.getVideoByObjectKeyStmt, err = db.PrepareContext(ctx, getVideoByObjectKey); err != nil {
-		return nil, fmt.Errorf("error preparing query GetVideoByObjectKey: %w", err)
-	}
-	if q.getVideosByUserIdStmt, err = db.PrepareContext(ctx, getVideosByUserId); err != nil {
-		return nil, fmt.Errorf("error preparing query GetVideosByUserId: %w", err)
+	if q.getVideosForUserStmt, err = db.PrepareContext(ctx, getVideosForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVideosForUser: %w", err)
 	}
 	if q.insertVideoStmt, err = db.PrepareContext(ctx, insertVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertVideo: %w", err)
@@ -49,14 +46,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getVideoByIdStmt: %w", cerr)
 		}
 	}
-	if q.getVideoByObjectKeyStmt != nil {
-		if cerr := q.getVideoByObjectKeyStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getVideoByObjectKeyStmt: %w", cerr)
-		}
-	}
-	if q.getVideosByUserIdStmt != nil {
-		if cerr := q.getVideosByUserIdStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getVideosByUserIdStmt: %w", cerr)
+	if q.getVideosForUserStmt != nil {
+		if cerr := q.getVideosForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVideosForUserStmt: %w", cerr)
 		}
 	}
 	if q.insertVideoStmt != nil {
@@ -106,23 +98,21 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                      DBTX
-	tx                      *sql.Tx
-	getVideoByIdStmt        *sql.Stmt
-	getVideoByObjectKeyStmt *sql.Stmt
-	getVideosByUserIdStmt   *sql.Stmt
-	insertVideoStmt         *sql.Stmt
-	updateVideoStatusStmt   *sql.Stmt
+	db                    DBTX
+	tx                    *sql.Tx
+	getVideoByIdStmt      *sql.Stmt
+	getVideosForUserStmt  *sql.Stmt
+	insertVideoStmt       *sql.Stmt
+	updateVideoStatusStmt *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                      tx,
-		tx:                      tx,
-		getVideoByIdStmt:        q.getVideoByIdStmt,
-		getVideoByObjectKeyStmt: q.getVideoByObjectKeyStmt,
-		getVideosByUserIdStmt:   q.getVideosByUserIdStmt,
-		insertVideoStmt:         q.insertVideoStmt,
-		updateVideoStatusStmt:   q.updateVideoStatusStmt,
+		db:                    tx,
+		tx:                    tx,
+		getVideoByIdStmt:      q.getVideoByIdStmt,
+		getVideosForUserStmt:  q.getVideosForUserStmt,
+		insertVideoStmt:       q.insertVideoStmt,
+		updateVideoStatusStmt: q.updateVideoStatusStmt,
 	}
 }

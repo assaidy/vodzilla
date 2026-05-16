@@ -11,7 +11,7 @@ import (
 )
 
 const getVideoById = `-- name: GetVideoById :one
-select id, object_key, owner_id, title, description, created_at, status from video_service.videos where id = $1 for update
+select id, owner_id, title, description, created_at, status from video_service.videos where id = $1 for update
 `
 
 func (q *Queries) GetVideoById(ctx context.Context, id string) (VideoServiceVideo, error) {
@@ -19,7 +19,6 @@ func (q *Queries) GetVideoById(ctx context.Context, id string) (VideoServiceVide
 	var i VideoServiceVideo
 	err := row.Scan(
 		&i.Id,
-		&i.ObjectKey,
 		&i.OwnerId,
 		&i.Title,
 		&i.Description,
@@ -29,31 +28,17 @@ func (q *Queries) GetVideoById(ctx context.Context, id string) (VideoServiceVide
 	return i, err
 }
 
-const getVideoByObjectKey = `-- name: GetVideoByObjectKey :one
-select id, object_key, owner_id, title, description, created_at, status from video_service.videos where object_key = $1 for update
+const getVideosForUser = `-- name: GetVideosForUser :many
+select id, owner_id, title, description, created_at, status from video_service.videos where owner_id = $1 and status = $2
 `
 
-func (q *Queries) GetVideoByObjectKey(ctx context.Context, objectKey string) (VideoServiceVideo, error) {
-	row := q.queryRow(ctx, q.getVideoByObjectKeyStmt, getVideoByObjectKey, objectKey)
-	var i VideoServiceVideo
-	err := row.Scan(
-		&i.Id,
-		&i.ObjectKey,
-		&i.OwnerId,
-		&i.Title,
-		&i.Description,
-		&i.CreatedAt,
-		&i.Status,
-	)
-	return i, err
+type GetVideosForUserParams struct {
+	OwnerId string
+	Status  string
 }
 
-const getVideosByUserId = `-- name: GetVideosByUserId :many
-select id, object_key, owner_id, title, description, created_at, status from video_service.videos where owner_id = $1
-`
-
-func (q *Queries) GetVideosByUserId(ctx context.Context, ownerID string) ([]VideoServiceVideo, error) {
-	rows, err := q.query(ctx, q.getVideosByUserIdStmt, getVideosByUserId, ownerID)
+func (q *Queries) GetVideosForUser(ctx context.Context, arg GetVideosForUserParams) ([]VideoServiceVideo, error) {
+	rows, err := q.query(ctx, q.getVideosForUserStmt, getVideosForUser, arg.OwnerId, arg.Status)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +48,6 @@ func (q *Queries) GetVideosByUserId(ctx context.Context, ownerID string) ([]Vide
 		var i VideoServiceVideo
 		if err := rows.Scan(
 			&i.Id,
-			&i.ObjectKey,
 			&i.OwnerId,
 			&i.Title,
 			&i.Description,
@@ -84,12 +68,11 @@ func (q *Queries) GetVideosByUserId(ctx context.Context, ownerID string) ([]Vide
 }
 
 const insertVideo = `-- name: InsertVideo :exec
-insert into video_service.videos (id, object_key, owner_id, title, description, status) values ($1, $2, $3, $4, $5, $6)
+insert into video_service.videos (id, owner_id, title, description, status) values ($1, $2, $3, $4, $5)
 `
 
 type InsertVideoParams struct {
 	Id          string
-	ObjectKey   string
 	OwnerId     string
 	Title       string
 	Description sql.NullString
@@ -99,7 +82,6 @@ type InsertVideoParams struct {
 func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error {
 	_, err := q.exec(ctx, q.insertVideoStmt, insertVideo,
 		arg.Id,
-		arg.ObjectKey,
 		arg.OwnerId,
 		arg.Title,
 		arg.Description,

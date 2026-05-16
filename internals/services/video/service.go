@@ -77,30 +77,20 @@ type CreateVideoParams struct {
 	Description string
 }
 
-type CreateVideoReuslt struct {
-	VideoId   string
-	ObjectKey string
-}
-
-func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (*CreateVideoReuslt, error) {
+func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (string, error) {
 	videoId := ulid.Make().String()
-	objectKey := fmt.Sprintf("%s/%s", params.OwnerId, videoId)
 
 	if err := me.queries.InsertVideo(ctx, queries.InsertVideoParams{
 		Id:          videoId,
-		ObjectKey:   objectKey,
 		OwnerId:     params.OwnerId,
 		Title:       params.Title,
 		Description: sql.NullString{Valid: params.Description != "", String: params.Description},
 		Status:      string(VideoStatusUploading),
 	}); err != nil {
-		return nil, fmt.Errorf("failed to insert video: %w", err)
+		return "", fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	return &CreateVideoReuslt{
-		VideoId:   videoId,
-		ObjectKey: objectKey,
-	}, nil
+	return videoId, nil
 }
 
 func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
@@ -117,17 +107,8 @@ func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
 				continue
 			}
 
-			video, err := me.queries.GetVideoByObjectKey(ctx, payload.ObjectKey)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					me.logger.Error("failed to get video by object key", "error", err)
-				}
-				// else, video was removed for expiration or something
-				continue
-			}
-
 			if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
-				Id:     video.Id,
+				Id:     payload.VideoId,
 				Status: string(VideoStatusUploaded),
 			}); err != nil {
 				me.logger.Error("failed to update video status", "error", err)
@@ -143,7 +124,6 @@ func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
 type Video struct {
 	Id          string
 	OwnerId     string
-	ObjectKey   string
 	Timestamp   time.Time
 	Title       string
 	Description string
@@ -161,7 +141,6 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 	return &Video{
 		Id:          video.Id,
 		OwnerId:     video.OwnerId,
-		ObjectKey:   video.ObjectKey,
 		Timestamp:   video.CreatedAt,
 		Title:       video.Title,
 		Description: video.Description.String,
@@ -169,7 +148,10 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 }
 
 func (me *Service) GetUserVideos(ctx context.Context, id string) ([]Video, error) {
-	videos, err := me.queries.GetVideosByUserId(ctx, id)
+	videos, err := me.queries.GetVideosForUser(ctx, queries.GetVideosForUserParams{
+		OwnerId: id,
+		Status:  string(VideoStatusReady),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get videos by user id: %w", err)
 	}
@@ -179,7 +161,6 @@ func (me *Service) GetUserVideos(ctx context.Context, id string) ([]Video, error
 		result = append(result, Video{
 			Id:          v.Id,
 			OwnerId:     v.OwnerId,
-			ObjectKey:   v.ObjectKey,
 			Timestamp:   v.CreatedAt,
 			Title:       v.Title,
 			Description: v.Description.String,

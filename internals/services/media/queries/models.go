@@ -3,3 +3,8 @@
 //   sqlc v1.31.1
 
 package queries
+
+type MediaServiceObjectKey struct {
+	VideoId   string
+	ObjectKey string
+}

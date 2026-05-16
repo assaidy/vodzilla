@@ -24,17 +24,25 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
-	if q.xStmt, err = db.PrepareContext(ctx, x); err != nil {
-		return nil, fmt.Errorf("error preparing query X: %w", err)
+	if q.getObjectKeyForVideoStmt, err = db.PrepareContext(ctx, getObjectKeyForVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query GetObjectKeyForVideo: %w", err)
+	}
+	if q.insertObjectKeyStmt, err = db.PrepareContext(ctx, insertObjectKey); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertObjectKey: %w", err)
 	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
-	if q.xStmt != nil {
-		if cerr := q.xStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing xStmt: %w", cerr)
+	if q.getObjectKeyForVideoStmt != nil {
+		if cerr := q.getObjectKeyForVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getObjectKeyForVideoStmt: %w", cerr)
+		}
+	}
+	if q.insertObjectKeyStmt != nil {
+		if cerr := q.insertObjectKeyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertObjectKeyStmt: %w", cerr)
 		}
 	}
 	return err
@@ -74,15 +82,17 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db    DBTX
-	tx    *sql.Tx
-	xStmt *sql.Stmt
+	db                       DBTX
+	tx                       *sql.Tx
+	getObjectKeyForVideoStmt *sql.Stmt
+	insertObjectKeyStmt      *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:    tx,
-		tx:    tx,
-		xStmt: q.xStmt,
+		db:                       tx,
+		tx:                       tx,
+		getObjectKeyForVideoStmt: q.getObjectKeyForVideoStmt,
+		insertObjectKeyStmt:      q.insertObjectKeyStmt,
 	}
 }

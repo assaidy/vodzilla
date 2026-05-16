@@ -27,6 +27,8 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+// TODO: revise and improve bg workers in all services
+
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Vodzilla",

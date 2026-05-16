@@ -11,7 +11,6 @@ import (
 
 type VideoServiceVideo struct {
 	Id          string
-	ObjectKey   string
 	OwnerId     string
 	Title       string
 	Description sql.NullString

@@ -9,13 +9,27 @@ import (
 	"context"
 )
 
-const x = `-- name: X :one
-select 1
+const getObjectKeyForVideo = `-- name: GetObjectKeyForVideo :one
+select object_key from media_service.object_keys where video_id = $1
 `
 
-func (q *Queries) X(ctx context.Context) (int32, error) {
-	row := q.queryRow(ctx, q.xStmt, x)
-	var column_1 int32
-	err := row.Scan(&column_1)
-	return column_1, err
+func (q *Queries) GetObjectKeyForVideo(ctx context.Context, videoID string) (string, error) {
+	row := q.queryRow(ctx, q.getObjectKeyForVideoStmt, getObjectKeyForVideo, videoID)
+	var object_key string
+	err := row.Scan(&object_key)
+	return object_key, err
+}
+
+const insertObjectKey = `-- name: InsertObjectKey :exec
+insert into media_service.object_keys (video_id, object_key) values ($1, $2)
+`
+
+type InsertObjectKeyParams struct {
+	VideoId   string
+	ObjectKey string
+}
+
+func (q *Queries) InsertObjectKey(ctx context.Context, arg InsertObjectKeyParams) error {
+	_, err := q.exec(ctx, q.insertObjectKeyStmt, insertObjectKey, arg.VideoId, arg.ObjectKey)
+	return err
 }

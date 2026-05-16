@@ -344,7 +344,7 @@ func HandleVideoPage(c fiber.Ctx) error {
 	}
 
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.ObjectKey)
+	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.Id)
 	if err != nil {
 		return err
 	}
@@ -385,7 +385,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	}
 
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.ObjectKey)
+	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.Id)
 	if err != nil {
 		return err
 	}
