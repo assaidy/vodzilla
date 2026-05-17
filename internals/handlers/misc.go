@@ -34,7 +34,12 @@ func WithLogging(c fiber.Ctx) error {
 	return nil
 }
 
-func WithErrorResolver(c fiber.Ctx, err error) error {
+func WithErrorResolver(c fiber.Ctx) error {
+	err := c.Next()
+	if err == nil {
+		return nil
+	}
+
 	code := fiber.StatusInternalServerError
 	if e, ok := errors.AsType[*fiber.Error](err); ok {
 		code = e.Code

@@ -436,6 +436,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			P(AttrClass("mt-4 text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
 		),
 
+		// FIX: this script raises error "redeclaration of `atterps`" when
+		// we request and swap the video page content (not doing full page reload).
 		SCRIPT()(RawText(fmt.Sprintf(`
 			const v = VIDEO_PLAYER;
 
