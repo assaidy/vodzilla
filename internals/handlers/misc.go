@@ -17,9 +17,6 @@ import (
 func WithLogging(c fiber.Ctx) error {
 	start := time.Now()
 	err := c.Next()
-	if err != nil {
-		errorHandler(c, err)
-	}
 	took := time.Since(start)
 
 	fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
@@ -32,10 +29,12 @@ func WithLogging(c fiber.Ctx) error {
 			"error", err,
 		)
 
+	// I don't return handlers chain error intentionally.
+	// All errors were handled and request was finalized in [WithErrorResolver].
 	return nil
 }
 
-func errorHandler(c fiber.Ctx, err error) error {
+func WithErrorResolver(c fiber.Ctx, err error) error {
 	code := fiber.StatusInternalServerError
 	if e, ok := errors.AsType[*fiber.Error](err); ok {
 		code = e.Code

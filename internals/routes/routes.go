@@ -10,6 +10,7 @@ import (
 
 func RegisterRoutes(app *fiber.App) {
 	app.Use(handlers.WithLogging)
+	app.Use(handlers.WithErrorResolver)
 	app.Use(handlers.WithPassClientIdToLocals)
 
 	app.Use(static.New("assets/", static.Config{
