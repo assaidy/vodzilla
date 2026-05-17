@@ -117,3 +117,15 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 
 	return nil
 }
+
+func HandleGetVideoStreamUrl(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"url": url})
+}

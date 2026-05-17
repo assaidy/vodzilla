@@ -194,10 +194,11 @@ func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) 
 		Key:                        aws.String(objectKey),
 		ResponseContentDisposition: aws.String("inline"),
 	}, func(opts *s3.PresignOptions) {
-		opts.Expires = 1 * time.Hour // FIX: this might expire for long videos
+		opts.Expires = 1 * time.Hour
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to presign get url: %w", err)
 	}
+
 	return request.URL, nil
 }

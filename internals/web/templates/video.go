@@ -171,7 +171,6 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 	)))
 }
 
-// TODO: move progress bars rendering to server
 func videoUploadersContainer() HyperNode {
 	return DIV(AttrId("VIDEO_UPLOADERS_CONTAINER"))(
 		SCRIPT()(RawText(`

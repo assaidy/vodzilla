@@ -416,6 +416,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(
 		VIDEO(
+			AttrId("VIDEO_PLAYER"),
 			AttrClass("w-full aspect-video bg-black rounded-box"),
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
@@ -434,5 +435,28 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			DIV(AttrClass("mt-1 text-sm text-base-content/60"))(params.Timestamp.Format(time.DateOnly)),
 			P(AttrClass("mt-4 text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
 		),
+
+		SCRIPT()(RawText(fmt.Sprintf(`
+			const v = VIDEO_PLAYER;
+
+			let attempts = 0;
+			v.addEventListener('error', async () => {
+				if (v.error && v.error.code !== v.error.MEDIA_ERR_NETWORK) return;
+				if (++attempts > 3) return;
+				try {
+					const r = await fetch('/videos/%s/stream_url');
+					const d = await r.json();
+					const t = v.currentTime;
+					const p = !v.paused;
+					v.src = d.url;
+					v.currentTime = t;
+					if (p) await v.play();
+				} catch(e) {
+					console.error(e);
+				}
+			});
+
+			v.addEventListener('playing', () => { attempts = 0; });
+		`, params.Id))),
 	)
 }
