@@ -11,3 +11,6 @@ where id = $2;
 
 -- name: GetVideosForUser :many
 select * from video_service.videos where owner_id = $1 and status = $2;
+
+-- name: CheckVideo :one
+select exists (select 1 from video_service.videos where id = $1 for update);

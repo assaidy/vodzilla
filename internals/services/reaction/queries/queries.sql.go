@@ -9,6 +9,66 @@ import (
 	"context"
 )
 
+const deleteReaction = `-- name: DeleteReaction :exec
+delete from reaction_service.reactions where video_id = $1 and user_id = $2 and kind = $3
+`
+
+type DeleteReactionParams struct {
+	VideoId string
+	UserId  string
+	Kind    string
+}
+
+func (q *Queries) DeleteReaction(ctx context.Context, arg DeleteReactionParams) error {
+	_, err := q.exec(ctx, q.deleteReactionStmt, deleteReaction, arg.VideoId, arg.UserId, arg.Kind)
+	return err
+}
+
+const getVideoReactionForUser = `-- name: GetVideoReactionForUser :one
+SELECT
+    kind = 'like'    as is_like,
+    kind = 'dislike' as is_dislike
+FROM reaction_service.reactions
+where video_id = $1 and user_id = $2
+`
+
+type GetVideoReactionForUserParams struct {
+	VideoId string
+	UserId  string
+}
+
+type GetVideoReactionForUserRow struct {
+	IsLike    bool
+	IsDislike bool
+}
+
+func (q *Queries) GetVideoReactionForUser(ctx context.Context, arg GetVideoReactionForUserParams) (GetVideoReactionForUserRow, error) {
+	row := q.queryRow(ctx, q.getVideoReactionForUserStmt, getVideoReactionForUser, arg.VideoId, arg.UserId)
+	var i GetVideoReactionForUserRow
+	err := row.Scan(&i.IsLike, &i.IsDislike)
+	return i, err
+}
+
+const getVideoReactions = `-- name: GetVideoReactions :one
+SELECT
+    count(*) filter (where kind = 'like')    as likes,
+    count(*) filter (where kind = 'dislike') as dislikes
+FROM reaction_service.reactions
+where video_id = $1
+`
+
+type GetVideoReactionsRow struct {
+	Likes    int64
+	Dislikes int64
+}
+
+func (q *Queries) GetVideoReactions(ctx context.Context, videoID string) (GetVideoReactionsRow, error) {
+	row := q.queryRow(ctx, q.getVideoReactionsStmt, getVideoReactions, videoID)
+	var i GetVideoReactionsRow
+	err := row.Scan(&i.Likes, &i.Dislikes)
+	return i, err
+}
+
 const getViewsCount = `-- name: GetViewsCount :one
 select count(*) from reaction_service.views where video_id = $1
 `
@@ -18,6 +78,24 @@ func (q *Queries) GetViewsCount(ctx context.Context, videoID string) (int64, err
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const insertReaction = `-- name: InsertReaction :exec
+insert into reaction_service.reactions (video_id, user_id, kind) values ($1, $2, $3)
+on conflict (video_id, user_id) do update set
+  kind = excluded.kind,
+  added_at = now()
+`
+
+type InsertReactionParams struct {
+	VideoId string
+	UserId  string
+	Kind    string
+}
+
+func (q *Queries) InsertReaction(ctx context.Context, arg InsertReactionParams) error {
+	_, err := q.exec(ctx, q.insertReactionStmt, insertReaction, arg.VideoId, arg.UserId, arg.Kind)
+	return err
 }
 
 const insertView = `-- name: InsertView :execrows

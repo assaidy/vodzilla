@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+type ReactionServiceReaction struct {
+	VideoId string
+	UserId  string
+	Kind    string
+	AddedAt time.Time
+}
+
 type ReactionServiceView struct {
 	VideoId   string
 	UserId    string

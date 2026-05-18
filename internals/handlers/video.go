@@ -125,6 +125,9 @@ func HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
 	if err != nil {
+		if errors.Is(err, media_service.ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		}
 		return err
 	}
 
@@ -135,10 +138,90 @@ func HandleViewVideo(c fiber.Ctx) error {
 	videoId := c.Params("video_id")
 	userId := c.Locals("user_id").(string)
 
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if ok, err := videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+
 	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 	if err := reactionService.ViewVideo(c.RequestCtx(), videoId, userId); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+const (
+	ReactionLike    = "like"
+	ReactionDislike = "dislike"
+)
+
+func HandleAddVideoReaction(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+	kind := c.Query("kind")
+
+	if kind != ReactionLike && kind != ReactionDislike {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid reaction kind")
+	}
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if ok, err := videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	if err := reactionService.AddVidoeReaction(c.RequestCtx(), videoId, userId, kind); err != nil {
+		return err
+	}
+
+	reactinCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
+	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
+		VideoId:       videoId,
+		LikesCount:    reactinCounts.Likes,
+		DislikesCount: reactinCounts.Dislikes,
+		IsLiked:       kind == ReactionLike,
+		IsDisliked:    kind == ReactionDislike,
+	}))
+}
+
+func HandleDeleteVideoReaction(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+	kind := c.Query("kind")
+
+	if kind != ReactionLike && kind != ReactionDislike {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid reaction kind")
+	}
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if ok, err := videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	if err := reactionService.DeleteVidoeReaction(c.RequestCtx(), videoId, userId, kind); err != nil {
+		return err
+	}
+
+	reactinCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
+	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
+		VideoId:       videoId,
+		LikesCount:    reactinCounts.Likes,
+		DislikesCount: reactinCounts.Dislikes,
+	}))
 }

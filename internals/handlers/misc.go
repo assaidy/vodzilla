@@ -48,10 +48,13 @@ func WithErrorResolver(c fiber.Ctx) error {
 
 	if code == fiber.StatusInternalServerError {
 		// Hide internal error from client; It has been catched by [WithLogging].
-		return render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
+		render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
+	} else {
+		c.SendString(err.Error())
 	}
 
-	return c.SendString(err.Error())
+	// Pass error to logger.
+	return err
 }
 
 func HandleCheckHealth(c fiber.Ctx) error {

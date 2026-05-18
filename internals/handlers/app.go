@@ -328,7 +328,7 @@ func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 }
 
 func HandleVideoPage(c fiber.Ctx) error {
-	user, err := getCurrentUser(c)
+	currentUser, err := getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -364,9 +364,17 @@ func HandleVideoPage(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	reactionCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+	currentUserReaction, err := reactionService.GetVideoReactionForUser(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
 
 	return render(c, templates.VideoPage(templates.VideoPageParams{
-		Username: user.Username,
+		Username: currentUser.Username,
 		ContentParams: templates.VideoPageContentParams{
 			Id:            video.Id,
 			OwnerName:     owner.Name,
@@ -376,6 +384,13 @@ func HandleVideoPage(c fiber.Ctx) error {
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
+			ReactionsParams: templates.ReactionsWidgetParams{
+				VideoId:       videoId,
+				LikesCount:    reactionCounts.Likes,
+				DislikesCount: reactionCounts.Dislikes,
+				IsLiked:       currentUserReaction.IsLike,
+				IsDisliked:    currentUserReaction.IsDislike,
+			},
 		},
 	}))
 }
@@ -417,6 +432,14 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	reactionCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+	currentUserReaction, err := reactionService.GetVideoReactionForUser(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
 
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
@@ -428,6 +451,13 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
+			ReactionsParams: templates.ReactionsWidgetParams{
+				VideoId:       videoId,
+				LikesCount:    reactionCounts.Likes,
+				DislikesCount: reactionCounts.Dislikes,
+				IsLiked:       currentUserReaction.IsLike,
+				IsDisliked:    currentUserReaction.IsDislike,
+			},
 		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(

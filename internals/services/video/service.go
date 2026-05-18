@@ -170,3 +170,12 @@ func (me *Service) GetUserVideos(ctx context.Context, id string) ([]Video, error
 	return result, nil
 
 }
+
+func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) {
+	ok, err := me.queries.CheckVideo(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("failed to check video: %w", err)
+	}
+
+	return ok, nil
+}

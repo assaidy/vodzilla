@@ -395,14 +395,15 @@ func VideoPage(params VideoPageParams) HyperNode {
 }
 
 type VideoPageContentParams struct {
-	Id            string
-	OwnerName     string
-	OwnerUsername string
-	SourceUrl     string
-	Title         string
-	Description   string
-	Timestamp     time.Time
-	ViewsCount    int
+	Id              string
+	OwnerName       string
+	OwnerUsername   string
+	SourceUrl       string
+	Title           string
+	Description     string
+	Timestamp       time.Time
+	ViewsCount      int
+	ReactionsParams ReactionsWidgetParams
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
@@ -434,6 +435,9 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
 					params.OwnerName,
 				),
+
+				// like,dislike
+				ReactionsWidget(params.ReactionsParams),
 			),
 			DIV(AttrClass("mt-4 card bg-base-200 p-4 space-y-2"))(
 				DIV(AttrClass("text-sm text-base-content/60 flex gap-4"))(
@@ -466,5 +470,48 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				v.addEventListener('playing', () => { attempts = 0; });
 			})();
 		`, params.Id))),
+	)
+}
+
+type ReactionsWidgetParams struct {
+	VideoId       string
+	LikesCount    int
+	DislikesCount int
+	IsLiked       bool
+	IsDisliked    bool
+}
+
+func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
+	return DIV(AttrId("REACTIONS_WIDGET"), AttrClass("join ml-auto"))(
+		BUTTON(
+			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
+			Attr("data-tip", "Like"),
+			IfElse(!params.IsLiked,
+				Attr("hx-post", fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
+				Attr("hx-delete", fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
+			),
+			Attr("hx-target", "#REACTIONS_WIDGET"),
+			Attr("hx-swap", "outerHTML"),
+		)(
+			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="%s" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
+				IfElse(params.IsLiked, "currentColor", "none"),
+			)),
+			SPAN(AttrClass("text-sm"))(fmt.Sprint(params.LikesCount)),
+		),
+		BUTTON(
+			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
+			Attr("data-tip", "Dislike"),
+			IfElse(!params.IsDisliked,
+				Attr("hx-post", fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
+				Attr("hx-delete", fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
+			),
+			Attr("hx-target", "#REACTIONS_WIDGET"),
+			Attr("hx-swap", "outerHTML"),
+		)(
+			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="%s" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
+				IfElse(params.IsDisliked, "currentColor", "none"),
+			)),
+			SPAN(AttrClass("text-sm"))(fmt.Sprint(params.DislikesCount)),
+		),
 	)
 }

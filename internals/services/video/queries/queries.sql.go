@@ -10,6 +10,17 @@ import (
 	"database/sql"
 )
 
+const checkVideo = `-- name: CheckVideo :one
+select exists (select 1 from video_service.videos where id = $1 for update)
+`
+
+func (q *Queries) CheckVideo(ctx context.Context, id string) (bool, error) {
+	row := q.queryRow(ctx, q.checkVideoStmt, checkVideo, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getVideoById = `-- name: GetVideoById :one
 select id, owner_id, title, description, created_at, status from video_service.videos where id = $1 for update
 `

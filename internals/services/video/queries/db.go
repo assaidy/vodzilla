@@ -24,6 +24,9 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.checkVideoStmt, err = db.PrepareContext(ctx, checkVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckVideo: %w", err)
+	}
 	if q.getVideoByIdStmt, err = db.PrepareContext(ctx, getVideoById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoById: %w", err)
 	}
@@ -41,6 +44,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.checkVideoStmt != nil {
+		if cerr := q.checkVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkVideoStmt: %w", cerr)
+		}
+	}
 	if q.getVideoByIdStmt != nil {
 		if cerr := q.getVideoByIdStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVideoByIdStmt: %w", cerr)
@@ -100,6 +108,7 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 type Queries struct {
 	db                    DBTX
 	tx                    *sql.Tx
+	checkVideoStmt        *sql.Stmt
 	getVideoByIdStmt      *sql.Stmt
 	getVideosForUserStmt  *sql.Stmt
 	insertVideoStmt       *sql.Stmt
@@ -110,6 +119,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                    tx,
 		tx:                    tx,
+		checkVideoStmt:        q.checkVideoStmt,
 		getVideoByIdStmt:      q.getVideoByIdStmt,
 		getVideosForUserStmt:  q.getVideosForUserStmt,
 		insertVideoStmt:       q.insertVideoStmt,
