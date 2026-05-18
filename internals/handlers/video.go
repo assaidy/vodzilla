@@ -8,6 +8,7 @@ import (
 
 	"github.com/assaidy/hyper/v2"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -128,4 +129,16 @@ func HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"url": url})
+}
+
+func HandleViewVideo(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	if err := reactionService.ViewVideo(c.RequestCtx(), videoId, userId); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -24,9 +24,6 @@ values ($1, $2, $3, $4, $5);
 -- name: DeleteSessionForUser :execrows
 delete from user_service.sessions where id = @session_id and owner_id = @user_id;
 
--- name: DeleteUser :execrows
-delete from user_service.users where id = $1;
-
 -- name: InsertEmailVerificationToken :exec
 insert into user_service.email_verification_tokens (id, owner_id, token, expires_at)
 values ($1, $2, $3, $4);

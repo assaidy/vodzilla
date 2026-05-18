@@ -33,9 +33,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deleteSessionForUserStmt, err = db.PrepareContext(ctx, deleteSessionForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteSessionForUser: %w", err)
 	}
-	if q.deleteUserStmt, err = db.PrepareContext(ctx, deleteUser); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteUser: %w", err)
-	}
 	if q.getSessionByIdStmt, err = db.PrepareContext(ctx, getSessionById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetSessionById: %w", err)
 	}
@@ -81,11 +78,6 @@ func (q *Queries) Close() error {
 	if q.deleteSessionForUserStmt != nil {
 		if cerr := q.deleteSessionForUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteSessionForUserStmt: %w", cerr)
-		}
-	}
-	if q.deleteUserStmt != nil {
-		if cerr := q.deleteUserStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteUserStmt: %w", cerr)
 		}
 	}
 	if q.getSessionByIdStmt != nil {
@@ -175,7 +167,6 @@ type Queries struct {
 	checkEmailStmt                   *sql.Stmt
 	checkUsernameStmt                *sql.Stmt
 	deleteSessionForUserStmt         *sql.Stmt
-	deleteUserStmt                   *sql.Stmt
 	getSessionByIdStmt               *sql.Stmt
 	getUserByEmailStmt               *sql.Stmt
 	getUserByIdStmt                  *sql.Stmt
@@ -194,7 +185,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		checkEmailStmt:                   q.checkEmailStmt,
 		checkUsernameStmt:                q.checkUsernameStmt,
 		deleteSessionForUserStmt:         q.deleteSessionForUserStmt,
-		deleteUserStmt:                   q.deleteUserStmt,
 		getSessionByIdStmt:               q.getSessionByIdStmt,
 		getUserByEmailStmt:               q.getUserByEmailStmt,
 		getUserByIdStmt:                  q.getUserByIdStmt,

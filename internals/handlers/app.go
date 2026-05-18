@@ -8,6 +8,7 @@ import (
 
 	"github.com/assaidy/hyper/v2"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -154,6 +155,7 @@ func HandleNotificationsPageContent(c fiber.Ctx) error {
 	))
 }
 
+// TODO: we can do a lot of lazy loading and pagination here and in other places
 func HandleProfilePage(c fiber.Ctx) error {
 	user, currentUser, err := getProfileUserAndCurrentUser(c)
 	if err != nil {
@@ -166,14 +168,22 @@ func HandleProfilePage(c fiber.Ctx) error {
 		return err
 	}
 
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
 	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
 	for _, v := range videos {
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
 		templateVideos = append(templateVideos, templates.VideoCardParams{
 			VideoId:       v.Id,
 			Title:         v.Title,
 			Timestamp:     v.Timestamp,
 			OwnerName:     user.Name,
 			OwnerUsername: user.Username,
+			ViewsCount:    viewsCount,
 		})
 	}
 
@@ -349,6 +359,12 @@ func HandleVideoPage(c fiber.Ctx) error {
 		return err
 	}
 
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
 	return render(c, templates.VideoPage(templates.VideoPageParams{
 		Username: user.Username,
 		ContentParams: templates.VideoPageContentParams{
@@ -359,6 +375,7 @@ func HandleVideoPage(c fiber.Ctx) error {
 			Title:         video.Title,
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
+			ViewsCount:    viewsCount,
 		},
 	}))
 }
@@ -395,6 +412,12 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
 			Id:            video.Id,
@@ -404,6 +427,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			Title:         video.Title,
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
+			ViewsCount:    viewsCount,
 		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(

@@ -402,6 +402,7 @@ type VideoPageContentParams struct {
 	Title         string
 	Description   string
 	Timestamp     time.Time
+	ViewsCount    int
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
@@ -421,6 +422,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
 			AttrPlaysInline(true),
+			Attr("hx-post", fmt.Sprintf("/videos/%s/views", params.Id)),
+			Attr("hx-trigger", "load"),
 		)(),
 		DIV(AttrClass("mt-4"))(
 			H1(AttrClass("text-2xl font-bold"))(params.Title),
@@ -432,8 +435,13 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 					params.OwnerName,
 				),
 			),
-			DIV(AttrClass("mt-1 text-sm text-base-content/60"))(params.Timestamp.Format(time.DateOnly)),
-			P(AttrClass("mt-4 text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
+			DIV(AttrClass("mt-4 card bg-base-200 p-4 space-y-2"))(
+				DIV(AttrClass("text-sm text-base-content/60 flex gap-4"))(
+					SPAN()(fmt.Sprintf("%d views", params.ViewsCount)),
+					SPAN()(params.Timestamp.Format(time.DateOnly)),
+				),
+				P(AttrClass("text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
+			),
 		),
 
 		SCRIPT()(RawText(fmt.Sprintf(`

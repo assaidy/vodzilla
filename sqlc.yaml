@@ -5,7 +5,7 @@ sql:
     schema: "./internals/services/user/db/migrations/"
     queries: "./internals/services/user/db/queries.sql"
     gen:
-      go:
+      go: &go-base
         package: "queries"
         out: "./internals/services/user/queries/"
         emit_prepared_queries: true
@@ -17,19 +17,21 @@ sql:
     queries: "./internals/services/video/db/queries.sql"
     gen:
       go:
-        package: "queries"
+        <<: *go-base
         out: "./internals/services/video/queries/"
-        emit_prepared_queries: true
-        emit_empty_slices: true
-        initialisms: []
 
   - engine: "postgresql"
     schema: "./internals/services/media/db/migrations/"
     queries: "./internals/services/media/db/queries.sql"
     gen:
       go:
-        package: "queries"
+        <<: *go-base
         out: "./internals/services/media/queries/"
-        emit_prepared_queries: true
-        emit_empty_slices: true
-        initialisms: []
+
+  - engine: "postgresql"
+    schema: "./internals/services/reaction/db/migrations/"
+    queries: "./internals/services/reaction/db/queries.sql"
+    gen:
+      go:
+        <<: *go-base
+        out: "./internals/services/reaction/queries/"

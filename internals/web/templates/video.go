@@ -129,8 +129,6 @@ type VideoUploaderParams struct {
 	UploadUrls     []string
 }
 
-// TODO: might move it to multiple chunks rendered on the server
-// with hx-trigger="load" for completion requests
 func VideoUploader(params VideoUploaderParams) HyperNode {
 	encodedUrls, _ := json.Marshal(params.UploadUrls)
 

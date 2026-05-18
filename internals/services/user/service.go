@@ -365,16 +365,6 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 	return nil
 }
 
-func (me *Service) DeleteAccount(ctx context.Context, userId string) error {
-	if nDeleted, err := me.queries.DeleteUser(ctx, userId); err != nil {
-		return fmt.Errorf("failed to delete user: %w", err)
-	} else if nDeleted == 0 {
-		return ErrNotFound
-	}
-
-	return nil
-}
-
 type User struct {
 	Id       string
 	Name     string

@@ -50,18 +50,6 @@ func (q *Queries) DeleteSessionForUser(ctx context.Context, arg DeleteSessionFor
 	return result.RowsAffected()
 }
 
-const deleteUser = `-- name: DeleteUser :execrows
-delete from user_service.users where id = $1
-`
-
-func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
-	result, err := q.exec(ctx, q.deleteUserStmt, deleteUser, id)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
 const getSessionById = `-- name: GetSessionById :one
 select id, owner_id, session_token, csrf_token, created_at, expires_at from user_service.sessions where id = $1
 `
