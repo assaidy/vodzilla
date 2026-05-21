@@ -419,6 +419,30 @@ func videoCardAvatarPlaceholder() HyperNode {
 	)
 }
 
+type WatchLaterButtonParams struct {
+	VideoId  string
+	IsActive bool
+}
+
+func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
+	return DIV(AttrId("WATCH_LATER_BUTTON"))(
+		BUTTON(
+			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
+			Attr("data-tip", IfElse(params.IsActive, "Remove from Watch Later", "Add to Watch Later")),
+			IfElse(params.IsActive,
+				Attr("hx-delete", fmt.Sprintf("/videos/%s/watch_later", params.VideoId)),
+				Attr("hx-post", fmt.Sprintf("/videos/%s/watch_later", params.VideoId)),
+			),
+			Attr("hx-target", "#WATCH_LATER_BUTTON"),
+			Attr("hx-swap", "outerHTML"),
+		)(
+			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="%s"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+				IfElse(params.IsActive, "text-primary", ""),
+			)),
+		),
+	)
+}
+
 func videoCardThumbnailPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
 		RawText(`<svg class="w-10 h-10 text-base-content/30" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clapperboard-icon lucide-clapperboard"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg>`),

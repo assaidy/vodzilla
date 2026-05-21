@@ -80,7 +80,49 @@ func HandleWatchLaterPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.WatchLaterPage(currentUser.Username))
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	videos, err := videoService.GetAllVideosInWatchLater(c.RequestCtx(), currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
+	ownerCache := make(map[string]*user_service.User)
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		owner, ok := ownerCache[v.OwnerId]
+		if !ok {
+			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrNotFound) {
+					continue
+				}
+				return err
+			}
+			ownerCache[v.OwnerId] = owner
+		}
+
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			ViewsCount:    viewsCount,
+		})
+	}
+
+	return render(c, templates.WatchLaterPage(templates.WatchLaterPageContentParams{
+		Username: currentUser.Username,
+		Videos:   templateVideos,
+	}))
 }
 
 func HandleWatchLaterPageContent(c fiber.Ctx) error {
@@ -89,8 +131,50 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	videos, err := videoService.GetAllVideosInWatchLater(c.RequestCtx(), currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
+	ownerCache := make(map[string]*user_service.User)
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		owner, ok := ownerCache[v.OwnerId]
+		if !ok {
+			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrNotFound) {
+					continue
+				}
+				return err
+			}
+			ownerCache[v.OwnerId] = owner
+		}
+
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			ViewsCount:    viewsCount,
+		})
+	}
+
 	return render(c, hyper.Group(
-		templates.WatchLaterPageContent(),
+		templates.WatchLaterPageContent(templates.WatchLaterPageContentParams{
+			Username: currentUser.Username,
+			Videos:   templateVideos,
+		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
@@ -163,7 +247,7 @@ func HandleProfilePage(c fiber.Ctx) error {
 	}
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videos, err := videoService.GetUserVideos(c.RequestCtx(), user.Id)
+	videos, err := videoService.GetAllUserVideos(c.RequestCtx(), user.Id)
 	if err != nil {
 		return err
 	}
@@ -203,19 +287,27 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 	}
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videos, err := videoService.GetUserVideos(c.RequestCtx(), user.Id)
+	videos, err := videoService.GetAllUserVideos(c.RequestCtx(), user.Id)
 	if err != nil {
 		return err
 	}
 
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
 	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
 	for _, v := range videos {
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
 		templateVideos = append(templateVideos, templates.VideoCardParams{
 			VideoId:       v.Id,
 			Title:         v.Title,
 			Timestamp:     v.Timestamp,
 			OwnerName:     user.Name,
 			OwnerUsername: user.Username,
+			ViewsCount:    viewsCount,
 		})
 	}
 
@@ -235,6 +327,45 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 			}),
 		),
 	))
+}
+
+func HandleAddToWatchLater(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.AddVideoToWatchLater(c.RequestCtx(), videoId, userId); err != nil {
+		if errors.Is(err, video_service.ErrConflict) {
+			return fiber.NewError(fiber.StatusConflict, "already in watch later")
+		}
+		if errors.Is(err, video_service.ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		}
+		return err
+	}
+
+	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+		VideoId:  videoId,
+		IsActive: true,
+	}))
+}
+
+func HandleDeleteFromWatchLater(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.DeleteVideoFromWatchLater(c.RequestCtx(), videoId, userId); err != nil {
+		if errors.Is(err, video_service.ErrNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
+		}
+		return err
+	}
+
+	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+		VideoId:  videoId,
+		IsActive: false,
+	}))
 }
 
 func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
@@ -373,6 +504,11 @@ func HandleVideoPage(c fiber.Ctx) error {
 		return err
 	}
 
+	isInWatchLater, err := videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
 	return render(c, templates.VideoPage(templates.VideoPageParams{
 		Username: currentUser.Username,
 		ContentParams: templates.VideoPageContentParams{
@@ -390,6 +526,10 @@ func HandleVideoPage(c fiber.Ctx) error {
 				DislikesCount: reactionCounts.Dislikes,
 				IsLiked:       currentUserReaction.IsLike,
 				IsDisliked:    currentUserReaction.IsDislike,
+			},
+			WatchLaterButtonParams: templates.WatchLaterButtonParams{
+				VideoId:  videoId,
+				IsActive: isInWatchLater,
 			},
 		},
 	}))
@@ -441,6 +581,11 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	isInWatchLater, err := videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
 			Id:            video.Id,
@@ -457,6 +602,10 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 				DislikesCount: reactionCounts.Dislikes,
 				IsLiked:       currentUserReaction.IsLike,
 				IsDisliked:    currentUserReaction.IsDislike,
+			},
+			WatchLaterButtonParams: templates.WatchLaterButtonParams{
+				VideoId:  videoId,
+				IsActive: isInWatchLater,
 			},
 		}),
 

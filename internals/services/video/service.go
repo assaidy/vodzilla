@@ -147,7 +147,7 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 	}, nil
 }
 
-func (me *Service) GetUserVideos(ctx context.Context, id string) ([]Video, error) {
+func (me *Service) GetAllUserVideos(ctx context.Context, id string) ([]Video, error) {
 	videos, err := me.queries.GetVideosForUser(ctx, queries.GetVideosForUserParams{
 		OwnerId: id,
 		Status:  string(VideoStatusReady),
@@ -178,4 +178,81 @@ func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) 
 	}
 
 	return ok, nil
+}
+
+func (me *Service) IsInWatchLater(ctx context.Context, videoId, userId string) (bool, error) {
+	return me.queries.CheckWatchLater(ctx, queries.CheckWatchLaterParams{
+		VideoId: videoId,
+		UserId:  userId,
+	})
+}
+
+func (me *Service) AddVideoToWatchLater(ctx context.Context, videoId, userId string) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if ok, err := qtx.CheckVideo(ctx, videoId); err != nil {
+		return fmt.Errorf("failed to check video: %w", err)
+	} else if !ok {
+		return fmt.Errorf("%w: video doesn't exists", ErrNotFound)
+	}
+
+	if ok, err := qtx.CheckWatchLater(ctx, queries.CheckWatchLaterParams{
+		VideoId: videoId,
+		UserId:  userId,
+	}); err != nil {
+		return fmt.Errorf("failed to check watch later: %w", err)
+	} else if ok {
+		return fmt.Errorf("%w: video already exists in watch later", ErrConflict)
+	}
+
+	if err := qtx.InsertIntoWatchLater(ctx, queries.InsertIntoWatchLaterParams{
+		VideoId: videoId,
+		UserId:  userId,
+	}); err != nil {
+		return fmt.Errorf("failed to insert into watch later: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func (me *Service) DeleteVideoFromWatchLater(ctx context.Context, videoId, userId string) error {
+	if n, err := me.queries.DeleteFromWatchLater(ctx, queries.DeleteFromWatchLaterParams{
+		VideoId: videoId,
+		UserId:  userId,
+	}); err != nil {
+		return fmt.Errorf("failed to delete from watch later: %w", err)
+	} else if n == 0 {
+		return fmt.Errorf("%w: video doesn't exist in watch later", ErrNotFound)
+	}
+
+	return nil
+}
+
+func (me *Service) GetAllVideosInWatchLater(ctx context.Context, userId string) ([]Video, error) {
+	videos, err := me.queries.GetVideosInWatchLater(ctx, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get videos in watch later: %w", err)
+	}
+
+	result := make([]Video, 0, len(videos))
+	for _, v := range videos {
+		result = append(result, Video{
+			Id:          v.Id,
+			OwnerId:     v.OwnerId,
+			Timestamp:   v.CreatedAt,
+			Title:       v.Title,
+			Description: v.Description.String,
+		})
+	}
+
+	return result, nil
 }

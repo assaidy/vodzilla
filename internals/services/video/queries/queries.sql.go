@@ -21,6 +21,39 @@ func (q *Queries) CheckVideo(ctx context.Context, id string) (bool, error) {
 	return exists, err
 }
 
+const checkWatchLater = `-- name: CheckWatchLater :one
+select exists (select 1 from video_service.watch_later where video_id = $1 and user_id = $2 for update)
+`
+
+type CheckWatchLaterParams struct {
+	VideoId string
+	UserId  string
+}
+
+func (q *Queries) CheckWatchLater(ctx context.Context, arg CheckWatchLaterParams) (bool, error) {
+	row := q.queryRow(ctx, q.checkWatchLaterStmt, checkWatchLater, arg.VideoId, arg.UserId)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const deleteFromWatchLater = `-- name: DeleteFromWatchLater :execrows
+delete from video_service.watch_later where video_id = $1 and user_id = $2
+`
+
+type DeleteFromWatchLaterParams struct {
+	VideoId string
+	UserId  string
+}
+
+func (q *Queries) DeleteFromWatchLater(ctx context.Context, arg DeleteFromWatchLaterParams) (int64, error) {
+	result, err := q.exec(ctx, q.deleteFromWatchLaterStmt, deleteFromWatchLater, arg.VideoId, arg.UserId)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getVideoById = `-- name: GetVideoById :one
 select id, owner_id, title, description, created_at, status from video_service.videos where id = $1 for update
 `
@@ -76,6 +109,58 @@ func (q *Queries) GetVideosForUser(ctx context.Context, arg GetVideosForUserPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const getVideosInWatchLater = `-- name: GetVideosInWatchLater :many
+select v.id, v.owner_id, v.title, v.description, v.created_at, v.status
+from video_service.watch_later wl
+join video_service.videos v on v.id = wl.video_id and v.owner_id = wl.user_id
+where wl.user_id = $1
+order by wl.added_at desc
+`
+
+func (q *Queries) GetVideosInWatchLater(ctx context.Context, userID string) ([]VideoServiceVideo, error) {
+	rows, err := q.query(ctx, q.getVideosInWatchLaterStmt, getVideosInWatchLater, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VideoServiceVideo{}
+	for rows.Next() {
+		var i VideoServiceVideo
+		if err := rows.Scan(
+			&i.Id,
+			&i.OwnerId,
+			&i.Title,
+			&i.Description,
+			&i.CreatedAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const insertIntoWatchLater = `-- name: InsertIntoWatchLater :exec
+insert into video_service.watch_later (video_id, user_id) values ($1, $2)
+`
+
+type InsertIntoWatchLaterParams struct {
+	VideoId string
+	UserId  string
+}
+
+func (q *Queries) InsertIntoWatchLater(ctx context.Context, arg InsertIntoWatchLaterParams) error {
+	_, err := q.exec(ctx, q.insertIntoWatchLaterStmt, insertIntoWatchLater, arg.VideoId, arg.UserId)
+	return err
 }
 
 const insertVideo = `-- name: InsertVideo :exec

@@ -27,11 +27,23 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkVideoStmt, err = db.PrepareContext(ctx, checkVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckVideo: %w", err)
 	}
+	if q.checkWatchLaterStmt, err = db.PrepareContext(ctx, checkWatchLater); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckWatchLater: %w", err)
+	}
+	if q.deleteFromWatchLaterStmt, err = db.PrepareContext(ctx, deleteFromWatchLater); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteFromWatchLater: %w", err)
+	}
 	if q.getVideoByIdStmt, err = db.PrepareContext(ctx, getVideoById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoById: %w", err)
 	}
 	if q.getVideosForUserStmt, err = db.PrepareContext(ctx, getVideosForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideosForUser: %w", err)
+	}
+	if q.getVideosInWatchLaterStmt, err = db.PrepareContext(ctx, getVideosInWatchLater); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVideosInWatchLater: %w", err)
+	}
+	if q.insertIntoWatchLaterStmt, err = db.PrepareContext(ctx, insertIntoWatchLater); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertIntoWatchLater: %w", err)
 	}
 	if q.insertVideoStmt, err = db.PrepareContext(ctx, insertVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertVideo: %w", err)
@@ -49,6 +61,16 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing checkVideoStmt: %w", cerr)
 		}
 	}
+	if q.checkWatchLaterStmt != nil {
+		if cerr := q.checkWatchLaterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkWatchLaterStmt: %w", cerr)
+		}
+	}
+	if q.deleteFromWatchLaterStmt != nil {
+		if cerr := q.deleteFromWatchLaterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteFromWatchLaterStmt: %w", cerr)
+		}
+	}
 	if q.getVideoByIdStmt != nil {
 		if cerr := q.getVideoByIdStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVideoByIdStmt: %w", cerr)
@@ -57,6 +79,16 @@ func (q *Queries) Close() error {
 	if q.getVideosForUserStmt != nil {
 		if cerr := q.getVideosForUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVideosForUserStmt: %w", cerr)
+		}
+	}
+	if q.getVideosInWatchLaterStmt != nil {
+		if cerr := q.getVideosInWatchLaterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVideosInWatchLaterStmt: %w", cerr)
+		}
+	}
+	if q.insertIntoWatchLaterStmt != nil {
+		if cerr := q.insertIntoWatchLaterStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertIntoWatchLaterStmt: %w", cerr)
 		}
 	}
 	if q.insertVideoStmt != nil {
@@ -106,23 +138,31 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                    DBTX
-	tx                    *sql.Tx
-	checkVideoStmt        *sql.Stmt
-	getVideoByIdStmt      *sql.Stmt
-	getVideosForUserStmt  *sql.Stmt
-	insertVideoStmt       *sql.Stmt
-	updateVideoStatusStmt *sql.Stmt
+	db                        DBTX
+	tx                        *sql.Tx
+	checkVideoStmt            *sql.Stmt
+	checkWatchLaterStmt       *sql.Stmt
+	deleteFromWatchLaterStmt  *sql.Stmt
+	getVideoByIdStmt          *sql.Stmt
+	getVideosForUserStmt      *sql.Stmt
+	getVideosInWatchLaterStmt *sql.Stmt
+	insertIntoWatchLaterStmt  *sql.Stmt
+	insertVideoStmt           *sql.Stmt
+	updateVideoStatusStmt     *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                    tx,
-		tx:                    tx,
-		checkVideoStmt:        q.checkVideoStmt,
-		getVideoByIdStmt:      q.getVideoByIdStmt,
-		getVideosForUserStmt:  q.getVideosForUserStmt,
-		insertVideoStmt:       q.insertVideoStmt,
-		updateVideoStatusStmt: q.updateVideoStatusStmt,
+		db:                        tx,
+		tx:                        tx,
+		checkVideoStmt:            q.checkVideoStmt,
+		checkWatchLaterStmt:       q.checkWatchLaterStmt,
+		deleteFromWatchLaterStmt:  q.deleteFromWatchLaterStmt,
+		getVideoByIdStmt:          q.getVideoByIdStmt,
+		getVideosForUserStmt:      q.getVideosForUserStmt,
+		getVideosInWatchLaterStmt: q.getVideosInWatchLaterStmt,
+		insertIntoWatchLaterStmt:  q.insertIntoWatchLaterStmt,
+		insertVideoStmt:           q.insertVideoStmt,
+		updateVideoStatusStmt:     q.updateVideoStatusStmt,
 	}
 }
