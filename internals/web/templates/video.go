@@ -284,7 +284,7 @@ type profileVideosParams struct {
 }
 
 func profileVideosContainer(params profileVideosParams) HyperNode {
-	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 lg:grid-cols-4 gap-4"))(
+	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"))(
 		Range(params.videoCards, func(p VideoCardParams) HyperNode {
 			return VideoCard(p)
 		}),

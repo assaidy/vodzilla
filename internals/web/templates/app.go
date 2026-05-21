@@ -126,7 +126,7 @@ type ProfilePageContentParams struct {
 func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 	return Group(
 		// profile card ==================================================
-		DIV(AttrClass("card bg-base-100 p-2 flex flex-col lg:flex-row overflow-hidden"))(
+		DIV(AttrClass("card bg-base-100 p-2 flex flex-col md:flex-row overflow-hidden"))(
 			profileCardAvatarPlaceholder(),
 			DIV(AttrClass("p-4"))(
 				H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
@@ -386,7 +386,7 @@ func appPageButton(params appPageButtonParams) HyperNode {
 }
 
 func profileCardAvatarPlaceholder() HyperNode {
-	return DIV(AttrClass("w-full aspect-square lg:w-64 lg:h-64 lg:aspect-auto rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
+	return DIV(AttrClass("w-full aspect-square md:w-48 md:h-48 md:aspect-auto lg:w-64 lg:h-64 rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
 		RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
 	)
 }
