@@ -225,3 +225,42 @@ func HandleDeleteVideoReaction(c fiber.Ctx) error {
 		DislikesCount: reactinCounts.Dislikes,
 	}))
 }
+
+func HandleAddToWatchLater(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.AddVideoToWatchLater(c.RequestCtx(), videoId, userId); err != nil {
+		if errors.Is(err, video_service.ErrConflict) {
+			return fiber.NewError(fiber.StatusConflict, "already in watch later")
+		}
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		}
+		return err
+	}
+
+	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+		VideoId:  videoId,
+		IsActive: true,
+	}))
+}
+
+func HandleDeleteFromWatchLater(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.DeleteVideoFromWatchLater(c.RequestCtx(), videoId, userId); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
+		}
+		return err
+	}
+
+	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+		VideoId:  videoId,
+		IsActive: false,
+	}))
+}

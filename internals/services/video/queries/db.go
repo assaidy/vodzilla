@@ -24,14 +24,41 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.checkPlaylistStmt, err = db.PrepareContext(ctx, checkPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckPlaylist: %w", err)
+	}
+	if q.checkPlaylistByNameForUserStmt, err = db.PrepareContext(ctx, checkPlaylistByNameForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckPlaylistByNameForUser: %w", err)
+	}
+	if q.checkPlaylistForUserStmt, err = db.PrepareContext(ctx, checkPlaylistForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckPlaylistForUser: %w", err)
+	}
 	if q.checkVideoStmt, err = db.PrepareContext(ctx, checkVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckVideo: %w", err)
+	}
+	if q.checkVideoInPlaylistStmt, err = db.PrepareContext(ctx, checkVideoInPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckVideoInPlaylist: %w", err)
 	}
 	if q.checkWatchLaterStmt, err = db.PrepareContext(ctx, checkWatchLater); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckWatchLater: %w", err)
 	}
 	if q.deleteFromWatchLaterStmt, err = db.PrepareContext(ctx, deleteFromWatchLater); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteFromWatchLater: %w", err)
+	}
+	if q.deletePlaylistStmt, err = db.PrepareContext(ctx, deletePlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query DeletePlaylist: %w", err)
+	}
+	if q.deleteVideoFromPlaylistStmt, err = db.PrepareContext(ctx, deleteVideoFromPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteVideoFromPlaylist: %w", err)
+	}
+	if q.getAllPlaylistsForUserStmt, err = db.PrepareContext(ctx, getAllPlaylistsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllPlaylistsForUser: %w", err)
+	}
+	if q.getAllVideosInPlaylistStmt, err = db.PrepareContext(ctx, getAllVideosInPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllVideosInPlaylist: %w", err)
+	}
+	if q.getPlaylistForUserStmt, err = db.PrepareContext(ctx, getPlaylistForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetPlaylistForUser: %w", err)
 	}
 	if q.getVideoByIdStmt, err = db.PrepareContext(ctx, getVideoById); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoById: %w", err)
@@ -42,8 +69,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVideosInWatchLaterStmt, err = db.PrepareContext(ctx, getVideosInWatchLater); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideosInWatchLater: %w", err)
 	}
+	if q.insertIntoPlaylistStmt, err = db.PrepareContext(ctx, insertIntoPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertIntoPlaylist: %w", err)
+	}
 	if q.insertIntoWatchLaterStmt, err = db.PrepareContext(ctx, insertIntoWatchLater); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertIntoWatchLater: %w", err)
+	}
+	if q.insertPlaylistStmt, err = db.PrepareContext(ctx, insertPlaylist); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertPlaylist: %w", err)
 	}
 	if q.insertVideoStmt, err = db.PrepareContext(ctx, insertVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertVideo: %w", err)
@@ -56,9 +89,29 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.checkPlaylistStmt != nil {
+		if cerr := q.checkPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkPlaylistStmt: %w", cerr)
+		}
+	}
+	if q.checkPlaylistByNameForUserStmt != nil {
+		if cerr := q.checkPlaylistByNameForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkPlaylistByNameForUserStmt: %w", cerr)
+		}
+	}
+	if q.checkPlaylistForUserStmt != nil {
+		if cerr := q.checkPlaylistForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkPlaylistForUserStmt: %w", cerr)
+		}
+	}
 	if q.checkVideoStmt != nil {
 		if cerr := q.checkVideoStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing checkVideoStmt: %w", cerr)
+		}
+	}
+	if q.checkVideoInPlaylistStmt != nil {
+		if cerr := q.checkVideoInPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkVideoInPlaylistStmt: %w", cerr)
 		}
 	}
 	if q.checkWatchLaterStmt != nil {
@@ -69,6 +122,31 @@ func (q *Queries) Close() error {
 	if q.deleteFromWatchLaterStmt != nil {
 		if cerr := q.deleteFromWatchLaterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteFromWatchLaterStmt: %w", cerr)
+		}
+	}
+	if q.deletePlaylistStmt != nil {
+		if cerr := q.deletePlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deletePlaylistStmt: %w", cerr)
+		}
+	}
+	if q.deleteVideoFromPlaylistStmt != nil {
+		if cerr := q.deleteVideoFromPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteVideoFromPlaylistStmt: %w", cerr)
+		}
+	}
+	if q.getAllPlaylistsForUserStmt != nil {
+		if cerr := q.getAllPlaylistsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllPlaylistsForUserStmt: %w", cerr)
+		}
+	}
+	if q.getAllVideosInPlaylistStmt != nil {
+		if cerr := q.getAllVideosInPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllVideosInPlaylistStmt: %w", cerr)
+		}
+	}
+	if q.getPlaylistForUserStmt != nil {
+		if cerr := q.getPlaylistForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getPlaylistForUserStmt: %w", cerr)
 		}
 	}
 	if q.getVideoByIdStmt != nil {
@@ -86,9 +164,19 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getVideosInWatchLaterStmt: %w", cerr)
 		}
 	}
+	if q.insertIntoPlaylistStmt != nil {
+		if cerr := q.insertIntoPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertIntoPlaylistStmt: %w", cerr)
+		}
+	}
 	if q.insertIntoWatchLaterStmt != nil {
 		if cerr := q.insertIntoWatchLaterStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertIntoWatchLaterStmt: %w", cerr)
+		}
+	}
+	if q.insertPlaylistStmt != nil {
+		if cerr := q.insertPlaylistStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertPlaylistStmt: %w", cerr)
 		}
 	}
 	if q.insertVideoStmt != nil {
@@ -138,31 +226,53 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                        DBTX
-	tx                        *sql.Tx
-	checkVideoStmt            *sql.Stmt
-	checkWatchLaterStmt       *sql.Stmt
-	deleteFromWatchLaterStmt  *sql.Stmt
-	getVideoByIdStmt          *sql.Stmt
-	getVideosForUserStmt      *sql.Stmt
-	getVideosInWatchLaterStmt *sql.Stmt
-	insertIntoWatchLaterStmt  *sql.Stmt
-	insertVideoStmt           *sql.Stmt
-	updateVideoStatusStmt     *sql.Stmt
+	db                             DBTX
+	tx                             *sql.Tx
+	checkPlaylistStmt              *sql.Stmt
+	checkPlaylistByNameForUserStmt *sql.Stmt
+	checkPlaylistForUserStmt       *sql.Stmt
+	checkVideoStmt                 *sql.Stmt
+	checkVideoInPlaylistStmt       *sql.Stmt
+	checkWatchLaterStmt            *sql.Stmt
+	deleteFromWatchLaterStmt       *sql.Stmt
+	deletePlaylistStmt             *sql.Stmt
+	deleteVideoFromPlaylistStmt    *sql.Stmt
+	getAllPlaylistsForUserStmt     *sql.Stmt
+	getAllVideosInPlaylistStmt     *sql.Stmt
+	getPlaylistForUserStmt         *sql.Stmt
+	getVideoByIdStmt               *sql.Stmt
+	getVideosForUserStmt           *sql.Stmt
+	getVideosInWatchLaterStmt      *sql.Stmt
+	insertIntoPlaylistStmt         *sql.Stmt
+	insertIntoWatchLaterStmt       *sql.Stmt
+	insertPlaylistStmt             *sql.Stmt
+	insertVideoStmt                *sql.Stmt
+	updateVideoStatusStmt          *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                        tx,
-		tx:                        tx,
-		checkVideoStmt:            q.checkVideoStmt,
-		checkWatchLaterStmt:       q.checkWatchLaterStmt,
-		deleteFromWatchLaterStmt:  q.deleteFromWatchLaterStmt,
-		getVideoByIdStmt:          q.getVideoByIdStmt,
-		getVideosForUserStmt:      q.getVideosForUserStmt,
-		getVideosInWatchLaterStmt: q.getVideosInWatchLaterStmt,
-		insertIntoWatchLaterStmt:  q.insertIntoWatchLaterStmt,
-		insertVideoStmt:           q.insertVideoStmt,
-		updateVideoStatusStmt:     q.updateVideoStatusStmt,
+		db:                             tx,
+		tx:                             tx,
+		checkPlaylistStmt:              q.checkPlaylistStmt,
+		checkPlaylistByNameForUserStmt: q.checkPlaylistByNameForUserStmt,
+		checkPlaylistForUserStmt:       q.checkPlaylistForUserStmt,
+		checkVideoStmt:                 q.checkVideoStmt,
+		checkVideoInPlaylistStmt:       q.checkVideoInPlaylistStmt,
+		checkWatchLaterStmt:            q.checkWatchLaterStmt,
+		deleteFromWatchLaterStmt:       q.deleteFromWatchLaterStmt,
+		deletePlaylistStmt:             q.deletePlaylistStmt,
+		deleteVideoFromPlaylistStmt:    q.deleteVideoFromPlaylistStmt,
+		getAllPlaylistsForUserStmt:     q.getAllPlaylistsForUserStmt,
+		getAllVideosInPlaylistStmt:     q.getAllVideosInPlaylistStmt,
+		getPlaylistForUserStmt:         q.getPlaylistForUserStmt,
+		getVideoByIdStmt:               q.getVideoByIdStmt,
+		getVideosForUserStmt:           q.getVideosForUserStmt,
+		getVideosInWatchLaterStmt:      q.getVideosInWatchLaterStmt,
+		insertIntoPlaylistStmt:         q.insertIntoPlaylistStmt,
+		insertIntoWatchLaterStmt:       q.insertIntoWatchLaterStmt,
+		insertPlaylistStmt:             q.insertPlaylistStmt,
+		insertVideoStmt:                q.insertVideoStmt,
+		updateVideoStatusStmt:          q.updateVideoStatusStmt,
 	}
 }

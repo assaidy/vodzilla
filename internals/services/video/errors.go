@@ -3,6 +3,7 @@ package video
 import "errors"
 
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("conflict")
+	ErrVideoNotFound    = errors.New("video not found")
+	ErrPlaylistNotFound = errors.New("playlist not found")
+	ErrConflict         = errors.New("conflict")
 )

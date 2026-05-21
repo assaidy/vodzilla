@@ -443,6 +443,113 @@ func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
 	)
 }
 
+type PlaylistCheckboxParams struct {
+	VideoId    string
+	PlaylistId string
+	Name       string
+	Checked    bool
+}
+
+func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
+	return DIV(AttrClass("form-control"))(
+		LABEL(AttrClass("label cursor-pointer flex justify-between"))(
+			SPAN(AttrClass("text-base-content"))(params.Name),
+			INPUT(
+				AttrType(TypeCheckbox),
+				AttrClass("checkbox checkbox-sm checkbox-primary"),
+				IfElse(params.Checked,
+					Attr("hx-delete", fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
+					Attr("hx-post", fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
+				),
+				Attr("hx-on::after:request", "if (evt.detail.ctx.response.ok) this.checked = !this.checked"),
+				Attr("hx-swap", "none"),
+				AttrChecked(params.Checked),
+			),
+		),
+	)
+}
+
+type AddToPlaylistModalParams struct {
+	VideoId   string
+	Playlists []PlaylistCheckboxParams
+}
+
+func AddToPlaylistButton(videoId string) HyperNode {
+	return DIV(AttrClass("tooltip tooltip-top"), Attr("data-tip", "Add to Playlist"))(
+		BUTTON(
+			AttrClass("btn btn-soft btn-sm"),
+			AttrOnClick("ADD_TO_PLAYLIST_MODAL.show()"),
+		)(
+			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`),
+		),
+	)
+}
+
+func AddToPlaylistModal(params AddToPlaylistModalParams) HyperNode {
+	return DIALOG(AttrId("ADD_TO_PLAYLIST_MODAL"), AttrClass("modal"))(
+		DIV(AttrClass("modal-box"))(
+			H3(AttrClass("text-lg font-bold mb-4"))("Add to Playlist"),
+			DIV(AttrId("PLAYLIST_CHECKBOX_LIST"), AttrClass("space-y-2"))(
+				If(len(params.Playlists) == 0,
+					P(AttrClass("text-sm text-base-content/60"))("No playlists yet. Create one below."),
+				).Else(
+					Group(
+						Range(params.Playlists, func(p PlaylistCheckboxParams) HyperNode {
+							return PlaylistCheckbox(p)
+						}),
+					),
+				),
+			),
+			DIV(AttrClass("divider my-4"))(),
+			CreatePlaylistForm(CreatePlaylistFormParams{VideoId: params.VideoId}),
+		),
+		FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
+			BUTTON()("close"),
+		),
+	)
+}
+
+type CreatePlaylistFormParams struct {
+	VideoId string
+	Name    string
+	NameErr error
+}
+
+func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
+	var p CreatePlaylistFormParams
+	if len(params) > 0 {
+		p = params[0]
+	}
+
+	return FORM(
+		AttrId("CREATE_PLAYLIST_FORM"),
+		AttrClass("flex gap-2"),
+		Attr("hx-post", "/playlists"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-target", "this"),
+		Attr("hx-vals", fmt.Sprintf(`js:{videoId: %q}`, p.VideoId)),
+	)(
+		INPUT(
+			AttrId("FORM_PLAYLIST_NAME"),
+			AttrType(TypeText),
+			AttrName("name"),
+			AttrValue(p.Name),
+			AttrPlaceholder("New playlist name..."),
+			AttrClass("input w-full"+IfElseZero(p.NameErr != nil, " input-error")),
+			AttrRequired(true),
+		),
+		BUTTON(
+			AttrClass("btn btn-primary"),
+			AttrType(TypeSubmit),
+		)(
+			"Create",
+		),
+		If(p.NameErr != nil,
+			P(AttrClass("text-xs text-error"))(p.NameErr),
+		),
+	)
+}
+
 func videoCardThumbnailPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
 		RawText(`<svg class="w-10 h-10 text-base-content/30" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clapperboard-icon lucide-clapperboard"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg>`),

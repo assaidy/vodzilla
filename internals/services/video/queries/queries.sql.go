@@ -10,12 +10,71 @@ import (
 	"database/sql"
 )
 
+const checkPlaylist = `-- name: CheckPlaylist :one
+select exists (select 1 from video_service.playlists where id = $1 for update)
+`
+
+func (q *Queries) CheckPlaylist(ctx context.Context, id string) (bool, error) {
+	row := q.queryRow(ctx, q.checkPlaylistStmt, checkPlaylist, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkPlaylistByNameForUser = `-- name: CheckPlaylistByNameForUser :one
+select exists (select 1 from video_service.playlists where name = $1 and owner_id = $2 for update)
+`
+
+type CheckPlaylistByNameForUserParams struct {
+	Name    string
+	OwnerId string
+}
+
+func (q *Queries) CheckPlaylistByNameForUser(ctx context.Context, arg CheckPlaylistByNameForUserParams) (bool, error) {
+	row := q.queryRow(ctx, q.checkPlaylistByNameForUserStmt, checkPlaylistByNameForUser, arg.Name, arg.OwnerId)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkPlaylistForUser = `-- name: CheckPlaylistForUser :one
+select exists (select 1 from video_service.playlists where id = $1 and owner_id = $2 for update)
+`
+
+type CheckPlaylistForUserParams struct {
+	Id      string
+	OwnerId string
+}
+
+func (q *Queries) CheckPlaylistForUser(ctx context.Context, arg CheckPlaylistForUserParams) (bool, error) {
+	row := q.queryRow(ctx, q.checkPlaylistForUserStmt, checkPlaylistForUser, arg.Id, arg.OwnerId)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const checkVideo = `-- name: CheckVideo :one
 select exists (select 1 from video_service.videos where id = $1 for update)
 `
 
 func (q *Queries) CheckVideo(ctx context.Context, id string) (bool, error) {
 	row := q.queryRow(ctx, q.checkVideoStmt, checkVideo, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkVideoInPlaylist = `-- name: CheckVideoInPlaylist :one
+select exists (select 1 from video_service.playlist_videos where playlist_id = $1 and video_id = $2 for update)
+`
+
+type CheckVideoInPlaylistParams struct {
+	PlaylistId string
+	VideoId    string
+}
+
+func (q *Queries) CheckVideoInPlaylist(ctx context.Context, arg CheckVideoInPlaylistParams) (bool, error) {
+	row := q.queryRow(ctx, q.checkVideoInPlaylistStmt, checkVideoInPlaylist, arg.PlaylistId, arg.VideoId)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -52,6 +111,148 @@ func (q *Queries) DeleteFromWatchLater(ctx context.Context, arg DeleteFromWatchL
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const deletePlaylist = `-- name: DeletePlaylist :execrows
+delete from video_service.playlists where id = $1 and owner_id = $2
+`
+
+type DeletePlaylistParams struct {
+	Id      string
+	OwnerId string
+}
+
+func (q *Queries) DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) (int64, error) {
+	result, err := q.exec(ctx, q.deletePlaylistStmt, deletePlaylist, arg.Id, arg.OwnerId)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const deleteVideoFromPlaylist = `-- name: DeleteVideoFromPlaylist :execrows
+delete from video_service.playlist_videos where playlist_id = $1 and video_id = $2
+`
+
+type DeleteVideoFromPlaylistParams struct {
+	PlaylistId string
+	VideoId    string
+}
+
+func (q *Queries) DeleteVideoFromPlaylist(ctx context.Context, arg DeleteVideoFromPlaylistParams) (int64, error) {
+	result, err := q.exec(ctx, q.deleteVideoFromPlaylistStmt, deleteVideoFromPlaylist, arg.PlaylistId, arg.VideoId)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const getAllPlaylistsForUser = `-- name: GetAllPlaylistsForUser :many
+select 
+  p.id,
+  p.name,
+  count(pv.video_id) as videos_count
+from video_service.playlists p
+left join video_service.playlist_videos pv on p.id = pv.playlist_id
+where owner_id = $1
+group by p.id
+order by p.created_at desc
+`
+
+type GetAllPlaylistsForUserRow struct {
+	Id          string
+	Name        string
+	VideosCount int64
+}
+
+func (q *Queries) GetAllPlaylistsForUser(ctx context.Context, ownerID string) ([]GetAllPlaylistsForUserRow, error) {
+	rows, err := q.query(ctx, q.getAllPlaylistsForUserStmt, getAllPlaylistsForUser, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllPlaylistsForUserRow{}
+	for rows.Next() {
+		var i GetAllPlaylistsForUserRow
+		if err := rows.Scan(&i.Id, &i.Name, &i.VideosCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllVideosInPlaylist = `-- name: GetAllVideosInPlaylist :many
+select v.id, v.owner_id, v.title, v.description, v.created_at, v.status
+from video_service.playlist_videos pv
+join video_service.videos v on v.id = pv.video_id
+where pv.playlist_id = $1
+order by pv.added_at desc
+`
+
+func (q *Queries) GetAllVideosInPlaylist(ctx context.Context, playlistID string) ([]VideoServiceVideo, error) {
+	rows, err := q.query(ctx, q.getAllVideosInPlaylistStmt, getAllVideosInPlaylist, playlistID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []VideoServiceVideo{}
+	for rows.Next() {
+		var i VideoServiceVideo
+		if err := rows.Scan(
+			&i.Id,
+			&i.OwnerId,
+			&i.Title,
+			&i.Description,
+			&i.CreatedAt,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPlaylistForUser = `-- name: GetPlaylistForUser :one
+select
+  p.id,
+  p.name,
+  count(pv.video_id) as videos_count
+from video_service.playlists p
+left join video_service.playlist_videos pv on p.id = pv.playlist_id
+where p.id = $1 and p.owner_id = $2
+group by p.id
+`
+
+type GetPlaylistForUserParams struct {
+	Id      string
+	OwnerId string
+}
+
+type GetPlaylistForUserRow struct {
+	Id          string
+	Name        string
+	VideosCount int64
+}
+
+func (q *Queries) GetPlaylistForUser(ctx context.Context, arg GetPlaylistForUserParams) (GetPlaylistForUserRow, error) {
+	row := q.queryRow(ctx, q.getPlaylistForUserStmt, getPlaylistForUser, arg.Id, arg.OwnerId)
+	var i GetPlaylistForUserRow
+	err := row.Scan(&i.Id, &i.Name, &i.VideosCount)
+	return i, err
 }
 
 const getVideoById = `-- name: GetVideoById :one
@@ -149,6 +350,20 @@ func (q *Queries) GetVideosInWatchLater(ctx context.Context, userID string) ([]V
 	return items, nil
 }
 
+const insertIntoPlaylist = `-- name: InsertIntoPlaylist :exec
+insert into video_service.playlist_videos (playlist_id, video_id) values ($1, $2)
+`
+
+type InsertIntoPlaylistParams struct {
+	PlaylistId string
+	VideoId    string
+}
+
+func (q *Queries) InsertIntoPlaylist(ctx context.Context, arg InsertIntoPlaylistParams) error {
+	_, err := q.exec(ctx, q.insertIntoPlaylistStmt, insertIntoPlaylist, arg.PlaylistId, arg.VideoId)
+	return err
+}
+
 const insertIntoWatchLater = `-- name: InsertIntoWatchLater :exec
 insert into video_service.watch_later (video_id, user_id) values ($1, $2)
 `
@@ -160,6 +375,21 @@ type InsertIntoWatchLaterParams struct {
 
 func (q *Queries) InsertIntoWatchLater(ctx context.Context, arg InsertIntoWatchLaterParams) error {
 	_, err := q.exec(ctx, q.insertIntoWatchLaterStmt, insertIntoWatchLater, arg.VideoId, arg.UserId)
+	return err
+}
+
+const insertPlaylist = `-- name: InsertPlaylist :exec
+insert into video_service.playlists (id, name, owner_id) values ($1, $2, $3)
+`
+
+type InsertPlaylistParams struct {
+	Id      string
+	Name    string
+	OwnerId string
+}
+
+func (q *Queries) InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) error {
+	_, err := q.exec(ctx, q.insertPlaylistStmt, insertPlaylist, arg.Id, arg.Name, arg.OwnerId)
 	return err
 }
 

@@ -191,7 +191,25 @@ func HandlePlaylistsPage(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.PlaylistsPage(currentUser.Username))
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	playlists, err := videoService.GetAllPlaylists(c.RequestCtx(), currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	templatePlaylists := make([]templates.PlaylistCardParams, 0, len(playlists))
+	for _, p := range playlists {
+		templatePlaylists = append(templatePlaylists, templates.PlaylistCardParams{
+			Id:          p.Id,
+			Name:        p.Name,
+			VideosCount: p.VideosCount,
+		})
+	}
+
+	return render(c, templates.PlaylistsPage(templates.PlaylistsPageContentParams{
+		Username:  currentUser.Username,
+		Playlists: templatePlaylists,
+	}))
 }
 
 func HandlePlaylistsPageContent(c fiber.Ctx) error {
@@ -200,8 +218,26 @@ func HandlePlaylistsPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	playlists, err := videoService.GetAllPlaylists(c.RequestCtx(), currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	templatePlaylists := make([]templates.PlaylistCardParams, 0, len(playlists))
+	for _, p := range playlists {
+		templatePlaylists = append(templatePlaylists, templates.PlaylistCardParams{
+			Id:          p.Id,
+			Name:        p.Name,
+			VideosCount: p.VideosCount,
+		})
+	}
+
 	return render(c, hyper.Group(
-		templates.PlaylistsPageContent(),
+		templates.PlaylistsPageContent(templates.PlaylistsPageContentParams{
+			Username:  currentUser.Username,
+			Playlists: templatePlaylists,
+		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
@@ -329,45 +365,6 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 	))
 }
 
-func HandleAddToWatchLater(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
-
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.AddVideoToWatchLater(c.RequestCtx(), videoId, userId); err != nil {
-		if errors.Is(err, video_service.ErrConflict) {
-			return fiber.NewError(fiber.StatusConflict, "already in watch later")
-		}
-		if errors.Is(err, video_service.ErrNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "video not found")
-		}
-		return err
-	}
-
-	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId,
-		IsActive: true,
-	}))
-}
-
-func HandleDeleteFromWatchLater(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
-
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.DeleteVideoFromWatchLater(c.RequestCtx(), videoId, userId); err != nil {
-		if errors.Is(err, video_service.ErrNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
-		}
-		return err
-	}
-
-	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId,
-		IsActive: false,
-	}))
-}
-
 func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	user, err := userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
@@ -469,7 +466,7 @@ func HandleVideoPage(c fiber.Ctx) error {
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
 	if err != nil {
-		if errors.Is(err, video_service.ErrNotFound) {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return fiber.ErrNotFound
 		}
 		return err
@@ -509,6 +506,21 @@ func HandleVideoPage(c fiber.Ctx) error {
 		return err
 	}
 
+	playlists, err := videoService.GetAllPlaylistsWithVideoStatus(c.RequestCtx(), currentUser.Id, videoId)
+	if err != nil {
+		return err
+	}
+
+	templatePlaylists := make([]templates.PlaylistCheckboxParams, 0, len(playlists))
+	for _, p := range playlists {
+		templatePlaylists = append(templatePlaylists, templates.PlaylistCheckboxParams{
+			VideoId:    videoId,
+			PlaylistId: p.Id,
+			Name:       p.Name,
+			Checked:    p.HasVideo,
+		})
+	}
+
 	return render(c, templates.VideoPage(templates.VideoPageParams{
 		Username: currentUser.Username,
 		ContentParams: templates.VideoPageContentParams{
@@ -531,6 +543,10 @@ func HandleVideoPage(c fiber.Ctx) error {
 				VideoId:  videoId,
 				IsActive: isInWatchLater,
 			},
+			AddToPlaylistModalParams: templates.AddToPlaylistModalParams{
+				VideoId:   videoId,
+				Playlists: templatePlaylists,
+			},
 		},
 	}))
 }
@@ -541,7 +557,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
 	if err != nil {
-		if errors.Is(err, video_service.ErrNotFound) {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return fiber.ErrNotFound
 		}
 		return err
@@ -586,6 +602,21 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	playlists, err := videoService.GetAllPlaylistsWithVideoStatus(c.RequestCtx(), currentUser.Id, videoId)
+	if err != nil {
+		return err
+	}
+
+	templatePlaylists := make([]templates.PlaylistCheckboxParams, 0, len(playlists))
+	for _, p := range playlists {
+		templatePlaylists = append(templatePlaylists, templates.PlaylistCheckboxParams{
+			VideoId:    videoId,
+			PlaylistId: p.Id,
+			Name:       p.Name,
+			Checked:    p.HasVideo,
+		})
+	}
+
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
 			Id:            video.Id,
@@ -607,6 +638,10 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 				VideoId:  videoId,
 				IsActive: isInWatchLater,
 			},
+			AddToPlaylistModalParams: templates.AddToPlaylistModalParams{
+				VideoId:   videoId,
+				Playlists: templatePlaylists,
+			},
 		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
@@ -615,4 +650,240 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			}),
 		),
 	))
+}
+
+func HandlePlaylistDetailPage(c fiber.Ctx) error {
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	playlistId := c.Params("playlist_id")
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	playlist, err := videoService.GetPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	videos, err := videoService.GetAllVideosInPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
+	ownerCache := make(map[string]*user_service.User)
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		owner, ok := ownerCache[v.OwnerId]
+		if !ok {
+			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrNotFound) {
+					continue
+				}
+				return err
+			}
+			ownerCache[v.OwnerId] = owner
+		}
+
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			ViewsCount:    viewsCount,
+		})
+	}
+
+	return render(c, templates.PlaylistDetailPage(templates.PlaylistDetailPageContentParams{
+		Username: currentUser.Username,
+		Playlist: templates.PlaylistCardParams{
+			Id:          playlist.Id,
+			Name:        playlist.Name,
+			VideosCount: playlist.VideosCount,
+		},
+		Videos: templateVideos,
+	}))
+}
+
+func HandlePlaylistDetailPageContent(c fiber.Ctx) error {
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	playlistId := c.Params("playlist_id")
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	playlist, err := videoService.GetPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	videos, err := videoService.GetAllVideosInPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+
+	ownerCache := make(map[string]*user_service.User)
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	for _, v := range videos {
+		owner, ok := ownerCache[v.OwnerId]
+		if !ok {
+			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrNotFound) {
+					continue
+				}
+				return err
+			}
+			ownerCache[v.OwnerId] = owner
+		}
+
+		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return err
+		}
+
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			ViewsCount:    viewsCount,
+		})
+	}
+
+	return render(c, hyper.Group(
+		templates.PlaylistDetailPageContent(templates.PlaylistDetailPageContentParams{
+			Username: currentUser.Username,
+			Playlist: templates.PlaylistCardParams{
+				Id:          playlist.Id,
+				Name:        playlist.Name,
+				VideosCount: playlist.VideosCount,
+			},
+			Videos: templateVideos,
+		}),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username:    currentUser.Username,
+				CurrentPage: templates.PagePlaylists,
+			}),
+		),
+	))
+}
+
+func HandleCreatePlaylist(c fiber.Ctx) error {
+	name := strings.TrimSpace(c.FormValue("name"))
+	videoId := c.FormValue("videoId")
+
+	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 50))
+
+	if nameErr != nil {
+		return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+			VideoId: videoId,
+			Name:    name,
+			NameErr: nameErr,
+		}))
+	}
+
+	userId := c.Locals("user_id").(string)
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+
+	playlistId, err := videoService.CreatePlaylist(c.RequestCtx(), userId, name)
+	if err != nil {
+		if errors.Is(err, video_service.ErrConflict) {
+			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+				VideoId: videoId,
+				Name:    name,
+				NameErr: fmt.Errorf("playlist with this name already exists"),
+			}))
+		}
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+			VideoId: videoId,
+		}),
+
+		hyper.DIV(
+			hyper.AttrId("PLAYLIST_CHECKBOX_LIST"),
+			hyper.Attr("hx-swap-oob", "beforeend"),
+		)(
+			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
+				VideoId:    videoId,
+				PlaylistId: playlistId,
+				Name:       name,
+				Checked:    false,
+			}),
+		),
+	))
+}
+
+func HandleAddVideoToPlaylist(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	playlistId := c.Params("playlist_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
+		if errors.Is(err, video_service.ErrConflict) {
+			return fiber.NewError(fiber.StatusConflict, "already in playlist")
+		}
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		}
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	playlistId := c.Params("playlist_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.DeleteVideoFromPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		}
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not in playlist")
+		}
+		return err
+	}
+
+	return nil
 }

@@ -70,20 +70,85 @@ func WatchLaterPageContent(params WatchLaterPageContentParams) HyperNode {
 	)
 }
 
-func PlaylistsPage(username string) HyperNode {
+type PlaylistCardParams struct {
+	Id          string
+	Name        string
+	VideosCount int
+}
+
+type PlaylistsPageContentParams struct {
+	Username  string
+	Playlists []PlaylistCardParams
+}
+
+func PlaylistsPage(params PlaylistsPageContentParams) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PagePlaylists,
-			Username:    username,
+			Username:    params.Username,
 		},
 	})(
-		PlaylistsPageContent(),
+		PlaylistsPageContent(params),
 	)
 }
 
-func PlaylistsPageContent() HyperNode {
-	return Group(
-		"Playlists Page",
+func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
+	return DIV(AttrId("PLAYLISTS_CONTAINER"), AttrClass("space-y-4"))(
+		H1(AttrClass("text-2xl font-bold mb-4"))("Playlists"),
+		If(len(params.Playlists) == 0,
+			P(AttrClass("text-center text-base-content/60 mt-20"))("No playlists yet."),
+		).Else(
+			Group(
+				Range(params.Playlists, func(p PlaylistCardParams) HyperNode {
+					playlistLink := fmt.Sprintf("/playlists/%s", p.Id)
+					return DIV(
+						AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
+						Attr("hx-get", fmt.Sprintf("%s/content", playlistLink)),
+						Attr("hx-push-url", playlistLink),
+						Attr("hx-target", "#APP_PAGE_CONTENT"),
+						Attr("hx-swap", "innerHTML"),
+					)(
+						DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
+							RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/80"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`),
+						),
+						DIV(AttrClass("p-4"))(
+							H2(AttrClass("card-title text-lg font-bold"))(p.Name),
+							P(AttrClass("text-sm text-base-content/60"))(fmt.Sprintf("%d videos", p.VideosCount)),
+						),
+					)
+				}),
+			),
+		),
+	)
+}
+
+type PlaylistDetailPageContentParams struct {
+	Username string
+	Playlist PlaylistCardParams
+	Videos   []VideoCardParams
+}
+
+func PlaylistDetailPage(params PlaylistDetailPageContentParams) HyperNode {
+	return appPageLayout(appPageLayoutParams{
+		navbarParams: NavbarParams{
+			CurrentPage: PagePlaylists,
+			Username:    params.Username,
+		},
+	})(
+		PlaylistDetailPageContent(params),
+	)
+}
+
+func PlaylistDetailPageContent(params PlaylistDetailPageContentParams) HyperNode {
+	return DIV(AttrId("PLAYLIST_DETAIL_CONTAINER"))(
+		H1(AttrClass("text-2xl font-bold mb-6"))(params.Playlist.Name),
+		If(len(params.Videos) == 0,
+			P(AttrClass("text-center text-base-content/60 mt-20"))("This playlist is empty."),
+		).Else(
+			profileVideosContainer(profileVideosParams{
+				videoCards: params.Videos,
+			}),
+		),
 	)
 }
 
@@ -407,16 +472,17 @@ func VideoPage(params VideoPageParams) HyperNode {
 }
 
 type VideoPageContentParams struct {
-	Id                    string
-	OwnerName             string
-	OwnerUsername         string
-	SourceUrl             string
-	Title                 string
-	Description           string
-	Timestamp             time.Time
-	ViewsCount            int
-	ReactionsParams       ReactionsWidgetParams
-	WatchLaterButtonParams WatchLaterButtonParams
+	Id                       string
+	OwnerName                string
+	OwnerUsername            string
+	SourceUrl                string
+	Title                    string
+	Description              string
+	Timestamp                time.Time
+	ViewsCount               int
+	ReactionsParams          ReactionsWidgetParams
+	WatchLaterButtonParams   WatchLaterButtonParams
+	AddToPlaylistModalParams AddToPlaylistModalParams
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
@@ -453,6 +519,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				ReactionsWidget(params.ReactionsParams),
 				// watch later
 				WatchLaterButton(params.WatchLaterButtonParams),
+				// add to playlist
+				AddToPlaylistButton(params.AddToPlaylistModalParams.VideoId),
 			),
 			DIV(AttrClass("mt-4 card bg-base-200 p-4 space-y-2"))(
 				DIV(AttrClass("text-sm text-base-content/60 flex gap-4"))(
@@ -462,6 +530,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				P(AttrClass("text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
 			),
 		),
+
+		AddToPlaylistModal(params.AddToPlaylistModalParams),
 
 		SCRIPT()(RawText(fmt.Sprintf(`
 			(() => {

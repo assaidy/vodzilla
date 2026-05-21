@@ -9,6 +9,19 @@ import (
 	"time"
 )
 
+type VideoServicePlaylist struct {
+	Id        string
+	Name      string
+	OwnerId   string
+	CreatedAt time.Time
+}
+
+type VideoServicePlaylistVideo struct {
+	PlaylistId string
+	VideoId    string
+	AddedAt    time.Time
+}
+
 type VideoServiceVideo struct {
 	Id          string
 	OwnerId     string
