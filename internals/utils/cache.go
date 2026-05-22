@@ -20,4 +20,3 @@ func ConnectToRedis(addr string) *redis.Client {
 
 	return client
 }
-

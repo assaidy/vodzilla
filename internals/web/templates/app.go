@@ -14,7 +14,7 @@ func FeedPage(username string) HyperNode {
 			Username:    username,
 		},
 	})(
-		FeedPageContent(),
+		pageContentLoader("/feed/content"),
 	)
 }
 
@@ -31,7 +31,7 @@ func DiscoverPage(username string) HyperNode {
 			Username:    username,
 		},
 	})(
-		DiscoverPageContent(),
+		pageContentLoader("/discover/content"),
 	)
 }
 
@@ -41,19 +41,28 @@ func DiscoverPageContent() HyperNode {
 	)
 }
 
+func pageContentLoader(contentPath string) HyperNode {
+	return DIV(
+		Attr("hx-get", contentPath),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-trigger", "load"),
+		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+	)()
+}
+
 type WatchLaterPageContentParams struct {
 	Username string
 	Videos   []VideoCardParams
 }
 
-func WatchLaterPage(params WatchLaterPageContentParams) HyperNode {
+func WatchLaterPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PageWatchLater,
-			Username:    params.Username,
+			Username:    username,
 		},
 	})(
-		WatchLaterPageContent(params),
+		pageContentLoader("/watch_later/content"),
 	)
 }
 
@@ -81,14 +90,14 @@ type PlaylistsPageContentParams struct {
 	Playlists []PlaylistCardParams
 }
 
-func PlaylistsPage(params PlaylistsPageContentParams) HyperNode {
+func PlaylistsPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PagePlaylists,
-			Username:    params.Username,
+			Username:    username,
 		},
 	})(
-		PlaylistsPageContent(params),
+		pageContentLoader("/playlists/content"),
 	)
 }
 
@@ -107,6 +116,7 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 						Attr("hx-push-url", playlistLink),
 						Attr("hx-target", "#APP_PAGE_CONTENT"),
 						Attr("hx-swap", "innerHTML"),
+						Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 					)(
 						DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
 							RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/80"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`),
@@ -128,14 +138,14 @@ type PlaylistDetailPageContentParams struct {
 	Videos   []VideoCardParams
 }
 
-func PlaylistDetailPage(params PlaylistDetailPageContentParams) HyperNode {
+func PlaylistDetailPage(username string, playlistId string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PagePlaylists,
-			Username:    params.Username,
+			Username:    username,
 		},
 	})(
-		PlaylistDetailPageContent(params),
+		pageContentLoader(fmt.Sprintf("/playlists/%s/content", playlistId)),
 	)
 }
 
@@ -155,11 +165,11 @@ func PlaylistDetailPageContent(params PlaylistDetailPageContentParams) HyperNode
 func NotificationsPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
-			CurrentPage: PageProfile,
+			CurrentPage: PageNotifications,
 			Username:    username,
 		},
 	})(
-		NotificationsPageContent(),
+		pageContentLoader("/notifications/content"),
 	)
 }
 
@@ -169,14 +179,14 @@ func NotificationsPageContent() HyperNode {
 	)
 }
 
-func ProfilePage(params ProfilePageContentParams) HyperNode {
+func ProfilePage(username string, profileUsername string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PageProfile,
-			Username:    params.Username,
+			Username:    username,
 		},
 	})(
-		ProfilePageContent(params),
+		pageContentLoader(fmt.Sprintf("/@%s/content", profileUsername)),
 	)
 }
 
@@ -340,7 +350,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Submit"),
-				spinner(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
 			),
 		),
 	)
@@ -355,8 +365,16 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 		return basicPageLayout(basicLayoutParams{title: "Vidzilla"})(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
-				MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("flex-1 p-6 overflow-y-auto"))(
-					Group(children...),
+				DIV(
+					AttrId("PAGE_CONTENT_CONTAINER"),
+					AttrClass("flex-1 relative group"),
+				)(
+					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full h-full p-6 overflow-y-auto"))(
+						Group(children...),
+					),
+					DIV(AttrClass("hidden group-[.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
+						SPAN(AttrClass("loading loading-spinner loading-lg"))(),
+					),
 				),
 				videoUploadersContainer(),
 				videoUploadIndicator(),
@@ -444,6 +462,7 @@ func appPageButton(params appPageButtonParams) HyperNode {
 			Attr("hx-push-url", params.pageLink),
 			Attr("hx-target", "#APP_PAGE_CONTENT"),
 			Attr("hx-swap", "innerHTML"),
+			Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 		)(
 			RawText(params.icon),
 		),
@@ -456,18 +475,13 @@ func profileCardAvatarPlaceholder() HyperNode {
 	)
 }
 
-type VideoPageParams struct {
-	Username      string
-	ContentParams VideoPageContentParams
-}
-
-func VideoPage(params VideoPageParams) HyperNode {
+func VideoPage(username string, videoId string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
-			Username: params.Username,
+			Username: username,
 		},
 	})(
-		VideoPageContent(params.ContentParams),
+		pageContentLoader(fmt.Sprintf("/videos/%s/content", videoId)),
 	)
 }
 
@@ -493,6 +507,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
+		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 	}
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(

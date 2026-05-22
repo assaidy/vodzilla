@@ -135,7 +135,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Register"),
-				spinner(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
 			),
 		),
 	)
@@ -296,7 +296,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Login"),
-				spinner(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
 			),
 		),
 

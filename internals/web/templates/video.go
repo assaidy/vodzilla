@@ -107,7 +107,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Post"),
-				spinner(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
 			),
 		),
 
@@ -311,6 +311,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
+		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 	}
 
 	return DIV(
@@ -319,6 +320,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 		Attr("hx-push-url", videoPageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
+		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 	)(
 		FIGURE(AttrClass("relative aspect-video overflow-hidden group"))(
 			DIV(AttrClass("w-full h-full transition-transform duration-200 group-hover:scale-105"))(

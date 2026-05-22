@@ -264,3 +264,91 @@ func HandleDeleteFromWatchLater(c fiber.Ctx) error {
 		IsActive: false,
 	}))
 }
+
+func HandleCreatePlaylist(c fiber.Ctx) error {
+	name := strings.TrimSpace(c.FormValue("name"))
+	videoId := c.FormValue("videoId")
+
+	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 50))
+
+	if nameErr != nil {
+		return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+			VideoId: videoId,
+			Name:    name,
+			NameErr: nameErr,
+		}))
+	}
+
+	userId := c.Locals("user_id").(string)
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+
+	playlistId, err := videoService.CreatePlaylist(c.RequestCtx(), userId, name)
+	if err != nil {
+		if errors.Is(err, video_service.ErrConflict) {
+			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+				VideoId: videoId,
+				Name:    name,
+				NameErr: fmt.Errorf("playlist with this name already exists"),
+			}))
+		}
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
+			VideoId: videoId,
+		}),
+
+		hyper.DIV(
+			hyper.AttrId("PLAYLIST_CHECKBOX_LIST"),
+			hyper.Attr("hx-swap-oob", "prepend"),
+		)(
+			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
+				VideoId:    videoId,
+				PlaylistId: playlistId,
+				Name:       name,
+				Checked:    false,
+			}),
+		),
+	))
+}
+
+func HandleAddVideoToPlaylist(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	playlistId := c.Params("playlist_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
+		switch {
+		case errors.Is(err, video_service.ErrConflict):
+			return fiber.NewError(fiber.StatusConflict, "already in playlist")
+		case errors.Is(err, video_service.ErrVideoNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		case errors.Is(err, video_service.ErrPlaylistNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
+	videoId := c.Params("video_id")
+	playlistId := c.Params("playlist_id")
+	userId := c.Locals("user_id").(string)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	if err := videoService.DeleteVideoFromPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
+		switch {
+		case errors.Is(err, video_service.ErrPlaylistNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		case errors.Is(err, video_service.ErrVideoNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "video not in playlist")
+		}
+		return err
+	}
+
+	return nil
+}
