@@ -23,6 +23,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TODO: create cleanup workers and register them in cron jobs:
+//   - CleanupExpiredSessions: delete sessions WHERE expires_at < now()
+//   - CleanupExpiredEmailVerificationTokens: delete tokens WHERE expires_at < now()
+//
+// TODO: consume UserDeletedEvent for cascading cleanup (soft deletion):
+//   - mark user as deleted (don't hard-delete immediately)
+//
+// TODO: when implementing user deletion, soft-delete users and publish UserDeletedEvent
+// so other services can mark their user-associated data as deleted
 const Name = "user"
 
 var _ services.Service = (*Service)(nil)
@@ -100,8 +109,6 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 		}
 	}
 }
-
-
 
 func (me *Service) Register(ctx context.Context, email, password, name, username string) error {
 	tx, err := me.db.BeginTx(ctx, nil)

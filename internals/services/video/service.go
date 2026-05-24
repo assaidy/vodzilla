@@ -17,6 +17,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// TODO: consume UploadExpiredEvent to delete pending video metadata (cron job)
+// (video with status=uploading that never completed)
+//
+// TODO: consume UserDeletedEvent for cascading cleanup (soft deletion):
+//   - mark user's videos and playlists as deleted
+//
+// TODO: when implementing video deletion, soft-delete videos and publish VideoDeletedEvent
+// so other services can mark their video-associated data as deleted
 const Name = "video"
 
 var _ services.Service = (*Service)(nil)

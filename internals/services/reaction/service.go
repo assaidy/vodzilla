@@ -11,6 +11,8 @@ import (
 	"github.com/assaidy/vodzilla/internals/services/reaction/queries"
 )
 
+// TODO: consume UserDeletedEvent to mark user's reactions and views as deleted
+// TODO: consume VideoDeletedEvent to mark video's reactions and views as deleted
 const Name = "reaction"
 
 var _ services.Service = (*Service)(nil)

@@ -14,7 +14,11 @@ import (
 func main() {
 	wm := workers.NewWorkerManager()
 
-	// register workers (ie. cron jobs) here...
+	// TODO: register cleanup workers (cron jobs):
+	//   - CleanupExpiredSessions: delete sessions WHERE expires_at < now()
+	//   - CleanupExpiredEmailVerificationTokens: delete tokens WHERE expires_at < now()
+	//   - CleanupExpiredUploads: scan Redis for expired upload_ttl keys,
+	//     abort S3 multipart uploads, delete object_keys, publish UploadExpiredEvent
 
 	wm.Start()
 	defer wm.Stop()
