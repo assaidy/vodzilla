@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 	"time"
 
@@ -19,8 +18,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -104,61 +101,9 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 	}
 }
 
-var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
 
-func validateRegisterParams(email, password, name, username string) error {
-	data := struct {
-		Email    string
-		Password string
-		Name     string
-		Username string
-	}{
-		Email:    email,
-		Password: password,
-		Name:     name,
-		Username: username,
-	}
-
-	if err := validation.ValidateStruct(&data,
-		validation.Field(&data.Email, validation.Required, is.Email),
-		validation.Field(&data.Password, validation.Required, validation.Length(8, 50)),
-		validation.Field(&data.Name, validation.Required, validation.Length(1, 256)),
-		validation.Field(&data.Username, validation.Required, validation.Length(1, 32), validation.Match(usernameRegex).Error("can only cotain letters, digits or _")),
-	); err != nil {
-		errs := err.(validation.Errors)
-		return RegisterValidationErrors{
-			Email:    errs["Email"],
-			Password: errs["Password"],
-			Name:     errs["Name"],
-			Username: errs["Username"],
-		}
-	}
-
-	return nil
-}
-
-type RegisterValidationErrors struct {
-	Email    error
-	Password error
-	Name     error
-	Username error
-}
-
-func (me RegisterValidationErrors) Error() string {
-	return fmt.Sprintf("email: %v, password: %v", me.Email, me.Password)
-}
-
-// TODO: move validation to handlers
 
 func (me *Service) Register(ctx context.Context, email, password, name, username string) error {
-	email = strings.ToLower(strings.TrimSpace(email))
-	name = strings.TrimSpace(name)
-	username = strings.TrimSpace(username)
-
-	if err := validateRegisterParams(email, password, name, username); err != nil {
-		return fmt.Errorf("%w: %w", ErrValidation, err)
-	}
-
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -201,7 +146,7 @@ func (me *Service) Register(ctx context.Context, email, password, name, username
 	return nil
 }
 
-const EmailVerificationQueue = "UserService:EmailVerification"
+const EmailVerificationQueue = "user_service:email_verification"
 
 type EmailVerificationQueuePayload struct {
 	Email            string

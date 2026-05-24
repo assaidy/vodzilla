@@ -4,11 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/web/templates"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -17,30 +20,33 @@ func HandleRegisterPage(c fiber.Ctx) error {
 }
 
 func HandleRegister(c fiber.Ctx) error {
-	name := c.FormValue("name")
-	username := c.FormValue("username")
-	email := c.FormValue("email")
+	email := strings.ToLower(strings.TrimSpace(c.FormValue("email")))
 	password := c.FormValue("password")
+	name := strings.TrimSpace(c.FormValue("name"))
+	username := strings.TrimSpace(c.FormValue("username"))
+
+	emailErr := validation.Validate(email, validation.Required, is.Email)
+	passwordErr := validation.Validate(password, validation.Required, validation.Length(8, 50))
+	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 256))
+	usernameErr := validation.Validate(username, validation.Required, validation.Length(1, 32),
+		validation.Match(usernameRegex).Error("can only contain letters, digits or _"))
+
+	if errors.Join(emailErr, passwordErr, nameErr, usernameErr) != nil {
+		return render(c, templates.RegisterForm(templates.RegisterFormParams{
+			Name:        name,
+			NameErr:     nameErr,
+			Username:    username,
+			UsernameErr: usernameErr,
+			Email:       email,
+			EmailErr:    emailErr,
+			Password:    password,
+			PasswordErr: passwordErr,
+		}))
+	}
 
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
 	if err := userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
-		if errors.Is(err, user_service.ErrValidation) {
-			if validationErrs, ok := errors.AsType[user_service.RegisterValidationErrors](err); !ok {
-				panic("expected user.RegisterValidationErrors")
-			} else {
-				return render(c, templates.RegisterForm(templates.RegisterFormParams{
-					Name:        name,
-					NameErr:     validationErrs.Name,
-					Username:    username,
-					UsernameErr: validationErrs.Username,
-					Email:       email,
-					EmailErr:    validationErrs.Email,
-					Password:    password,
-					PasswordErr: validationErrs.Password,
-				}))
-			}
-		}
 		if errors.Is(err, user_service.ErrEmailConflict) {
 			return render(c, templates.RegisterForm(templates.RegisterFormParams{
 				Name:     name,

@@ -215,7 +215,6 @@ func HandleNotificationsPageContent(c fiber.Ctx) error {
 	))
 }
 
-// TODO: we can do a lot of lazy loading and pagination here and in other places
 func HandleProfilePage(c fiber.Ctx) error {
 	profileUser, currentUser, err := getProfileUserAndCurrentUser(c)
 	if err != nil {
@@ -225,6 +224,7 @@ func HandleProfilePage(c fiber.Ctx) error {
 	return render(c, templates.ProfilePage(currentUser.Username, profileUser.Username))
 }
 
+// TODO: we can do a lot of lazy loading and pagination here and in other places
 func HandleProfilePageContent(c fiber.Ctx) error {
 	profileUser, currentUser, err := getProfileUserAndCurrentUser(c)
 	if err != nil {
