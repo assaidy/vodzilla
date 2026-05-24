@@ -207,7 +207,7 @@ func (me *Service) AddVideoToWatchLater(ctx context.Context, videoId, userId str
 	}); err != nil {
 		return fmt.Errorf("failed to check watch later: %w", err)
 	} else if ok {
-		return ErrConflict
+		return ErrWatchLaterConflict
 	}
 
 	if err := qtx.InsertIntoWatchLater(ctx, queries.InsertIntoWatchLaterParams{
@@ -271,7 +271,7 @@ func (me *Service) CreatePlaylist(ctx context.Context, userId, playlistName stri
 	}); err != nil {
 		return "", fmt.Errorf("failed to check playlist by name for user: %w", err)
 	} else if ok {
-		return "", ErrConflict
+		return "", ErrPlaylistNameConflict
 	}
 
 	playlistId := ulid.Make().String()
@@ -329,7 +329,7 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, play
 	}); err != nil {
 		return fmt.Errorf("failed to check video in playlist: %w", err)
 	} else if ok {
-		return ErrConflict
+		return ErrPlaylistVideoConflict
 	}
 
 	if err := qtx.InsertIntoPlaylist(ctx, queries.InsertIntoPlaylistParams{

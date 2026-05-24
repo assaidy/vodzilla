@@ -119,7 +119,7 @@ func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string,
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
+			return ErrObjectNotFound
 		}
 		return fmt.Errorf("failed to get object key: %w", err)
 	}
@@ -183,7 +183,7 @@ func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) 
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", ErrNotFound
+			return "", ErrObjectNotFound
 		}
 		return "", fmt.Errorf("failed to get object key: %w", err)
 	}

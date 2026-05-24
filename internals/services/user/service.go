@@ -166,7 +166,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 	user, err := qtx.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
+			return ErrUserNotFound
 		}
 		return fmt.Errorf("failed to get user by email: %w", err)
 	}
@@ -205,7 +205,7 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) er
 	if n, err := me.queries.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
 		return fmt.Errorf("failed to verify email: %w", err)
 	} else if n == 0 {
-		return ErrNotFound
+		return ErrTokenNotFound
 	}
 
 	return nil
@@ -283,7 +283,7 @@ func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, 
 	session, err := me.queries.GetSessionById(ctx, sessionId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, ErrSessionNotFound
 		}
 		return nil, fmt.Errorf("failed to get session by token: %w", err)
 	}
@@ -304,7 +304,7 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 	}); err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	} else if nDeleted == 0 {
-		return ErrNotFound
+		return ErrSessionNotFound
 	}
 
 	return nil
@@ -322,7 +322,7 @@ func (me *Service) GetUserById(ctx context.Context, userId string) (*User, error
 	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by id: %w", err)
 	}
@@ -340,7 +340,7 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	user, err := me.queries.GetUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
+			return nil, ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by id: %w", err)
 	}
@@ -365,7 +365,7 @@ func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio 
 	user, err := qtx.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrNotFound
+			return ErrUserNotFound
 		}
 		return fmt.Errorf("failed to get user by id: %w", err)
 	}

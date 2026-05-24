@@ -125,7 +125,7 @@ func HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
 	if err != nil {
-		if errors.Is(err, media_service.ErrNotFound) {
+		if errors.Is(err, media_service.ErrObjectNotFound) {
 			return fiber.NewError(fiber.StatusNotFound, "video not found")
 		}
 		return err
@@ -232,7 +232,7 @@ func HandleAddToWatchLater(c fiber.Ctx) error {
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.AddVideoToWatchLater(c.RequestCtx(), videoId, userId); err != nil {
-		if errors.Is(err, video_service.ErrConflict) {
+		if errors.Is(err, video_service.ErrWatchLaterConflict) {
 			return fiber.NewError(fiber.StatusConflict, "already in watch later")
 		}
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -284,7 +284,7 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 
 	playlistId, err := videoService.CreatePlaylist(c.RequestCtx(), userId, name)
 	if err != nil {
-		if errors.Is(err, video_service.ErrConflict) {
+		if errors.Is(err, video_service.ErrPlaylistNameConflict) {
 			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
 				VideoId: videoId,
 				Name:    name,
@@ -321,7 +321,7 @@ func HandleAddVideoToPlaylist(c fiber.Ctx) error {
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
 		switch {
-		case errors.Is(err, video_service.ErrConflict):
+		case errors.Is(err, video_service.ErrPlaylistVideoConflict):
 			return fiber.NewError(fiber.StatusConflict, "already in playlist")
 		case errors.Is(err, video_service.ErrVideoNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "video not found")

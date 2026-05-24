@@ -88,7 +88,7 @@ func HandleVerifyEmailPage(c fiber.Ctx) error {
 
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	if err := userService.VerifyEmail(c.RequestCtx(), token); err != nil {
-		if errors.Is(err, user_service.ErrNotFound) {
+		if errors.Is(err, user_service.ErrTokenNotFound) {
 			return render(c, templates.InvalidVerificationLinkPage())
 		}
 		return err
@@ -156,7 +156,7 @@ func WithSession(c fiber.Ctx) error {
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	session, err := userService.GetSession(c.RequestCtx(), sessionId)
 	if err != nil {
-		if errors.Is(err, user_service.ErrNotFound) {
+		if errors.Is(err, user_service.ErrSessionNotFound) {
 			return redirect(c, "/login")
 		}
 		return err

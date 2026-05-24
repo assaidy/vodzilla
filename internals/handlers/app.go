@@ -105,9 +105,9 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 		if !ok {
 			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
 			if err != nil {
-				if errors.Is(err, user_service.ErrNotFound) {
-					continue
-				}
+			if errors.Is(err, user_service.ErrUserNotFound) {
+				continue
+			}
 				return err
 			}
 			ownerCache[v.OwnerId] = owner
@@ -278,7 +278,7 @@ func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_servic
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	profileUser, err := userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
 	if err != nil {
-		if errors.Is(err, user_service.ErrNotFound) {
+		if errors.Is(err, user_service.ErrUserNotFound) {
 			return nil, nil, fiber.ErrNotFound
 		}
 		return nil, nil, fmt.Errorf("failed to get profile user: %w", err)
@@ -355,7 +355,7 @@ func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 
 	user, err := userService.GetUserById(c.RequestCtx(), userId)
 	if err != nil {
-		if errors.Is(err, user_service.ErrNotFound) {
+		if errors.Is(err, user_service.ErrUserNotFound) {
 			return nil, redirect(c, "/login")
 		}
 		return nil, err
@@ -390,7 +390,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 	owner, err := userService.GetUserById(c.RequestCtx(), video.OwnerId)
 	if err != nil {
-		if errors.Is(err, user_service.ErrNotFound) {
+		if errors.Is(err, user_service.ErrUserNotFound) {
 			return fiber.ErrNotFound
 		}
 		return err
@@ -522,9 +522,9 @@ func HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 		if !ok {
 			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
 			if err != nil {
-				if errors.Is(err, user_service.ErrNotFound) {
-					continue
-				}
+			if errors.Is(err, user_service.ErrUserNotFound) {
+				continue
+			}
 				return err
 			}
 			ownerCache[v.OwnerId] = owner

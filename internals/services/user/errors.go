@@ -7,5 +7,7 @@ var (
 	ErrUsernameConflict = errors.New("username conflict")
 	ErrUnauthorized     = errors.New("unauthorized")
 	ErrUnverified       = errors.New("unverified")
-	ErrNotFound         = errors.New("not found")
+	ErrUserNotFound     = errors.New("user not found")
+	ErrSessionNotFound  = errors.New("session not found")
+	ErrTokenNotFound    = errors.New("token not found")
 )
