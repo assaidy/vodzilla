@@ -451,6 +451,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
+			CurrentUserId: currentUser.Id,
 			ReactionsParams: templates.ReactionsWidgetParams{
 				VideoId:       videoId,
 				LikesCount:    reactionCounts.Likes,

@@ -24,8 +24,23 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.checkCommentStmt, err = db.PrepareContext(ctx, checkComment); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckComment: %w", err)
+	}
+	if q.checkCommentForUserStmt, err = db.PrepareContext(ctx, checkCommentForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckCommentForUser: %w", err)
+	}
+	if q.deleteCommentStmt, err = db.PrepareContext(ctx, deleteComment); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteComment: %w", err)
+	}
 	if q.deleteReactionStmt, err = db.PrepareContext(ctx, deleteReaction); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteReaction: %w", err)
+	}
+	if q.getAllCommentRepliesStmt, err = db.PrepareContext(ctx, getAllCommentReplies); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllCommentReplies: %w", err)
+	}
+	if q.getAllVideoCommentsStmt, err = db.PrepareContext(ctx, getAllVideoComments); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllVideoComments: %w", err)
 	}
 	if q.getVideoReactionForUserStmt, err = db.PrepareContext(ctx, getVideoReactionForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVideoReactionForUser: %w", err)
@@ -36,20 +51,51 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getViewsCountStmt, err = db.PrepareContext(ctx, getViewsCount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetViewsCount: %w", err)
 	}
+	if q.insertCommentStmt, err = db.PrepareContext(ctx, insertComment); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertComment: %w", err)
+	}
 	if q.insertReactionStmt, err = db.PrepareContext(ctx, insertReaction); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertReaction: %w", err)
 	}
 	if q.insertViewStmt, err = db.PrepareContext(ctx, insertView); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertView: %w", err)
 	}
+	if q.updateCommentStmt, err = db.PrepareContext(ctx, updateComment); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateComment: %w", err)
+	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
+	if q.checkCommentStmt != nil {
+		if cerr := q.checkCommentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkCommentStmt: %w", cerr)
+		}
+	}
+	if q.checkCommentForUserStmt != nil {
+		if cerr := q.checkCommentForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkCommentForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteCommentStmt != nil {
+		if cerr := q.deleteCommentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteCommentStmt: %w", cerr)
+		}
+	}
 	if q.deleteReactionStmt != nil {
 		if cerr := q.deleteReactionStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing deleteReactionStmt: %w", cerr)
+		}
+	}
+	if q.getAllCommentRepliesStmt != nil {
+		if cerr := q.getAllCommentRepliesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllCommentRepliesStmt: %w", cerr)
+		}
+	}
+	if q.getAllVideoCommentsStmt != nil {
+		if cerr := q.getAllVideoCommentsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllVideoCommentsStmt: %w", cerr)
 		}
 	}
 	if q.getVideoReactionForUserStmt != nil {
@@ -67,6 +113,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getViewsCountStmt: %w", cerr)
 		}
 	}
+	if q.insertCommentStmt != nil {
+		if cerr := q.insertCommentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertCommentStmt: %w", cerr)
+		}
+	}
 	if q.insertReactionStmt != nil {
 		if cerr := q.insertReactionStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertReactionStmt: %w", cerr)
@@ -75,6 +126,11 @@ func (q *Queries) Close() error {
 	if q.insertViewStmt != nil {
 		if cerr := q.insertViewStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertViewStmt: %w", cerr)
+		}
+	}
+	if q.updateCommentStmt != nil {
+		if cerr := q.updateCommentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateCommentStmt: %w", cerr)
 		}
 	}
 	return err
@@ -116,23 +172,37 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 type Queries struct {
 	db                          DBTX
 	tx                          *sql.Tx
+	checkCommentStmt            *sql.Stmt
+	checkCommentForUserStmt     *sql.Stmt
+	deleteCommentStmt           *sql.Stmt
 	deleteReactionStmt          *sql.Stmt
+	getAllCommentRepliesStmt    *sql.Stmt
+	getAllVideoCommentsStmt     *sql.Stmt
 	getVideoReactionForUserStmt *sql.Stmt
 	getVideoReactionsStmt       *sql.Stmt
 	getViewsCountStmt           *sql.Stmt
+	insertCommentStmt           *sql.Stmt
 	insertReactionStmt          *sql.Stmt
 	insertViewStmt              *sql.Stmt
+	updateCommentStmt           *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                          tx,
 		tx:                          tx,
+		checkCommentStmt:            q.checkCommentStmt,
+		checkCommentForUserStmt:     q.checkCommentForUserStmt,
+		deleteCommentStmt:           q.deleteCommentStmt,
 		deleteReactionStmt:          q.deleteReactionStmt,
+		getAllCommentRepliesStmt:    q.getAllCommentRepliesStmt,
+		getAllVideoCommentsStmt:     q.getAllVideoCommentsStmt,
 		getVideoReactionForUserStmt: q.getVideoReactionForUserStmt,
 		getVideoReactionsStmt:       q.getVideoReactionsStmt,
 		getViewsCountStmt:           q.getViewsCountStmt,
+		insertCommentStmt:           q.insertCommentStmt,
 		insertReactionStmt:          q.insertReactionStmt,
 		insertViewStmt:              q.insertViewStmt,
+		updateCommentStmt:           q.updateCommentStmt,
 	}
 }

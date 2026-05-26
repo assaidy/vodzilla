@@ -27,6 +27,7 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+// TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Vodzilla",
@@ -84,7 +85,9 @@ func main() {
 
 	go func() {
 		port, _ := utils.GetEnv("PORT", "8080")
-		if err := app.Listen(fmt.Sprintf(":%s", port), fiber.ListenConfig{EnablePrefork: true}); err != nil {
+		// TODO: Before enabling prefork, make sure to implement Consumer Groups to
+		// prevent multiple instances of a service from consuming the same event multiple times.
+		if err := app.Listen(fmt.Sprintf(":%s", port)); err != nil {
 			logger.Error("failed to start server", "error", err, "pid", os.Getpid())
 			os.Exit(1)
 		}

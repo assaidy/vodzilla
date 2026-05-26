@@ -5,8 +5,18 @@
 package queries
 
 import (
+	"database/sql"
 	"time"
 )
+
+type ReactionServiceComment struct {
+	Id        string
+	VideoId   string
+	OwnerId   string
+	Content   string
+	CreatedAt time.Time
+	ParentId  sql.NullString
+}
 
 type ReactionServiceReaction struct {
 	VideoId string

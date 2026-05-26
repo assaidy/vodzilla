@@ -64,4 +64,10 @@ func RegisterRoutes(app *fiber.App) {
 	app.Post("/playlists", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleCreatePlaylist)
 	app.Post("/videos/:video_id/playlists/:playlist_id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleAddVideoToPlaylist)
 	app.Delete("/videos/:video_id/playlists/:playlist_id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleDeleteVideoFromPlaylist)
+
+	app.Get("/videos/:video_id/comments", handlers.WithSession, handlers.HandleGetVideoComments)
+	app.Get("/videos/:video_id/comments/:comment_id/replies", handlers.WithSession, handlers.HandleGetCommentReplies)
+	app.Post("/videos/:video_id/comments", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleCreateComment)
+	app.Put("/videos/:video_id/comments/:comment_id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleEditComment)
+	app.Delete("/videos/:video_id/comments/:comment_id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleDeleteComment)
 }

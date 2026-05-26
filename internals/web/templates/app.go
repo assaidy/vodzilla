@@ -494,6 +494,7 @@ type VideoPageContentParams struct {
 	Description              string
 	Timestamp                time.Time
 	ViewsCount               int
+	CurrentUserId            string
 	ReactionsParams          ReactionsWidgetParams
 	WatchLaterButtonParams   WatchLaterButtonParams
 	AddToPlaylistModalParams AddToPlaylistModalParams
@@ -547,6 +548,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 		),
 
 		AddToPlaylistModal(params.AddToPlaylistModalParams),
+
+		CommentSection(params.Id),
 
 		SCRIPT()(RawText(fmt.Sprintf(`
 			(() => {

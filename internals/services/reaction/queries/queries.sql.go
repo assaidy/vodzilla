@@ -7,7 +7,53 @@ package queries
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
+
+const checkComment = `-- name: CheckComment :one
+select exists (select 1 from reaction_service.comments where id = $1 for update)
+`
+
+func (q *Queries) CheckComment(ctx context.Context, id string) (bool, error) {
+	row := q.queryRow(ctx, q.checkCommentStmt, checkComment, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkCommentForUser = `-- name: CheckCommentForUser :one
+select exists (select 1 from reaction_service.comments where id = $1 and owner_id = $2 for update)
+`
+
+type CheckCommentForUserParams struct {
+	Id      string
+	OwnerId string
+}
+
+func (q *Queries) CheckCommentForUser(ctx context.Context, arg CheckCommentForUserParams) (bool, error) {
+	row := q.queryRow(ctx, q.checkCommentForUserStmt, checkCommentForUser, arg.Id, arg.OwnerId)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const deleteComment = `-- name: DeleteComment :execrows
+delete from reaction_service.comments where id = $1 and owner_id = $2
+`
+
+type DeleteCommentParams struct {
+	Id      string
+	OwnerId string
+}
+
+func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) (int64, error) {
+	result, err := q.exec(ctx, q.deleteCommentStmt, deleteComment, arg.Id, arg.OwnerId)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
 
 const deleteReaction = `-- name: DeleteReaction :exec
 delete from reaction_service.reactions where video_id = $1 and user_id = $2 and kind = $3
@@ -24,11 +70,113 @@ func (q *Queries) DeleteReaction(ctx context.Context, arg DeleteReactionParams) 
 	return err
 }
 
+const getAllCommentReplies = `-- name: GetAllCommentReplies :many
+select 
+  c.id,
+  c.owner_id,
+  c.content,
+  c.created_at,
+  count(r.id) as replies_count
+from reaction_service.comments c
+left join reaction_service.comments r on c.id = r.parent_id
+where c.parent_id = $1::varchar
+group by c.id, c.owner_id, c.content, c.created_at
+order by c.created_at asc
+`
+
+type GetAllCommentRepliesRow struct {
+	Id           string
+	OwnerId      string
+	Content      string
+	CreatedAt    time.Time
+	RepliesCount int64
+}
+
+func (q *Queries) GetAllCommentReplies(ctx context.Context, commentID string) ([]GetAllCommentRepliesRow, error) {
+	rows, err := q.query(ctx, q.getAllCommentRepliesStmt, getAllCommentReplies, commentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllCommentRepliesRow{}
+	for rows.Next() {
+		var i GetAllCommentRepliesRow
+		if err := rows.Scan(
+			&i.Id,
+			&i.OwnerId,
+			&i.Content,
+			&i.CreatedAt,
+			&i.RepliesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllVideoComments = `-- name: GetAllVideoComments :many
+select 
+  c.id,
+  c.owner_id,
+  c.content,
+  c.created_at,
+  count(r.id) as replies_count
+from reaction_service.comments c
+left join reaction_service.comments r on c.id = r.parent_id
+where c.video_id = $1 and c.parent_id is null
+group by c.id, c.owner_id, c.content, c.created_at
+order by c.created_at desc
+`
+
+type GetAllVideoCommentsRow struct {
+	Id           string
+	OwnerId      string
+	Content      string
+	CreatedAt    time.Time
+	RepliesCount int64
+}
+
+func (q *Queries) GetAllVideoComments(ctx context.Context, videoID string) ([]GetAllVideoCommentsRow, error) {
+	rows, err := q.query(ctx, q.getAllVideoCommentsStmt, getAllVideoComments, videoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAllVideoCommentsRow{}
+	for rows.Next() {
+		var i GetAllVideoCommentsRow
+		if err := rows.Scan(
+			&i.Id,
+			&i.OwnerId,
+			&i.Content,
+			&i.CreatedAt,
+			&i.RepliesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getVideoReactionForUser = `-- name: GetVideoReactionForUser :one
-SELECT
+select
     kind = 'like'    as is_like,
     kind = 'dislike' as is_dislike
-FROM reaction_service.reactions
+from reaction_service.reactions
 where video_id = $1 and user_id = $2
 `
 
@@ -50,10 +198,10 @@ func (q *Queries) GetVideoReactionForUser(ctx context.Context, arg GetVideoReact
 }
 
 const getVideoReactions = `-- name: GetVideoReactions :one
-SELECT
+select
     count(*) filter (where kind = 'like')    as likes,
     count(*) filter (where kind = 'dislike') as dislikes
-FROM reaction_service.reactions
+from reaction_service.reactions
 where video_id = $1
 `
 
@@ -78,6 +226,29 @@ func (q *Queries) GetViewsCount(ctx context.Context, videoID string) (int64, err
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const insertComment = `-- name: InsertComment :exec
+insert into reaction_service.comments (id, owner_id, video_id, content, parent_id) values ($1, $2, $3, $4, $5)
+`
+
+type InsertCommentParams struct {
+	Id       string
+	OwnerId  string
+	VideoId  string
+	Content  string
+	ParentId sql.NullString
+}
+
+func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) error {
+	_, err := q.exec(ctx, q.insertCommentStmt, insertComment,
+		arg.Id,
+		arg.OwnerId,
+		arg.VideoId,
+		arg.Content,
+		arg.ParentId,
+	)
+	return err
 }
 
 const insertReaction = `-- name: InsertReaction :exec
@@ -114,4 +285,20 @@ func (q *Queries) InsertView(ctx context.Context, arg InsertViewParams) (int64, 
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const updateComment = `-- name: UpdateComment :exec
+update reaction_service.comments 
+set content = $1
+where id = $2
+`
+
+type UpdateCommentParams struct {
+	Content string
+	Id      string
+}
+
+func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) error {
+	_, err := q.exec(ctx, q.updateCommentStmt, updateComment, arg.Content, arg.Id)
+	return err
 }

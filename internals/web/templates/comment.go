@@ -1,0 +1,280 @@
+package templates
+
+import (
+	"fmt"
+	"time"
+
+	. "github.com/assaidy/hyper/v2"
+)
+
+// TODO: the indentation for replies is too big. use the menu
+// component from daisy ui; it comes with indentation styles.
+func CommentSection(videoId string) HyperNode {
+	return DIV(AttrId("COMMENT_SECTION"), AttrClass("mt-8"))(
+		H2(AttrClass("text-xl font-bold mb-4"))("Comments"),
+		CreateCommentForm(CreateCommentFormParams{VideoId: videoId}),
+		DIV(
+			AttrId("COMMENTS_LIST"),
+			AttrClass("space-y-4 mt-6"),
+			Attr("hx-get", fmt.Sprintf("/videos/%s/comments", videoId)),
+			Attr("hx-trigger", "load"),
+			Attr("hx-swap", "innerHTML"),
+		)(),
+	)
+}
+
+type CreateCommentFormParams struct {
+	VideoId             string
+	ParentId            string
+	Content             string
+	ContentErr          error
+	HideParentReplyForm bool
+}
+
+// TODO: split comment form into two forms: create comment, create reply
+// TODO: the loading of replies is not correct.
+// there should be a button show/hide replies whose text changes according to the replies status (showed/hidden).
+// the replies list is lazy loaded when first show. that way we can hide/show comments any time and also it fixes
+// that the new reply is inserted event if replies is hidden, and that create two duplicate replies if we opened(loaded)
+// replies after a new reply inserted. also the number of replies (in the button) will be updated dynamically when new replies inserted.
+// TODO: make dropdown menu not to appear in the bottom
+func CreateCommentForm(params CreateCommentFormParams) HyperNode {
+	formId := "CREATE_COMMENT_FORM"
+	textareaId := "CREATE_COMMENT_TEXTAREA"
+	placeholder := "Add a comment..."
+	submitText := "Comment"
+
+	if params.ParentId != "" {
+		formId = fmt.Sprintf("REPLY_FORM_INNER_%s", params.ParentId)
+		textareaId = fmt.Sprintf("REPLY_TEXTAREA_%s", params.ParentId)
+		placeholder = "Write a reply..."
+		submitText = "Reply"
+	}
+
+	return Group(
+		FORM(
+			AttrId(formId),
+			AttrClass("flex gap-2 items-start "+IfElseZero(params.HideParentReplyForm, "hidden")),
+			Attr("hx-post", fmt.Sprintf("/videos/%s/comments", params.VideoId)),
+			Attr("hx-swap", "outerHTML"),
+			Attr("hx-indicator", "find .submit-btn"),
+		)(
+			If(params.ParentId == "",
+				commentAvatarPlaceholder(),
+			),
+			DIV(AttrClass("flex-1 flex gap-2"))(
+				TEXTAREA(
+					AttrId(textareaId),
+					AttrClass("textarea textarea-bordered w-full resize-none"),
+					AttrName("content"),
+					AttrPlaceholder(placeholder),
+					AttrRows("1"),
+					AttrRequired(true),
+					AttrMaxLength("500"),
+				)(params.Content),
+				If(params.ContentErr != nil,
+					LABEL(AttrClass("label"))(
+						SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
+					),
+				),
+				If(params.ParentId != "",
+					INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId)),
+				),
+				BUTTON(
+					AttrClass("btn btn-primary btn-sm submit-btn"),
+					AttrType(TypeSubmit),
+				)(submitText),
+			),
+		),
+	)
+}
+
+type CommentParams struct {
+	VideoId       string
+	CommentId     string
+	OwnerName     string
+	OwnerUsername string
+	Content       string
+	CreatedAt     time.Time
+	RepliesCount  int
+	IsOwner       bool
+}
+
+func Comment(params CommentParams) HyperNode {
+	commentId := params.CommentId
+	videoId := params.VideoId
+
+	ownerProfilePageLink := fmt.Sprintf("/@%s", params.OwnerUsername)
+	visitProfileAttrs := []Attribute{
+		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+		Attr("hx-push-url", ownerProfilePageLink),
+		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-swap", "innerHTML"),
+		Attr("hx-trigger", "click consume"),
+		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+	}
+
+	return DIV(
+		AttrId(fmt.Sprintf("COMMENT_%s", commentId)),
+		AttrClass("flex gap-2"),
+	)(
+		DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
+			commentAvatarPlaceholder(),
+		),
+
+		DIV(AttrClass("flex-1 min-w-0"))(
+			DIV(AttrClass("flex items-center gap-2 text-sm"))(
+				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
+					params.OwnerName,
+				),
+				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
+			),
+
+			DIV(AttrId(fmt.Sprintf("COMMENT_BODY_%s", commentId)))(
+				DIV(AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId)))(
+					P(AttrClass("text-sm"))(params.Content),
+				),
+				If(params.IsOwner,
+					FORM(
+						AttrId(fmt.Sprintf("EDIT_FORM_%s", commentId)),
+						AttrClass("hidden"),
+						Attr("hx-put", fmt.Sprintf("/videos/%s/comments/%s", videoId, commentId)),
+						Attr("hx-swap", "outerHTML"),
+					)(
+						TEXTAREA(
+							AttrClass("textarea textarea-bordered w-full"),
+							AttrName("content"),
+							AttrRequired(true),
+							AttrMaxLength("500"),
+						)(params.Content),
+						DIV(AttrClass("flex gap-2 mt-1"))(
+							BUTTON(AttrClass("btn btn-primary btn-sm"), AttrType(TypeSubmit))("Save"),
+							BUTTON(
+								AttrClass("btn btn-ghost btn-sm"),
+								AttrType(TypeButton),
+								Attr("onclick", fmt.Sprintf(`
+									COMMENT_CONTENT_%[1]s.classList.remove('hidden');
+									EDIT_FORM_%[1]s.classList.add('hidden');
+								`,
+									commentId,
+								)),
+							)("Cancel"),
+						),
+					),
+				),
+			),
+
+			DIV(AttrClass("flex items-center gap-1 mt-1"))(
+				BUTTON(
+					AttrClass("btn btn-ghost btn-xs"),
+					Attr("onclick", fmt.Sprintf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
+				)("Reply"),
+
+				If(params.RepliesCount > 0,
+					BUTTON(
+						AttrClass("btn btn-soft btn-xs"),
+						Attr("hx-get", fmt.Sprintf("/videos/%s/comments/%s/replies", videoId, commentId)),
+						Attr("hx-target", fmt.Sprintf("#REPLIES_%s", commentId)),
+						Attr("hx-swap", "append"),
+						Attr("hx-on::after:request", "this.remove()"),
+					)(fmt.Sprintf("Show replies (%d)", params.RepliesCount)),
+				),
+
+				If(params.IsOwner,
+					DIV(AttrClass("dropdown dropdown-end"))(
+						BUTTON(
+							AttrClass("btn btn-ghost btn-xs btn-circle"),
+							Attr("tabindex", "0"),
+						)(
+							RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`),
+						),
+						UL(
+							AttrClass("dropdown-content menu p-2 shadow bg-base-100 rounded-box z-[1]"),
+							Attr("tabindex", "0"),
+						)(
+							LI()(
+								A(
+									Attr("onclick", fmt.Sprintf(`
+										COMMENT_CONTENT_%[1]s.classList.add('hidden');
+										EDIT_FORM_%[1]s.classList.remove('hidden');
+									`,
+										commentId,
+									)),
+								)("Edit"),
+							),
+							LI()(
+								A(
+									Attr("hx-delete", fmt.Sprintf("/videos/%s/comments/%s", videoId, commentId)),
+									Attr("hx-target", fmt.Sprintf("#COMMENT_%s", commentId)),
+									Attr("hx-swap", "delete"),
+									Attr("hx-confirm", "Are you sure?"),
+								)("Delete"),
+							),
+						),
+					),
+				),
+			),
+
+			DIV(
+				AttrId(fmt.Sprintf("REPLY_FORM_%s", commentId)),
+				AttrClass("hidden mt-2"),
+			)(
+				CreateCommentForm(CreateCommentFormParams{VideoId: videoId, ParentId: commentId}),
+			),
+
+			DIV(
+				AttrId(fmt.Sprintf("REPLIES_%s", commentId)),
+				AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3"),
+			)(),
+		),
+	)
+}
+
+type EditCommentFormParams struct {
+	VideoId    string
+	CommentId  string
+	Content    string
+	ContentErr error
+	Hide       bool
+}
+
+func EditCommentForm(params EditCommentFormParams) HyperNode {
+	return FORM(
+		AttrId(fmt.Sprintf("EDIT_FORM_%s", params.CommentId)),
+		AttrClass(IfElseZero(params.Hide, "hidden")),
+		Attr("hx-put", fmt.Sprintf("/videos/%s/comments/%s", params.VideoId, params.CommentId)),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .submit-btn"),
+	)(
+		TEXTAREA(
+			AttrClass("textarea textarea-bordered w-full"),
+			AttrName("content"),
+			AttrRequired(true),
+			AttrMaxLength("500"),
+		)(params.Content),
+		If(params.ContentErr != nil,
+			LABEL(AttrClass("label"))(
+				SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
+			),
+		),
+		DIV(AttrClass("flex gap-2 mt-1"))(
+			BUTTON(AttrClass("btn btn-primary btn-sm submit-btn"), AttrType(TypeSubmit))("Save"),
+			BUTTON(
+				AttrClass("btn btn-ghost btn-sm"),
+				AttrType(TypeButton),
+				Attr("onclick", fmt.Sprintf(`
+					COMMENT_CONTENT_%[1]s.classList.remove('hidden');
+					EDIT_FORM_%[1]s.classList.add('hidden');
+				`, params.CommentId)),
+			)("Cancel"),
+		),
+	)
+}
+
+func commentAvatarPlaceholder() HyperNode {
+	return DIV(AttrClass("avatar placeholder shrink-0"))(
+		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-8 h-8 flex items-center justify-center text-xs"))(
+			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+		),
+	)
+}
