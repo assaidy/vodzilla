@@ -68,7 +68,6 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 					AttrClass("textarea textarea-bordered w-full resize-none"),
 					AttrName("content"),
 					AttrPlaceholder(placeholder),
-					AttrRows("1"),
 					AttrRequired(true),
 					AttrMaxLength("500"),
 				)(params.Content),
@@ -135,32 +134,12 @@ func Comment(params CommentParams) HyperNode {
 					P(AttrClass("text-sm"))(params.Content),
 				),
 				If(params.IsOwner,
-					FORM(
-						AttrId(fmt.Sprintf("EDIT_FORM_%s", commentId)),
-						AttrClass("hidden"),
-						Attr("hx-put", fmt.Sprintf("/videos/%s/comments/%s", videoId, commentId)),
-						Attr("hx-swap", "outerHTML"),
-					)(
-						TEXTAREA(
-							AttrClass("textarea textarea-bordered w-full"),
-							AttrName("content"),
-							AttrRequired(true),
-							AttrMaxLength("500"),
-						)(params.Content),
-						DIV(AttrClass("flex gap-2 mt-1"))(
-							BUTTON(AttrClass("btn btn-primary btn-sm"), AttrType(TypeSubmit))("Save"),
-							BUTTON(
-								AttrClass("btn btn-ghost btn-sm"),
-								AttrType(TypeButton),
-								Attr("onclick", fmt.Sprintf(`
-									COMMENT_CONTENT_%[1]s.classList.remove('hidden');
-									EDIT_FORM_%[1]s.classList.add('hidden');
-								`,
-									commentId,
-								)),
-							)("Cancel"),
-						),
-					),
+					EditCommentForm(EditCommentFormParams{
+						VideoId:   videoId,
+						CommentId: commentId,
+						Content:   params.Content,
+						Hide:      true,
+					}),
 				),
 			),
 
@@ -200,7 +179,9 @@ func Comment(params CommentParams) HyperNode {
 									`,
 										commentId,
 									)),
-								)("Edit"),
+								)(
+									"Edit",
+								),
 							),
 							LI()(
 								A(
@@ -208,7 +189,9 @@ func Comment(params CommentParams) HyperNode {
 									Attr("hx-target", fmt.Sprintf("#COMMENT_%s", commentId)),
 									Attr("hx-swap", "delete"),
 									Attr("hx-confirm", "Are you sure?"),
-								)("Delete"),
+								)(
+									"Delete",
+								),
 							),
 						),
 					),
@@ -247,11 +230,13 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 		Attr("hx-indicator", "find .submit-btn"),
 	)(
 		TEXTAREA(
-			AttrClass("textarea textarea-bordered w-full"),
+			AttrClass("textarea textarea-bordered w-full resize-none"),
 			AttrName("content"),
 			AttrRequired(true),
 			AttrMaxLength("500"),
-		)(params.Content),
+		)(
+			params.Content,
+		),
 		If(params.ContentErr != nil,
 			LABEL(AttrClass("label"))(
 				SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),

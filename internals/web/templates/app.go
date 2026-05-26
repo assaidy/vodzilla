@@ -367,9 +367,9 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 				Navbar(params.navbarParams),
 				DIV(
 					AttrId("PAGE_CONTENT_CONTAINER"),
-					AttrClass("flex-1 relative group"),
+					AttrClass("flex-1 relative group pt-20"),
 				)(
-					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full h-full p-6 overflow-y-auto"))(
+					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full p-6"))(
 						Group(children...),
 					),
 					DIV(AttrClass("hidden group-[.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
@@ -389,7 +389,7 @@ type NavbarParams struct {
 }
 
 func Navbar(params NavbarParams) HyperNode {
-	return NAV(AttrId("NAVBAR"), AttrClass("w-full sticky top-0 z-10 py-2 flex justify-center"))(
+	return NAV(AttrId("NAVBAR"), AttrClass("w-full fixed top-0 z-10 py-2 flex justify-center"))(
 		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
