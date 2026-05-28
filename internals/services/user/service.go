@@ -23,10 +23,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: create cleanup workers and register them in cron jobs:
-//   - CleanupExpiredSessions: delete sessions WHERE expires_at < now()
-//   - CleanupExpiredEmailVerificationTokens: delete tokens WHERE expires_at < now()
-//
 // TODO: consume UserDeletedEvent for cascading cleanup (soft deletion):
 //   - mark user as deleted (don't hard-delete immediately)
 //
@@ -58,9 +54,29 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, 
 	}
 
 	service.workerManager.RegisterWorker(
-		workers.NewWorker("verification email sender", service.verificationEmailSenderJob,
-			workers.WithNRuns(1),
-			workers.WithNRetries(0),
+		workers.NewWorker(
+			"verification email sender",
+			service.verificationEmailSenderJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			"cleanup expired email verification tokens",
+			service.cleanupExpiredEmailVerificationTokensJob,
+			workers.WithTick(1*time.Hour),
+			workers.WithTimeout(5*time.Minute),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			"cleanup expired sessions",
+			service.cleanupExpiredSessions,
+			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
+			workers.WithTimeout(10*time.Minute),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 		),
 	)
 
@@ -85,16 +101,16 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 		default:
 			result, err := me.redis.BLPop(ctx, 5*time.Second, EmailVerificationQueue).Result()
 			if err != nil {
-				if !errors.Is(err, redis.Nil) && ctx.Err() == nil { // not a BLPop timout or context canceled
-					me.logger.Error("failed to LPop email verification queue", "error", err)
+				if errors.Is(err, redis.Nil) || ctx.Err() != nil {
+					// BLPop timout or context canceled
+					continue
 				}
-				continue
+				return fmt.Errorf("failed to BLPop email verification queue: %w", err)
 			}
 
 			var payload EmailVerificationQueuePayload
 			if err := json.Unmarshal([]byte(result[1]), &payload); err != nil {
-				me.logger.Error("failed to decode email verification queue payload", "error", err)
-				continue
+				return fmt.Errorf("failed to decode email verification queue payload: %w", err)
 			}
 
 			if err := me.mailer.SendEmail(ctx, mailer.Message{
@@ -104,7 +120,7 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 				ContentType: "text/html; charset=utf-8",
 				Body:        fmt.Sprintf(`To verifiy you email click <a href="%s">here</a>`, payload.VerificationLink),
 			}); err != nil {
-				me.logger.Error("failed to send verification email", "error", err)
+				return fmt.Errorf("failed to send verification email: %w", err)
 			}
 		}
 	}
@@ -218,6 +234,14 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) er
 	return nil
 }
 
+func (me *Service) cleanupExpiredEmailVerificationTokensJob(ctx context.Context) error {
+	if err := me.queries.BatchDeleteExpiredEmailVerificationTokens(ctx); err != nil {
+		return fmt.Errorf("failed to batch delete expired email verification tokens: %w", err)
+	}
+
+	return nil
+}
+
 type Session struct {
 	Id           string
 	OwnerId      string
@@ -312,6 +336,14 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 		return fmt.Errorf("failed to delete session: %w", err)
 	} else if nDeleted == 0 {
 		return ErrSessionNotFound
+	}
+
+	return nil
+}
+
+func (me *Service) cleanupExpiredSessions(ctx context.Context) error {
+	if err := me.queries.BatchDeleteExpiredSessions(ctx); err != nil {
+		return fmt.Errorf("failed to batch delete expired sessions: %w", err)
 	}
 
 	return nil

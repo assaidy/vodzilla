@@ -47,3 +47,41 @@ set
   username = $2,
   bio = $3
 where id = @user_id;
+
+-- name: BatchDeleteExpiredEmailVerificationTokens :exec
+do $$
+declare
+  rows_deleted int;
+begin
+  loop
+    delete from user_service.email_verification_tokens
+    where ctid in (
+      select ctid
+      from user_service.email_verification_tokens
+      where expires_at <= now()
+      limit 1000
+    );
+    get diagnostics rows_deleted = row_count;
+    exit when rows_deleted = 0;
+  end loop;
+end
+$$;
+
+-- name: BatchDeleteExpiredSessions :exec
+do $$
+declare
+  rows_deleted int;
+begin
+  loop
+    delete from user_service.sessions
+    where ctid in (
+      select ctid
+      from user_service.sessions
+      where expires_at <= now()
+      limit 1000
+    );
+    get diagnostics rows_deleted = row_count;
+    exit when rows_deleted = 0;
+  end loop;
+end
+$$;

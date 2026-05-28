@@ -11,6 +11,56 @@ import (
 	"time"
 )
 
+const batchDeleteExpiredEmailVerificationTokens = `-- name: BatchDeleteExpiredEmailVerificationTokens :exec
+do $$
+declare
+  rows_deleted int;
+begin
+  loop
+    delete from user_service.email_verification_tokens
+    where ctid in (
+      select ctid
+      from user_service.email_verification_tokens
+      where expires_at <= now()
+      limit 1000
+    );
+    get diagnostics rows_deleted = row_count;
+    exit when rows_deleted = 0;
+  end loop;
+end
+$$
+`
+
+func (q *Queries) BatchDeleteExpiredEmailVerificationTokens(ctx context.Context) error {
+	_, err := q.exec(ctx, q.batchDeleteExpiredEmailVerificationTokensStmt, batchDeleteExpiredEmailVerificationTokens)
+	return err
+}
+
+const batchDeleteExpiredSessions = `-- name: BatchDeleteExpiredSessions :exec
+do $$
+declare
+  rows_deleted int;
+begin
+  loop
+    delete from user_service.sessions
+    where ctid in (
+      select ctid
+      from user_service.sessions
+      where expires_at <= now()
+      limit 1000
+    );
+    get diagnostics rows_deleted = row_count;
+    exit when rows_deleted = 0;
+  end loop;
+end
+$$
+`
+
+func (q *Queries) BatchDeleteExpiredSessions(ctx context.Context) error {
+	_, err := q.exec(ctx, q.batchDeleteExpiredSessionsStmt, batchDeleteExpiredSessions)
+	return err
+}
+
 const checkEmail = `-- name: CheckEmail :one
 select exists (select 1 from user_service.users where email = $1 for update)
 `
