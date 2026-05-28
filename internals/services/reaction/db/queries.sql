@@ -70,3 +70,21 @@ left join reaction_service.comments r on c.id = r.parent_id
 where c.parent_id = @comment_id::varchar
 group by c.id, c.owner_id, c.content, c.created_at
 order by c.created_at asc;
+
+-- name: DeleteAllViewsForUser :exec
+delete from reaction_service.views where user_id = $1;
+
+-- name: DeleteAllReactionsForUser :exec
+delete from reaction_service.reactions where user_id = $1;
+
+-- name: DeleteAllCommentsForUser :exec
+delete from reaction_service.comments where owner_id = $1;
+
+-- name: DeleteAllViewsForVideo :exec
+delete from reaction_service.views where video_id = $1;
+
+-- name: DeleteAllReactionsForVideo :exec
+delete from reaction_service.reactions where video_id = $1;
+
+-- name: DeleteAllCommentsForVideo :exec
+delete from reaction_service.comments where video_id = $1;

@@ -38,6 +38,60 @@ func (q *Queries) CheckCommentForUser(ctx context.Context, arg CheckCommentForUs
 	return exists, err
 }
 
+const deleteAllCommentsForUser = `-- name: DeleteAllCommentsForUser :exec
+delete from reaction_service.comments where owner_id = $1
+`
+
+func (q *Queries) DeleteAllCommentsForUser(ctx context.Context, ownerID string) error {
+	_, err := q.exec(ctx, q.deleteAllCommentsForUserStmt, deleteAllCommentsForUser, ownerID)
+	return err
+}
+
+const deleteAllCommentsForVideo = `-- name: DeleteAllCommentsForVideo :exec
+delete from reaction_service.comments where video_id = $1
+`
+
+func (q *Queries) DeleteAllCommentsForVideo(ctx context.Context, videoID string) error {
+	_, err := q.exec(ctx, q.deleteAllCommentsForVideoStmt, deleteAllCommentsForVideo, videoID)
+	return err
+}
+
+const deleteAllReactionsForUser = `-- name: DeleteAllReactionsForUser :exec
+delete from reaction_service.reactions where user_id = $1
+`
+
+func (q *Queries) DeleteAllReactionsForUser(ctx context.Context, userID string) error {
+	_, err := q.exec(ctx, q.deleteAllReactionsForUserStmt, deleteAllReactionsForUser, userID)
+	return err
+}
+
+const deleteAllReactionsForVideo = `-- name: DeleteAllReactionsForVideo :exec
+delete from reaction_service.reactions where video_id = $1
+`
+
+func (q *Queries) DeleteAllReactionsForVideo(ctx context.Context, videoID string) error {
+	_, err := q.exec(ctx, q.deleteAllReactionsForVideoStmt, deleteAllReactionsForVideo, videoID)
+	return err
+}
+
+const deleteAllViewsForUser = `-- name: DeleteAllViewsForUser :exec
+delete from reaction_service.views where user_id = $1
+`
+
+func (q *Queries) DeleteAllViewsForUser(ctx context.Context, userID string) error {
+	_, err := q.exec(ctx, q.deleteAllViewsForUserStmt, deleteAllViewsForUser, userID)
+	return err
+}
+
+const deleteAllViewsForVideo = `-- name: DeleteAllViewsForVideo :exec
+delete from reaction_service.views where video_id = $1
+`
+
+func (q *Queries) DeleteAllViewsForVideo(ctx context.Context, videoID string) error {
+	_, err := q.exec(ctx, q.deleteAllViewsForVideoStmt, deleteAllViewsForVideo, videoID)
+	return err
+}
+
 const deleteComment = `-- name: DeleteComment :execrows
 delete from reaction_service.comments where id = $1 and owner_id = $2
 `

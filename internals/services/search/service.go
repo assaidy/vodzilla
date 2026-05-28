@@ -6,7 +6,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-// TODO: when implementing search, account for soft-deleted users and videos
 const Name = "search"
 
 var _ services.Service = (*Service)(nil)

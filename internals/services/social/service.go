@@ -6,7 +6,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-// TODO: when implementing social, account for soft-deleted users
 const Name = "social"
 
 var _ services.Service = (*Service)(nil)

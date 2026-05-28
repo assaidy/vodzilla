@@ -90,7 +90,7 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 	}
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videos, err := videoService.GetAllVideosInWatchLater(c.RequestCtx(), currentUser.Id)
+	videos, err := videoService.GetAllVideosInWatchlater(c.RequestCtx(), currentUser.Id)
 	if err != nil {
 		return err
 	}

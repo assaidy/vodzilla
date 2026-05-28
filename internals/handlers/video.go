@@ -231,8 +231,8 @@ func HandleAddToWatchLater(c fiber.Ctx) error {
 	userId := c.Locals("user_id").(string)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.AddVideoToWatchLater(c.RequestCtx(), videoId, userId); err != nil {
-		if errors.Is(err, video_service.ErrWatchLaterConflict) {
+	if err := videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
+		if errors.Is(err, video_service.ErrWatchlaterConflict) {
 			return fiber.NewError(fiber.StatusConflict, "already in watch later")
 		}
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -252,7 +252,7 @@ func HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	userId := c.Locals("user_id").(string)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.DeleteVideoFromWatchLater(c.RequestCtx(), videoId, userId); err != nil {
+	if err := videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
 		}

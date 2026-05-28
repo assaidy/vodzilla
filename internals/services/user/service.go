@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/assaidy/vodzilla/internals/events"
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/user/queries"
 	"github.com/assaidy/vodzilla/internals/utils"
@@ -23,11 +24,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: consume UserDeletedEvent for cascading cleanup (soft deletion):
-//   - mark user as deleted (don't hard-delete immediately)
-//
-// TODO: when implementing user deletion, soft-delete users and publish UserDeletedEvent
-// so other services can mark their user-associated data as deleted
 const Name = "user"
 
 var _ services.Service = (*Service)(nil)
@@ -63,8 +59,8 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, 
 	)
 	service.workerManager.RegisterWorker(
 		workers.NewWorker(
-			"cleanup expired email verification tokens",
-			service.cleanupExpiredEmailVerificationTokensJob,
+			"expired email verification tokens cleanup",
+			service.emailVerificationTokensCleanupJob,
 			workers.WithTick(1*time.Hour),
 			workers.WithTimeout(5*time.Minute),
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
@@ -72,8 +68,8 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, 
 	)
 	service.workerManager.RegisterWorker(
 		workers.NewWorker(
-			"cleanup expired sessions",
-			service.cleanupExpiredSessions,
+			"expired sessions cleanup",
+			service.sessionsCleanupJob,
 			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
 			workers.WithTimeout(10*time.Minute),
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
@@ -234,9 +230,9 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) er
 	return nil
 }
 
-func (me *Service) cleanupExpiredEmailVerificationTokensJob(ctx context.Context) error {
+func (me *Service) emailVerificationTokensCleanupJob(ctx context.Context) error {
 	if err := me.queries.BatchDeleteExpiredEmailVerificationTokens(ctx); err != nil {
-		return fmt.Errorf("failed to batch delete expired email verification tokens: %w", err)
+		return fmt.Errorf("failed to batch delete expired or deleted email verification tokens: %w", err)
 	}
 
 	return nil
@@ -333,7 +329,7 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 		SessionId: sessionId,
 		UserId:    userId,
 	}); err != nil {
-		return fmt.Errorf("failed to delete session: %w", err)
+		return fmt.Errorf("failed to soft delete session: %w", err)
 	} else if nDeleted == 0 {
 		return ErrSessionNotFound
 	}
@@ -341,7 +337,7 @@ func (me *Service) Logout(ctx context.Context, userId string, sessionId string) 
 	return nil
 }
 
-func (me *Service) cleanupExpiredSessions(ctx context.Context) error {
+func (me *Service) sessionsCleanupJob(ctx context.Context) error {
 	if err := me.queries.BatchDeleteExpiredSessions(ctx); err != nil {
 		return fmt.Errorf("failed to batch delete expired sessions: %w", err)
 	}
@@ -424,6 +420,42 @@ func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio 
 		Bio:      sql.NullString{Valid: true, String: bio},
 	}); err != nil {
 		return fmt.Errorf("failed to update profile: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func (me *Service) DeleteUser(ctx context.Context, userId string) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if n, err := qtx.SoftDeleteUserById(ctx, userId); err != nil {
+		return fmt.Errorf("failed to soft delete user by id: %w", err)
+	} else if n == 0 {
+		return ErrUserNotFound
+	}
+
+	if err := qtx.DeleteAllSessionsForUser(ctx, userId); err != nil {
+		return fmt.Errorf("failed to soft delete all sessions for user: %w", err)
+	}
+
+	if err := qtx.DeleteAllEmailVerificationTokensForUser(ctx, userId); err != nil {
+		return fmt.Errorf("failed to soft delete all email verification tokens for user: %w", err)
+	}
+
+	if err := me.redis.Publish(ctx, events.UserDeletedEvent, events.UserDeletedEventPayload{
+		UserId:    userId,
+		Timestamp: time.Now(),
+	}).Err(); err != nil {
+		return fmt.Errorf("failed to publish %q event: %w", events.UserDeletedEvent, err)
 	}
 
 	if err := tx.Commit(); err != nil {

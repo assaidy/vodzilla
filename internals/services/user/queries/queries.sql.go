@@ -62,7 +62,7 @@ func (q *Queries) BatchDeleteExpiredSessions(ctx context.Context) error {
 }
 
 const checkEmail = `-- name: CheckEmail :one
-select exists (select 1 from user_service.users where email = $1 for update)
+select exists (select 1 from user_service.users where email = $1 and is_deleted = false for update)
 `
 
 func (q *Queries) CheckEmail(ctx context.Context, email string) (bool, error) {
@@ -76,11 +76,31 @@ const checkUsername = `-- name: CheckUsername :one
 select exists (select 1 from user_service.users where username = $1 for update)
 `
 
+// Don't check for is_deleted. Username can only be aquired once.
+// We don't need unexpected profiles when navigating a url.
 func (q *Queries) CheckUsername(ctx context.Context, username string) (bool, error) {
 	row := q.queryRow(ctx, q.checkUsernameStmt, checkUsername, username)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const deleteAllEmailVerificationTokensForUser = `-- name: DeleteAllEmailVerificationTokensForUser :exec
+delete from user_service.email_verification_tokens where owner_id = $1 and expires_at > now()
+`
+
+func (q *Queries) DeleteAllEmailVerificationTokensForUser(ctx context.Context, ownerID string) error {
+	_, err := q.exec(ctx, q.deleteAllEmailVerificationTokensForUserStmt, deleteAllEmailVerificationTokensForUser, ownerID)
+	return err
+}
+
+const deleteAllSessionsForUser = `-- name: DeleteAllSessionsForUser :exec
+delete from user_service.sessions where owner_id = $1 and expires_at > now()
+`
+
+func (q *Queries) DeleteAllSessionsForUser(ctx context.Context, ownerID string) error {
+	_, err := q.exec(ctx, q.deleteAllSessionsForUserStmt, deleteAllSessionsForUser, ownerID)
+	return err
 }
 
 const deleteSessionForUser = `-- name: DeleteSessionForUser :execrows
@@ -119,7 +139,7 @@ func (q *Queries) GetSessionById(ctx context.Context, id string) (UserServiceSes
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where email = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified, is_deleted from user_service.users where email = $1 and is_deleted = false for update
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserServiceUser, error) {
@@ -134,12 +154,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (UserService
 		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
+		&i.IsDeleted,
 	)
 	return i, err
 }
 
 const getUserById = `-- name: GetUserById :one
-select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where id = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified, is_deleted from user_service.users where id = $1 and is_deleted = false for update
 `
 
 func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, error) {
@@ -154,12 +175,13 @@ func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, 
 		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
+		&i.IsDeleted,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-select id, email, password_hash, name, username, bio, created_at, is_verified from user_service.users where username = $1 for update
+select id, email, password_hash, name, username, bio, created_at, is_verified, is_deleted from user_service.users where username = $1 and is_deleted = false for update
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserServiceUser, error) {
@@ -174,6 +196,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (UserS
 		&i.Bio,
 		&i.CreatedAt,
 		&i.IsVerified,
+		&i.IsDeleted,
 	)
 	return i, err
 }
@@ -248,6 +271,18 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) error {
 		arg.Bio,
 	)
 	return err
+}
+
+const softDeleteUserById = `-- name: SoftDeleteUserById :execrows
+update user_service.users set is_deleted = true where id = $1
+`
+
+func (q *Queries) SoftDeleteUserById(ctx context.Context, id string) (int64, error) {
+	result, err := q.exec(ctx, q.softDeleteUserByIdStmt, softDeleteUserById, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const updateProfile = `-- name: UpdateProfile :exec

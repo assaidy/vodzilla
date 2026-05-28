@@ -30,6 +30,24 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkCommentForUserStmt, err = db.PrepareContext(ctx, checkCommentForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckCommentForUser: %w", err)
 	}
+	if q.deleteAllCommentsForUserStmt, err = db.PrepareContext(ctx, deleteAllCommentsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllCommentsForUser: %w", err)
+	}
+	if q.deleteAllCommentsForVideoStmt, err = db.PrepareContext(ctx, deleteAllCommentsForVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllCommentsForVideo: %w", err)
+	}
+	if q.deleteAllReactionsForUserStmt, err = db.PrepareContext(ctx, deleteAllReactionsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllReactionsForUser: %w", err)
+	}
+	if q.deleteAllReactionsForVideoStmt, err = db.PrepareContext(ctx, deleteAllReactionsForVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllReactionsForVideo: %w", err)
+	}
+	if q.deleteAllViewsForUserStmt, err = db.PrepareContext(ctx, deleteAllViewsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllViewsForUser: %w", err)
+	}
+	if q.deleteAllViewsForVideoStmt, err = db.PrepareContext(ctx, deleteAllViewsForVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllViewsForVideo: %w", err)
+	}
 	if q.deleteCommentStmt, err = db.PrepareContext(ctx, deleteComment); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteComment: %w", err)
 	}
@@ -76,6 +94,36 @@ func (q *Queries) Close() error {
 	if q.checkCommentForUserStmt != nil {
 		if cerr := q.checkCommentForUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing checkCommentForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllCommentsForUserStmt != nil {
+		if cerr := q.deleteAllCommentsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllCommentsForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllCommentsForVideoStmt != nil {
+		if cerr := q.deleteAllCommentsForVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllCommentsForVideoStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllReactionsForUserStmt != nil {
+		if cerr := q.deleteAllReactionsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllReactionsForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllReactionsForVideoStmt != nil {
+		if cerr := q.deleteAllReactionsForVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllReactionsForVideoStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllViewsForUserStmt != nil {
+		if cerr := q.deleteAllViewsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllViewsForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllViewsForVideoStmt != nil {
+		if cerr := q.deleteAllViewsForVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllViewsForVideoStmt: %w", cerr)
 		}
 	}
 	if q.deleteCommentStmt != nil {
@@ -170,39 +218,51 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                          DBTX
-	tx                          *sql.Tx
-	checkCommentStmt            *sql.Stmt
-	checkCommentForUserStmt     *sql.Stmt
-	deleteCommentStmt           *sql.Stmt
-	deleteReactionStmt          *sql.Stmt
-	getAllCommentRepliesStmt    *sql.Stmt
-	getAllVideoCommentsStmt     *sql.Stmt
-	getVideoReactionForUserStmt *sql.Stmt
-	getVideoReactionsStmt       *sql.Stmt
-	getViewsCountStmt           *sql.Stmt
-	insertCommentStmt           *sql.Stmt
-	insertReactionStmt          *sql.Stmt
-	insertViewStmt              *sql.Stmt
-	updateCommentStmt           *sql.Stmt
+	db                             DBTX
+	tx                             *sql.Tx
+	checkCommentStmt               *sql.Stmt
+	checkCommentForUserStmt        *sql.Stmt
+	deleteAllCommentsForUserStmt   *sql.Stmt
+	deleteAllCommentsForVideoStmt  *sql.Stmt
+	deleteAllReactionsForUserStmt  *sql.Stmt
+	deleteAllReactionsForVideoStmt *sql.Stmt
+	deleteAllViewsForUserStmt      *sql.Stmt
+	deleteAllViewsForVideoStmt     *sql.Stmt
+	deleteCommentStmt              *sql.Stmt
+	deleteReactionStmt             *sql.Stmt
+	getAllCommentRepliesStmt       *sql.Stmt
+	getAllVideoCommentsStmt        *sql.Stmt
+	getVideoReactionForUserStmt    *sql.Stmt
+	getVideoReactionsStmt          *sql.Stmt
+	getViewsCountStmt              *sql.Stmt
+	insertCommentStmt              *sql.Stmt
+	insertReactionStmt             *sql.Stmt
+	insertViewStmt                 *sql.Stmt
+	updateCommentStmt              *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                          tx,
-		tx:                          tx,
-		checkCommentStmt:            q.checkCommentStmt,
-		checkCommentForUserStmt:     q.checkCommentForUserStmt,
-		deleteCommentStmt:           q.deleteCommentStmt,
-		deleteReactionStmt:          q.deleteReactionStmt,
-		getAllCommentRepliesStmt:    q.getAllCommentRepliesStmt,
-		getAllVideoCommentsStmt:     q.getAllVideoCommentsStmt,
-		getVideoReactionForUserStmt: q.getVideoReactionForUserStmt,
-		getVideoReactionsStmt:       q.getVideoReactionsStmt,
-		getViewsCountStmt:           q.getViewsCountStmt,
-		insertCommentStmt:           q.insertCommentStmt,
-		insertReactionStmt:          q.insertReactionStmt,
-		insertViewStmt:              q.insertViewStmt,
-		updateCommentStmt:           q.updateCommentStmt,
+		db:                             tx,
+		tx:                             tx,
+		checkCommentStmt:               q.checkCommentStmt,
+		checkCommentForUserStmt:        q.checkCommentForUserStmt,
+		deleteAllCommentsForUserStmt:   q.deleteAllCommentsForUserStmt,
+		deleteAllCommentsForVideoStmt:  q.deleteAllCommentsForVideoStmt,
+		deleteAllReactionsForUserStmt:  q.deleteAllReactionsForUserStmt,
+		deleteAllReactionsForVideoStmt: q.deleteAllReactionsForVideoStmt,
+		deleteAllViewsForUserStmt:      q.deleteAllViewsForUserStmt,
+		deleteAllViewsForVideoStmt:     q.deleteAllViewsForVideoStmt,
+		deleteCommentStmt:              q.deleteCommentStmt,
+		deleteReactionStmt:             q.deleteReactionStmt,
+		getAllCommentRepliesStmt:       q.getAllCommentRepliesStmt,
+		getAllVideoCommentsStmt:        q.getAllVideoCommentsStmt,
+		getVideoReactionForUserStmt:    q.getVideoReactionForUserStmt,
+		getVideoReactionsStmt:          q.getVideoReactionsStmt,
+		getViewsCountStmt:              q.getViewsCountStmt,
+		insertCommentStmt:              q.insertCommentStmt,
+		insertReactionStmt:             q.insertReactionStmt,
+		insertViewStmt:                 q.insertViewStmt,
+		updateCommentStmt:              q.updateCommentStmt,
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-// TODO: when implementing history, account for soft-deleted users and videos
 const Name = "history"
 
 var _ services.Service = (*Service)(nil)

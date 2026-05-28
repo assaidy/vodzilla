@@ -1,7 +1,9 @@
 -- name: CheckEmail :one
-select exists (select 1 from user_service.users where email = $1 for update);
+select exists (select 1 from user_service.users where email = $1 and is_deleted = false for update);
 
 -- name: CheckUsername :one
+-- Don't check for is_deleted. Username can only be aquired once. 
+-- We don't need unexpected profiles when navigating a url.
 select exists (select 1 from user_service.users where username = $1 for update);
 
 -- name: InsertUser :exec
@@ -9,13 +11,13 @@ insert into user_service.users (id, email, password_hash, name, username, bio)
 values ($1, $2, $3, $4, $5, $6);
 
 -- name: GetUserByEmail :one
-select * from user_service.users where email = $1 for update;
+select * from user_service.users where email = $1 and is_deleted = false for update;
 
 -- name: GetUserById :one
-select * from user_service.users where id = $1 for update;
+select * from user_service.users where id = $1 and is_deleted = false for update;
 
 -- name: GetUserByUsername :one
-select * from user_service.users where username = $1 for update;
+select * from user_service.users where username = $1 and is_deleted = false for update;
 
 -- name: InsertSession :exec
 insert into user_service.sessions (id, owner_id, session_token, csrf_token, expires_at)
@@ -85,3 +87,12 @@ begin
   end loop;
 end
 $$;
+
+-- name: SoftDeleteUserById :execrows
+update user_service.users set is_deleted = true where id = $1;
+
+-- name: DeleteAllSessionsForUser :exec
+delete from user_service.sessions where owner_id = $1 and expires_at > now();
+
+-- name: DeleteAllEmailVerificationTokensForUser :exec
+delete from user_service.email_verification_tokens where owner_id = $1 and expires_at > now();

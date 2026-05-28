@@ -3,38 +3,70 @@ package reaction
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/assaidy/vodzilla/internals/events"
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/reaction/queries"
+	"github.com/assaidy/workers"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/go-redis/v9"
 )
 
-// TODO: consume UserDeletedEvent to mark user's reactions and views as deleted
-// TODO: consume VideoDeletedEvent to mark video's reactions and views as deleted
 const Name = "reaction"
 
 var _ services.Service = (*Service)(nil)
 
 type Service struct {
-	db      *sql.DB
-	queries *queries.Queries
-	logger  *slog.Logger
+	db            *sql.DB
+	queries       *queries.Queries
+	redis         *redis.Client
+	logger        *slog.Logger
+	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, logger *slog.Logger) *Service {
-	return &Service{
-		db:      db,
-		queries: queries.New(db),
-		logger:  logger,
+func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
+	service := &Service{
+		db:            db,
+		queries:       queries.New(db),
+		redis:         redis,
+		logger:        logger,
+		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
 	}
+
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			fmt.Sprintf("%q event consumer", events.UserDeletedEvent),
+			service.userDeletedEventConsumerJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			fmt.Sprintf("%q event consumer", events.VideoDeletedEvent),
+			service.videoDeletedEventConsumerJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
+
+	return service
 }
 
-func (me *Service) Start(ctx context.Context) error { return nil }
-func (me *Service) Stop(ctx context.Context) error  { return nil }
+func (me *Service) Start(ctx context.Context) error {
+	me.workerManager.Start()
+	return nil
+}
+
+func (me *Service) Stop(ctx context.Context) error {
+	me.workerManager.Stop()
+	return nil
+}
 
 func (me *Service) ViewVideo(ctx context.Context, videoId, userId string) error {
 	_, err := me.queries.InsertView(ctx, queries.InsertViewParams{
@@ -259,4 +291,104 @@ func (me *Service) GetAllCommentReplies(ctx context.Context, commentId string) (
 	}
 
 	return result, nil
+}
+
+func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
+	defer sub.Close()
+	ch := sub.Channel()
+
+	for {
+		select {
+		case message := <-ch:
+			var payload events.UserDeletedEventPayload
+			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
+				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.UserDeletedEvent, err)
+			}
+
+			if err := func() error {
+				tx, err := me.db.BeginTx(ctx, nil)
+				if err != nil {
+					return fmt.Errorf("failed to begin tx: %w", err)
+				}
+				defer tx.Rollback()
+				qtx := me.queries.WithTx(tx)
+
+				// TODO: Maybe it's better to mark user_id as null (soft deletion) to save statistics.
+
+				if err := qtx.DeleteAllViewsForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all views for user: %w", err)
+				}
+
+				if err := qtx.DeleteAllReactionsForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all reactions for user: %w", err)
+				}
+
+				if err := qtx.DeleteAllCommentsForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all comments for user: %w", err)
+				}
+
+				if err := tx.Commit(); err != nil {
+					return fmt.Errorf("failed to commit tx: %w", err)
+				}
+
+				return nil
+			}(); err != nil {
+				return err
+			}
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
+	sub := me.redis.Subscribe(ctx, events.VideoDeletedEvent)
+	defer sub.Close()
+	ch := sub.Channel()
+
+	for {
+		select {
+		case message := <-ch:
+			var payload events.VideoDeletedEventPayload
+			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
+				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoDeletedEvent, err)
+			}
+
+			if err := func() error {
+				tx, err := me.db.BeginTx(ctx, nil)
+				if err != nil {
+					return fmt.Errorf("failed to begin tx: %w", err)
+				}
+				defer tx.Rollback()
+				qtx := me.queries.WithTx(tx)
+
+				// TODO: Maybe it's better to mark video_id as null (soft deletion) for efficiency.
+
+				if err := qtx.DeleteAllViewsForVideo(ctx, payload.VideoId); err != nil {
+					return fmt.Errorf("failed to delete all views for video: %w", err)
+				}
+
+				if err := qtx.DeleteAllReactionsForVideo(ctx, payload.VideoId); err != nil {
+					return fmt.Errorf("failed to delete all reactions for video: %w", err)
+				}
+
+				if err := qtx.DeleteAllCommentsForVideo(ctx, payload.VideoId); err != nil {
+					return fmt.Errorf("failed to delete all comments for video: %w", err)
+				}
+
+				if err := tx.Commit(); err != nil {
+					return fmt.Errorf("failed to commit tx: %w", err)
+				}
+
+				return nil
+			}(); err != nil {
+				return err
+			}
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }

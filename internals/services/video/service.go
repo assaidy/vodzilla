@@ -17,14 +17,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// TODO: consume UploadExpiredEvent to delete pending video metadata (cron job)
+// TODO: consume UploadExpiredEvent to delete pending video metadata
 // (video with status=uploading that never completed)
-//
-// TODO: consume UserDeletedEvent for cascading cleanup (soft deletion):
-//   - mark user's videos and playlists as deleted
-//
-// TODO: when implementing video deletion, soft-delete videos and publish VideoDeletedEvent
-// so other services can mark their video-associated data as deleted
 const Name = "video"
 
 var _ services.Service = (*Service)(nil)
@@ -49,9 +43,17 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 	service.workerManager.RegisterWorker(
 		workers.NewWorker(
 			fmt.Sprintf("%q event consumer", events.VideoUploadedEvent),
-			service.videoUploadedEventConsumer,
-			workers.WithNRuns(1),
-			workers.WithNRetries(0),
+			service.videoUploadedEventConsumerJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			fmt.Sprintf("%q event consumer", events.UserDeletedEvent),
+			service.userDeletedEventConsumerJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 		),
 	)
 
@@ -73,7 +75,8 @@ type VideoStatus string
 const (
 	// do not put this into db; it's for application to know if video is ready or not
 	// this status might change if we added or removed layers of processing to video
-	VideoStatusReady = VideoStatusUploaded
+	VideoStatusInitial = VideoStatusUploading
+	VideoStatusReady   = VideoStatusUploaded
 
 	VideoStatusUploading VideoStatus = "uploading"
 	VideoStatusUploaded  VideoStatus = "uploaded"
@@ -101,7 +104,7 @@ func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (s
 	return videoId, nil
 }
 
-func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
+func (me *Service) videoUploadedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.VideoUploadedEvent)
 	defer sub.Close()
 	ch := sub.Channel()
@@ -111,16 +114,14 @@ func (me *Service) videoUploadedEventConsumer(ctx context.Context) error {
 		case message := <-ch:
 			var payload events.VideoUploadedEventPayload
 			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
-				me.logger.Error("failed to unmarshal event payload", "event", events.VideoUploadedEvent, "error", err)
-				continue
+				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
 			}
 
 			if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
 				Id:     payload.VideoId,
 				Status: string(VideoStatusUploaded),
 			}); err != nil {
-				me.logger.Error("failed to update video status", "error", err)
-				continue
+				return fmt.Errorf("failed to update video status: %w", err)
 			}
 
 		case <-ctx.Done():
@@ -138,7 +139,10 @@ type Video struct {
 }
 
 func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) {
-	video, err := me.queries.GetVideoById(ctx, id)
+	video, err := me.queries.GetVideoById(ctx, queries.GetVideoByIdParams{
+		Id:     id,
+		Status: string(VideoStatusReady),
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || video.Status != string(VideoStatusReady) {
 			return nil, ErrVideoNotFound
@@ -156,7 +160,7 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 }
 
 func (me *Service) GetAllUserVideos(ctx context.Context, id string) ([]Video, error) {
-	videos, err := me.queries.GetVideosForUser(ctx, queries.GetVideosForUserParams{
+	videos, err := me.queries.GetAllVideosForUser(ctx, queries.GetAllVideosForUserParams{
 		OwnerId: id,
 		Status:  string(VideoStatusReady),
 	})
@@ -180,7 +184,10 @@ func (me *Service) GetAllUserVideos(ctx context.Context, id string) ([]Video, er
 }
 
 func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) {
-	ok, err := me.queries.CheckVideo(ctx, id)
+	ok, err := me.queries.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:     id,
+		Status: string(VideoStatusReady),
+	})
 	if err != nil {
 		return false, fmt.Errorf("failed to check video: %w", err)
 	}
@@ -189,13 +196,13 @@ func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) 
 }
 
 func (me *Service) IsInWatchLater(ctx context.Context, videoId, userId string) (bool, error) {
-	return me.queries.CheckWatchLater(ctx, queries.CheckWatchLaterParams{
+	return me.queries.CheckVideoInWatchlaters(ctx, queries.CheckVideoInWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	})
 }
 
-func (me *Service) AddVideoToWatchLater(ctx context.Context, videoId, userId string) error {
+func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -203,26 +210,29 @@ func (me *Service) AddVideoToWatchLater(ctx context.Context, videoId, userId str
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if ok, err := qtx.CheckVideo(ctx, videoId); err != nil {
+	if ok, err := qtx.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:     videoId,
+		Status: string(VideoStatusReady),
+	}); err != nil {
 		return fmt.Errorf("failed to check video: %w", err)
 	} else if !ok {
 		return ErrVideoNotFound
 	}
 
-	if ok, err := qtx.CheckWatchLater(ctx, queries.CheckWatchLaterParams{
+	if ok, err := qtx.CheckVideoInWatchlaters(ctx, queries.CheckVideoInWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	}); err != nil {
-		return fmt.Errorf("failed to check watch later: %w", err)
+		return fmt.Errorf("failed to check watchlater: %w", err)
 	} else if ok {
-		return ErrWatchLaterConflict
+		return ErrWatchlaterConflict
 	}
 
-	if err := qtx.InsertIntoWatchLater(ctx, queries.InsertIntoWatchLaterParams{
+	if err := qtx.InsertIntoWatchlaters(ctx, queries.InsertIntoWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	}); err != nil {
-		return fmt.Errorf("failed to insert into watch later: %w", err)
+		return fmt.Errorf("failed to insert into watchlater: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -232,12 +242,12 @@ func (me *Service) AddVideoToWatchLater(ctx context.Context, videoId, userId str
 	return nil
 }
 
-func (me *Service) DeleteVideoFromWatchLater(ctx context.Context, videoId, userId string) error {
-	if n, err := me.queries.DeleteFromWatchLater(ctx, queries.DeleteFromWatchLaterParams{
+func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId string) error {
+	if n, err := me.queries.DeleteFromWatchlaters(ctx, queries.DeleteFromWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	}); err != nil {
-		return fmt.Errorf("failed to delete from watch later: %w", err)
+		return fmt.Errorf("failed to delete from watchlater: %w", err)
 	} else if n == 0 {
 		return ErrVideoNotFound
 	}
@@ -245,10 +255,10 @@ func (me *Service) DeleteVideoFromWatchLater(ctx context.Context, videoId, userI
 	return nil
 }
 
-func (me *Service) GetAllVideosInWatchLater(ctx context.Context, userId string) ([]Video, error) {
-	videos, err := me.queries.GetVideosInWatchLater(ctx, userId)
+func (me *Service) GetAllVideosInWatchlater(ctx context.Context, userId string) ([]Video, error) {
+	videos, err := me.queries.GetAllVideosInWatchlatersForUser(ctx, userId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get videos in watch later: %w", err)
+		return nil, fmt.Errorf("failed to get videos in watchlater: %w", err)
 	}
 
 	result := make([]Video, 0, len(videos))
@@ -319,7 +329,10 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, play
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if ok, err := qtx.CheckVideo(ctx, videoId); err != nil {
+	if ok, err := qtx.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:     videoId,
+		Status: string(VideoStatusReady),
+	}); err != nil {
 		return fmt.Errorf("failed to check video: %w", err)
 	} else if !ok {
 		return ErrVideoNotFound
@@ -507,4 +520,82 @@ func (me *Service) IsInPlaylist(ctx context.Context, videoId, playlistId string)
 		VideoId:    videoId,
 		PlaylistId: playlistId,
 	})
+}
+
+func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
+	defer sub.Close()
+	ch := sub.Channel()
+
+	for {
+		select {
+		case message := <-ch:
+			var payload events.UserDeletedEventPayload
+			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
+				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
+			}
+
+			if err := func() error {
+				tx, err := me.db.BeginTx(ctx, nil)
+				if err != nil {
+					return fmt.Errorf("failed to begin tx: %w", err)
+				}
+				defer tx.Rollback()
+				qtx := me.queries.WithTx(tx)
+
+				deletedVideoIds, err := qtx.DeleteAllVideosForUser(ctx, payload.UserId)
+				if err != nil {
+					return fmt.Errorf("failed to deletd all videos for user: %w", err)
+				}
+				now := time.Now()
+				for _, id := range deletedVideoIds {
+					if err := me.redis.Publish(ctx, events.VideoDeletedEvent, events.VideoDeletedEventPayload{
+						VideoId:   id,
+						Timestamp: now,
+					}).Err(); err != nil {
+						return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
+					}
+				}
+
+				if err := qtx.DeleteAllWatchlatersForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all watchlaters for user: %w", err)
+				}
+
+				if err := qtx.DeleteAllPlaylistsForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all playlists for user: %w", err)
+				}
+
+				if err := tx.Commit(); err != nil {
+					return fmt.Errorf("failed to commit tx: %w", err)
+				}
+
+				return nil
+			}(); err != nil {
+				return err
+			}
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (me *Service) DeleteVideo(ctx context.Context, videoId string, userId string) error {
+	if n, err := me.queries.DeleteVdieoByIdForUser(ctx, queries.DeleteVdieoByIdForUserParams{
+		Id:      videoId,
+		OwnerId: userId,
+	}); err != nil {
+		return fmt.Errorf("failed to delete video by id for user: %w", err)
+	} else if n == 0 {
+		return ErrVideoNotFound
+	}
+
+	if err := me.redis.Publish(ctx, events.VideoDeletedEvent, events.VideoDeletedEventPayload{
+		VideoId:   videoId,
+		Timestamp: time.Now(),
+	}).Err(); err != nil {
+		return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
+	}
+
+	return nil
 }

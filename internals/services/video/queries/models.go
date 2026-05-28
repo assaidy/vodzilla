@@ -31,7 +31,7 @@ type VideoServiceVideo struct {
 	Status      string
 }
 
-type VideoServiceWatchLater struct {
+type VideoServiceWatchlater struct {
 	VideoId string
 	UserId  string
 	AddedAt time.Time

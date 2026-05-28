@@ -28,7 +28,7 @@ import (
 )
 
 // FIX: current roadmap
-// [ ] implement backend todos
+// [/] implement backend todos
 // [ ] refactor client scripts and event listeners(including hx-on) to use hyperscript
 // [ ] add retries to video upload
 
@@ -77,7 +77,7 @@ func main() {
 	)
 	registry.AddServiceWithInjection(
 		reaction_service.Name,
-		reaction_service.New(postgres, logger.WithGroup("reaction service")),
+		reaction_service.New(postgres, redis, logger.WithGroup("reaction service")),
 	)
 	registry.AddServiceWithInjection(social_service.Name, social_service.New())
 	registry.AddServiceWithInjection(search_service.Name, search_service.New())

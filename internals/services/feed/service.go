@@ -6,7 +6,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-// TODO: when implementing feed, account for soft-deleted users and videos
 const Name = "feed"
 
 var _ services.Service = (*Service)(nil)

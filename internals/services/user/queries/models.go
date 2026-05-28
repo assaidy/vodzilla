@@ -35,4 +35,5 @@ type UserServiceUser struct {
 	Bio          sql.NullString
 	CreatedAt    time.Time
 	IsVerified   bool
+	IsDeleted    bool
 }

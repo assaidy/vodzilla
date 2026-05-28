@@ -36,6 +36,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkUsernameStmt, err = db.PrepareContext(ctx, checkUsername); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckUsername: %w", err)
 	}
+	if q.deleteAllEmailVerificationTokensForUserStmt, err = db.PrepareContext(ctx, deleteAllEmailVerificationTokensForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllEmailVerificationTokensForUser: %w", err)
+	}
+	if q.deleteAllSessionsForUserStmt, err = db.PrepareContext(ctx, deleteAllSessionsForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteAllSessionsForUser: %w", err)
+	}
 	if q.deleteSessionForUserStmt, err = db.PrepareContext(ctx, deleteSessionForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteSessionForUser: %w", err)
 	}
@@ -59,6 +65,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.insertUserStmt, err = db.PrepareContext(ctx, insertUser); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertUser: %w", err)
+	}
+	if q.softDeleteUserByIdStmt, err = db.PrepareContext(ctx, softDeleteUserById); err != nil {
+		return nil, fmt.Errorf("error preparing query SoftDeleteUserById: %w", err)
 	}
 	if q.updateProfileStmt, err = db.PrepareContext(ctx, updateProfile); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProfile: %w", err)
@@ -89,6 +98,16 @@ func (q *Queries) Close() error {
 	if q.checkUsernameStmt != nil {
 		if cerr := q.checkUsernameStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing checkUsernameStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllEmailVerificationTokensForUserStmt != nil {
+		if cerr := q.deleteAllEmailVerificationTokensForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllEmailVerificationTokensForUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteAllSessionsForUserStmt != nil {
+		if cerr := q.deleteAllSessionsForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteAllSessionsForUserStmt: %w", cerr)
 		}
 	}
 	if q.deleteSessionForUserStmt != nil {
@@ -129,6 +148,11 @@ func (q *Queries) Close() error {
 	if q.insertUserStmt != nil {
 		if cerr := q.insertUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertUserStmt: %w", cerr)
+		}
+	}
+	if q.softDeleteUserByIdStmt != nil {
+		if cerr := q.softDeleteUserByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing softDeleteUserByIdStmt: %w", cerr)
 		}
 	}
 	if q.updateProfileStmt != nil {
@@ -184,6 +208,8 @@ type Queries struct {
 	batchDeleteExpiredSessionsStmt                *sql.Stmt
 	checkEmailStmt                                *sql.Stmt
 	checkUsernameStmt                             *sql.Stmt
+	deleteAllEmailVerificationTokensForUserStmt   *sql.Stmt
+	deleteAllSessionsForUserStmt                  *sql.Stmt
 	deleteSessionForUserStmt                      *sql.Stmt
 	getSessionByIdStmt                            *sql.Stmt
 	getUserByEmailStmt                            *sql.Stmt
@@ -192,6 +218,7 @@ type Queries struct {
 	insertEmailVerificationTokenStmt              *sql.Stmt
 	insertSessionStmt                             *sql.Stmt
 	insertUserStmt                                *sql.Stmt
+	softDeleteUserByIdStmt                        *sql.Stmt
 	updateProfileStmt                             *sql.Stmt
 	verifyEmailByTokenStmt                        *sql.Stmt
 }
@@ -204,6 +231,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		batchDeleteExpiredSessionsStmt:                q.batchDeleteExpiredSessionsStmt,
 		checkEmailStmt:                                q.checkEmailStmt,
 		checkUsernameStmt:                             q.checkUsernameStmt,
+		deleteAllEmailVerificationTokensForUserStmt:   q.deleteAllEmailVerificationTokensForUserStmt,
+		deleteAllSessionsForUserStmt:                  q.deleteAllSessionsForUserStmt,
 		deleteSessionForUserStmt:                      q.deleteSessionForUserStmt,
 		getSessionByIdStmt:                            q.getSessionByIdStmt,
 		getUserByEmailStmt:                            q.getUserByEmailStmt,
@@ -212,6 +241,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		insertEmailVerificationTokenStmt:              q.insertEmailVerificationTokenStmt,
 		insertSessionStmt:                             q.insertSessionStmt,
 		insertUserStmt:                                q.insertUserStmt,
+		softDeleteUserByIdStmt:                        q.softDeleteUserByIdStmt,
 		updateProfileStmt:                             q.updateProfileStmt,
 		verifyEmailByTokenStmt:                        q.verifyEmailByTokenStmt,
 	}
