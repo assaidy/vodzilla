@@ -3,7 +3,7 @@ module github.com/assaidy/vodzilla
 go 1.26.1
 
 require (
-	github.com/assaidy/hyper/v2 v2.5.0
+	github.com/assaidy/hyper/v2 v2.6.0
 	github.com/assaidy/workers v1.2.3
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17

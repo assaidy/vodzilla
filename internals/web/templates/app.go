@@ -108,7 +108,7 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 			P(AttrClass("text-center text-base-content/60 mt-20"))("No playlists yet."),
 		).Else(
 			Group(
-				Range(params.Playlists, func(p PlaylistCardParams) HyperNode {
+				Range(params.Playlists, func(p PlaylistCardParams) any {
 					playlistLink := fmt.Sprintf("/playlists/%s", p.Id)
 					return DIV(
 						AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),

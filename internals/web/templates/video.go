@@ -285,7 +285,7 @@ type profileVideosParams struct {
 
 func profileVideosContainer(params profileVideosParams) HyperNode {
 	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"))(
-		Range(params.videoCards, func(p VideoCardParams) HyperNode {
+		Range(params.videoCards, func(p VideoCardParams) any {
 			return VideoCard(p)
 		}),
 	)
@@ -496,7 +496,7 @@ func AddToPlaylistModal(params AddToPlaylistModalParams) HyperNode {
 					P(AttrClass("text-sm text-base-content/60"))("No playlists yet. Create one below."),
 				).Else(
 					Group(
-						Range(params.Playlists, func(p PlaylistCheckboxParams) HyperNode {
+						Range(params.Playlists, func(p PlaylistCheckboxParams) any {
 							return PlaylistCheckbox(p)
 						}),
 					),

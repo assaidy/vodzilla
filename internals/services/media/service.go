@@ -57,12 +57,12 @@ type PresignedUpload struct {
 	Urls     []string
 }
 
+// TODO: set expiration for the upload urls while generation
 // TODO: after generating presigned PUT URLs, store video_id in Redis with TTL
 //	SET upload_ttl:{video_id} "" EX <timeout>
-//
 // TODO: register cleanup worker for expired uploads:
 //	- scan Redis for expired/missing upload_ttl keys
-//	- for expired entries: abort S3 multipart upload, delete object_keys DB record
+//	- for expired entries, delete object_keys DB record
 //	- publish UploadExpiredEvent{VideoId} for video service to delete the pending video metadata
 func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
 	createOut, err := me.s3.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{

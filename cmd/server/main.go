@@ -27,6 +27,13 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+// FIX: current roadmap
+// [ ] implement backend todos
+// [ ] refactor client scripts and event listeners(including hx-on) to use hyperscript
+// [ ] add retries to video upload
+
+// TODO: add profile avatar upload
+
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 func main() {
 	app := fiber.New(fiber.Config{

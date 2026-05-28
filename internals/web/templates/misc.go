@@ -29,6 +29,7 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
 					SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
+					// TODO: Rename clientId To websocketId and only use it when initializing the ws connection.
 					window._clientId = %q;
 
 					htmx.on('htmx:config:request', (event) => {
@@ -49,7 +50,7 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 					Group(children...),
 				),
 			),
-		).(Element)
+		)
 	}
 }
 
