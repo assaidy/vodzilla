@@ -35,6 +35,8 @@ import (
 // TODO: add profile avatar upload
 
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
+// TODO: rethink all cleanup workers and deletion of data. we might need data.
+// TODO: check all published events. sometimes i put them inside a tx and sometimes not.
 func main() {
 	app := fiber.New(fiber.Config{
 		AppName:      "Vodzilla",

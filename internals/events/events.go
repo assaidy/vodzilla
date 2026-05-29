@@ -2,6 +2,9 @@ package events
 
 import "time"
 
+// TODO: why i'm putting timestamp in all events?
+// should i put an general event with general metadata then the generic payload as a field?
+
 const VideoUploadedEvent = "media_service.video_uploaded"
 
 type VideoUploadedEventPayload struct {
@@ -23,7 +26,7 @@ type VideoDeletedEventPayload struct {
 	Timestamp time.Time
 }
 
-const UploadDeletedEvent = "media_serivice.upload_expired"
+const UploadExpiredEvent = "media_serivice.upload_expired"
 
 type UploadExpiredEventPayload struct {
 	VideoId   string

@@ -314,8 +314,6 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
-				// TODO: Maybe it's better to mark user_id as null (soft deletion) to save statistics.
-
 				if err := qtx.DeleteAllViewsForUser(ctx, payload.UserId); err != nil {
 					return fmt.Errorf("failed to delete all views for user: %w", err)
 				}
@@ -363,8 +361,6 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 				}
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
-
-				// TODO: Maybe it's better to mark video_id as null (soft deletion) for efficiency.
 
 				if err := qtx.DeleteAllViewsForVideo(ctx, payload.VideoId); err != nil {
 					return fmt.Errorf("failed to delete all views for video: %w", err)

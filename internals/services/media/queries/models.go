@@ -4,7 +4,17 @@
 
 package queries
 
+import (
+	"time"
+)
+
 type MediaServiceObjectKey struct {
 	VideoId   string
 	ObjectKey string
+}
+
+type MediaServiceUpload struct {
+	Id        string
+	ObjectKey string
+	ExpiresAt time.Time
 }

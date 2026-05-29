@@ -451,10 +451,14 @@ func (me *Service) DeleteUser(ctx context.Context, userId string) error {
 		return fmt.Errorf("failed to soft delete all email verification tokens for user: %w", err)
 	}
 
-	if err := me.redis.Publish(ctx, events.UserDeletedEvent, events.UserDeletedEventPayload{
+	payload, err := json.Marshal(events.UserDeletedEventPayload{
 		UserId:    userId,
 		Timestamp: time.Now(),
-	}).Err(); err != nil {
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal %q event payload: %w", events.UserDeletedEvent, err)
+	}
+	if err := me.redis.Publish(ctx, events.UserDeletedEvent, payload).Err(); err != nil {
 		return fmt.Errorf("failed to publish %q event: %w", events.UserDeletedEvent, err)
 	}
 

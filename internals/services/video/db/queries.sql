@@ -92,5 +92,8 @@ delete from video_service.watchlaters where user_id= $1;
 -- name: DeleteAllPlaylistsForUser :exec
 delete from video_service.playlists where owner_id = $1;
 
--- name: DeleteVdieoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2;
+-- name: DeleteVideoByIdForUser :execrows
+delete from video_service.videos where id = $1 and owner_id = $2 and status = $3;
+
+-- name: DeleteVideoById :exec
+delete from video_service.videos where id = $1;

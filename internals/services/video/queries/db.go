@@ -57,8 +57,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.deletePlaylistStmt, err = db.PrepareContext(ctx, deletePlaylist); err != nil {
 		return nil, fmt.Errorf("error preparing query DeletePlaylist: %w", err)
 	}
-	if q.deleteVdieoByIdForUserStmt, err = db.PrepareContext(ctx, deleteVdieoByIdForUser); err != nil {
-		return nil, fmt.Errorf("error preparing query DeleteVdieoByIdForUser: %w", err)
+	if q.deleteVideoByIdStmt, err = db.PrepareContext(ctx, deleteVideoById); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteVideoById: %w", err)
+	}
+	if q.deleteVideoByIdForUserStmt, err = db.PrepareContext(ctx, deleteVideoByIdForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteVideoByIdForUser: %w", err)
 	}
 	if q.deleteVideoFromPlaylistStmt, err = db.PrepareContext(ctx, deleteVideoFromPlaylist); err != nil {
 		return nil, fmt.Errorf("error preparing query DeleteVideoFromPlaylist: %w", err)
@@ -156,9 +159,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing deletePlaylistStmt: %w", cerr)
 		}
 	}
-	if q.deleteVdieoByIdForUserStmt != nil {
-		if cerr := q.deleteVdieoByIdForUserStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing deleteVdieoByIdForUserStmt: %w", cerr)
+	if q.deleteVideoByIdStmt != nil {
+		if cerr := q.deleteVideoByIdStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteVideoByIdStmt: %w", cerr)
+		}
+	}
+	if q.deleteVideoByIdForUserStmt != nil {
+		if cerr := q.deleteVideoByIdForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteVideoByIdForUserStmt: %w", cerr)
 		}
 	}
 	if q.deleteVideoFromPlaylistStmt != nil {
@@ -271,7 +279,8 @@ type Queries struct {
 	deleteAllWatchlatersForUserStmt      *sql.Stmt
 	deleteFromWatchlatersStmt            *sql.Stmt
 	deletePlaylistStmt                   *sql.Stmt
-	deleteVdieoByIdForUserStmt           *sql.Stmt
+	deleteVideoByIdStmt                  *sql.Stmt
+	deleteVideoByIdForUserStmt           *sql.Stmt
 	deleteVideoFromPlaylistStmt          *sql.Stmt
 	getAllPlaylistsForUserStmt           *sql.Stmt
 	getAllVideosForUserStmt              *sql.Stmt
@@ -301,7 +310,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteAllWatchlatersForUserStmt:      q.deleteAllWatchlatersForUserStmt,
 		deleteFromWatchlatersStmt:            q.deleteFromWatchlatersStmt,
 		deletePlaylistStmt:                   q.deletePlaylistStmt,
-		deleteVdieoByIdForUserStmt:           q.deleteVdieoByIdForUserStmt,
+		deleteVideoByIdStmt:                  q.deleteVideoByIdStmt,
+		deleteVideoByIdForUserStmt:           q.deleteVideoByIdForUserStmt,
 		deleteVideoFromPlaylistStmt:          q.deleteVideoFromPlaylistStmt,
 		getAllPlaylistsForUserStmt:           q.getAllPlaylistsForUserStmt,
 		getAllVideosForUserStmt:              q.getAllVideosForUserStmt,

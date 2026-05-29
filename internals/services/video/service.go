@@ -17,8 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// TODO: consume UploadExpiredEvent to delete pending video metadata
-// (video with status=uploading that never completed)
 const Name = "video"
 
 var _ services.Service = (*Service)(nil)
@@ -56,6 +54,14 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 		),
 	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			fmt.Sprintf("%q event consumer", events.UploadExpiredEvent),
+			service.uploadExpiredEventConsumerJob,
+			workers.WithRetryDelay(time.Second),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+		),
+	)
 
 	return service
 }
@@ -70,6 +76,7 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
+// TODO: I think this shuold be in media service and video service only stores is_ready.
 type VideoStatus string
 
 const (
@@ -549,10 +556,14 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				}
 				now := time.Now()
 				for _, id := range deletedVideoIds {
-					if err := me.redis.Publish(ctx, events.VideoDeletedEvent, events.VideoDeletedEventPayload{
+					payload, err := json.Marshal(events.VideoDeletedEventPayload{
 						VideoId:   id,
 						Timestamp: now,
-					}).Err(); err != nil {
+					})
+					if err != nil {
+						return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
+					}
+					if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
 						return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
 					}
 				}
@@ -581,21 +592,51 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 }
 
 func (me *Service) DeleteVideo(ctx context.Context, videoId string, userId string) error {
-	if n, err := me.queries.DeleteVdieoByIdForUser(ctx, queries.DeleteVdieoByIdForUserParams{
+	if n, err := me.queries.DeleteVideoByIdForUser(ctx, queries.DeleteVideoByIdForUserParams{
 		Id:      videoId,
 		OwnerId: userId,
+		Status:  string(VideoStatusReady), // only ready videos are visible to users
 	}); err != nil {
 		return fmt.Errorf("failed to delete video by id for user: %w", err)
 	} else if n == 0 {
 		return ErrVideoNotFound
 	}
 
-	if err := me.redis.Publish(ctx, events.VideoDeletedEvent, events.VideoDeletedEventPayload{
+	payload, err := json.Marshal(events.VideoDeletedEventPayload{
 		VideoId:   videoId,
 		Timestamp: time.Now(),
-	}).Err(); err != nil {
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
+	}
+	if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
 		return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
 	}
 
 	return nil
+}
+
+func (me *Service) uploadExpiredEventConsumerJob(ctx context.Context) error {
+	sub := me.redis.Subscribe(ctx, events.UploadExpiredEvent)
+	defer sub.Close()
+	ch := sub.Channel()
+
+	for {
+		select {
+		case message := <-ch:
+			var payload events.UploadExpiredEventPayload
+			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
+				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.UploadExpiredEvent, err)
+			}
+
+			// The video is not in ready status yet, so no other service except media has reference to it.
+			// Media service already deleted it references before publishing the event.
+			if err := me.queries.DeleteVideoById(ctx, payload.VideoId); err != nil {
+				return fmt.Errorf("failed to delete video by id: %w", err)
+			}
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
 }

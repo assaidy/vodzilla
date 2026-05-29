@@ -180,17 +180,27 @@ func (q *Queries) DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) 
 	return result.RowsAffected()
 }
 
-const deleteVdieoByIdForUser = `-- name: DeleteVdieoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2
+const deleteVideoById = `-- name: DeleteVideoById :exec
+delete from video_service.videos where id = $1
 `
 
-type DeleteVdieoByIdForUserParams struct {
-	Id      string
-	OwnerId string
+func (q *Queries) DeleteVideoById(ctx context.Context, id string) error {
+	_, err := q.exec(ctx, q.deleteVideoByIdStmt, deleteVideoById, id)
+	return err
 }
 
-func (q *Queries) DeleteVdieoByIdForUser(ctx context.Context, arg DeleteVdieoByIdForUserParams) (int64, error) {
-	result, err := q.exec(ctx, q.deleteVdieoByIdForUserStmt, deleteVdieoByIdForUser, arg.Id, arg.OwnerId)
+const deleteVideoByIdForUser = `-- name: DeleteVideoByIdForUser :execrows
+delete from video_service.videos where id = $1 and owner_id = $2 and status = $3
+`
+
+type DeleteVideoByIdForUserParams struct {
+	Id      string
+	OwnerId string
+	Status  string
+}
+
+func (q *Queries) DeleteVideoByIdForUser(ctx context.Context, arg DeleteVideoByIdForUserParams) (int64, error) {
+	result, err := q.exec(ctx, q.deleteVideoByIdForUserStmt, deleteVideoByIdForUser, arg.Id, arg.OwnerId, arg.Status)
 	if err != nil {
 		return 0, err
 	}

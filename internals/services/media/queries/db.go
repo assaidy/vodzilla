@@ -24,25 +24,73 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.deleteExpiredUploadsStmt, err = db.PrepareContext(ctx, deleteExpiredUploads); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteExpiredUploads: %w", err)
+	}
+	if q.deleteObjectKeyForVideoStmt, err = db.PrepareContext(ctx, deleteObjectKeyForVideo); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteObjectKeyForVideo: %w", err)
+	}
+	if q.deleteObjectKeysInListStmt, err = db.PrepareContext(ctx, deleteObjectKeysInList); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteObjectKeysInList: %w", err)
+	}
+	if q.deleteUploadStmt, err = db.PrepareContext(ctx, deleteUpload); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteUpload: %w", err)
+	}
 	if q.getObjectKeyForVideoStmt, err = db.PrepareContext(ctx, getObjectKeyForVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query GetObjectKeyForVideo: %w", err)
 	}
+	if q.getUploadIdForObjectStmt, err = db.PrepareContext(ctx, getUploadIdForObject); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUploadIdForObject: %w", err)
+	}
 	if q.insertObjectKeyStmt, err = db.PrepareContext(ctx, insertObjectKey); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertObjectKey: %w", err)
+	}
+	if q.insertUploadStmt, err = db.PrepareContext(ctx, insertUpload); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertUpload: %w", err)
 	}
 	return &q, nil
 }
 
 func (q *Queries) Close() error {
 	var err error
+	if q.deleteExpiredUploadsStmt != nil {
+		if cerr := q.deleteExpiredUploadsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteExpiredUploadsStmt: %w", cerr)
+		}
+	}
+	if q.deleteObjectKeyForVideoStmt != nil {
+		if cerr := q.deleteObjectKeyForVideoStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteObjectKeyForVideoStmt: %w", cerr)
+		}
+	}
+	if q.deleteObjectKeysInListStmt != nil {
+		if cerr := q.deleteObjectKeysInListStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteObjectKeysInListStmt: %w", cerr)
+		}
+	}
+	if q.deleteUploadStmt != nil {
+		if cerr := q.deleteUploadStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteUploadStmt: %w", cerr)
+		}
+	}
 	if q.getObjectKeyForVideoStmt != nil {
 		if cerr := q.getObjectKeyForVideoStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getObjectKeyForVideoStmt: %w", cerr)
 		}
 	}
+	if q.getUploadIdForObjectStmt != nil {
+		if cerr := q.getUploadIdForObjectStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUploadIdForObjectStmt: %w", cerr)
+		}
+	}
 	if q.insertObjectKeyStmt != nil {
 		if cerr := q.insertObjectKeyStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing insertObjectKeyStmt: %w", cerr)
+		}
+	}
+	if q.insertUploadStmt != nil {
+		if cerr := q.insertUploadStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertUploadStmt: %w", cerr)
 		}
 	}
 	return err
@@ -82,17 +130,29 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                       DBTX
-	tx                       *sql.Tx
-	getObjectKeyForVideoStmt *sql.Stmt
-	insertObjectKeyStmt      *sql.Stmt
+	db                          DBTX
+	tx                          *sql.Tx
+	deleteExpiredUploadsStmt    *sql.Stmt
+	deleteObjectKeyForVideoStmt *sql.Stmt
+	deleteObjectKeysInListStmt  *sql.Stmt
+	deleteUploadStmt            *sql.Stmt
+	getObjectKeyForVideoStmt    *sql.Stmt
+	getUploadIdForObjectStmt    *sql.Stmt
+	insertObjectKeyStmt         *sql.Stmt
+	insertUploadStmt            *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                       tx,
-		tx:                       tx,
-		getObjectKeyForVideoStmt: q.getObjectKeyForVideoStmt,
-		insertObjectKeyStmt:      q.insertObjectKeyStmt,
+		db:                          tx,
+		tx:                          tx,
+		deleteExpiredUploadsStmt:    q.deleteExpiredUploadsStmt,
+		deleteObjectKeyForVideoStmt: q.deleteObjectKeyForVideoStmt,
+		deleteObjectKeysInListStmt:  q.deleteObjectKeysInListStmt,
+		deleteUploadStmt:            q.deleteUploadStmt,
+		getObjectKeyForVideoStmt:    q.getObjectKeyForVideoStmt,
+		getUploadIdForObjectStmt:    q.getUploadIdForObjectStmt,
+		insertObjectKeyStmt:         q.insertObjectKeyStmt,
+		insertUploadStmt:            q.insertUploadStmt,
 	}
 }

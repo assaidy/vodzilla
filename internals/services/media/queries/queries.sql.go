@@ -7,7 +7,82 @@ package queries
 
 import (
 	"context"
+	"time"
+
+	"github.com/lib/pq"
 )
+
+const deleteExpiredUploads = `-- name: DeleteExpiredUploads :many
+delete from media_service.uploads where expires_at <= now() returning object_key
+`
+
+func (q *Queries) DeleteExpiredUploads(ctx context.Context) ([]string, error) {
+	rows, err := q.query(ctx, q.deleteExpiredUploadsStmt, deleteExpiredUploads)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var object_key string
+		if err := rows.Scan(&object_key); err != nil {
+			return nil, err
+		}
+		items = append(items, object_key)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const deleteObjectKeyForVideo = `-- name: DeleteObjectKeyForVideo :exec
+delete from media_service.object_keys where video_id = $1
+`
+
+func (q *Queries) DeleteObjectKeyForVideo(ctx context.Context, videoID string) error {
+	_, err := q.exec(ctx, q.deleteObjectKeyForVideoStmt, deleteObjectKeyForVideo, videoID)
+	return err
+}
+
+const deleteObjectKeysInList = `-- name: DeleteObjectKeysInList :many
+delete from media_service.object_keys where object_key = any ($1::varchar[]) returning video_id
+`
+
+func (q *Queries) DeleteObjectKeysInList(ctx context.Context, objectKeys []string) ([]string, error) {
+	rows, err := q.query(ctx, q.deleteObjectKeysInListStmt, deleteObjectKeysInList, pq.Array(objectKeys))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var video_id string
+		if err := rows.Scan(&video_id); err != nil {
+			return nil, err
+		}
+		items = append(items, video_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const deleteUpload = `-- name: DeleteUpload :exec
+delete from media_service.uploads where id = $1
+`
+
+func (q *Queries) DeleteUpload(ctx context.Context, id string) error {
+	_, err := q.exec(ctx, q.deleteUploadStmt, deleteUpload, id)
+	return err
+}
 
 const getObjectKeyForVideo = `-- name: GetObjectKeyForVideo :one
 select object_key from media_service.object_keys where video_id = $1
@@ -18,6 +93,17 @@ func (q *Queries) GetObjectKeyForVideo(ctx context.Context, videoID string) (str
 	var object_key string
 	err := row.Scan(&object_key)
 	return object_key, err
+}
+
+const getUploadIdForObject = `-- name: GetUploadIdForObject :one
+select id from media_service.uploads where object_key = $1 and expires_at > now()
+`
+
+func (q *Queries) GetUploadIdForObject(ctx context.Context, objectKey string) (string, error) {
+	row := q.queryRow(ctx, q.getUploadIdForObjectStmt, getUploadIdForObject, objectKey)
+	var id string
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertObjectKey = `-- name: InsertObjectKey :exec
@@ -31,5 +117,20 @@ type InsertObjectKeyParams struct {
 
 func (q *Queries) InsertObjectKey(ctx context.Context, arg InsertObjectKeyParams) error {
 	_, err := q.exec(ctx, q.insertObjectKeyStmt, insertObjectKey, arg.VideoId, arg.ObjectKey)
+	return err
+}
+
+const insertUpload = `-- name: InsertUpload :exec
+insert into media_service.uploads (id, object_key, expires_at) values ($1, $2, $3)
+`
+
+type InsertUploadParams struct {
+	Id        string
+	ObjectKey string
+	ExpiresAt time.Time
+}
+
+func (q *Queries) InsertUpload(ctx context.Context, arg InsertUploadParams) error {
+	_, err := q.exec(ctx, q.insertUploadStmt, insertUpload, arg.Id, arg.ObjectKey, arg.ExpiresAt)
 	return err
 }
