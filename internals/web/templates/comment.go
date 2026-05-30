@@ -54,7 +54,7 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	return Group(
 		FORM(
 			AttrId(formId),
-			AttrClass("flex gap-2 items-start "+IfElseZero(params.HideParentReplyForm, "hidden")),
+			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.HideParentReplyForm, "hidden"))),
 			Attr("hx-post", fmt.Sprintf("/videos/%s/comments", params.VideoId)),
 			Attr("hx-swap", "outerHTML"),
 			Attr("hx-indicator", "find .submit-btn"),
@@ -156,7 +156,9 @@ func Comment(params CommentParams) HyperNode {
 						Attr("hx-target", fmt.Sprintf("#REPLIES_%s", commentId)),
 						Attr("hx-swap", "append"),
 						Attr("hx-on::after:request", "this.remove()"),
-					)(fmt.Sprintf("Show replies (%d)", params.RepliesCount)),
+					)(
+						fmt.Sprintf("Show replies (%d)", params.RepliesCount),
+					),
 				),
 
 				If(params.IsOwner,
@@ -251,7 +253,9 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 					COMMENT_CONTENT_%[1]s.classList.remove('hidden');
 					EDIT_FORM_%[1]s.classList.add('hidden');
 				`, params.CommentId)),
-			)("Cancel"),
+			)(
+				"Cancel",
+			),
 		),
 	)
 }

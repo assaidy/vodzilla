@@ -152,8 +152,8 @@ func HandleCreateComment(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:         videoId,
-			ParentId:        parentId,
+			VideoId:             videoId,
+			ParentId:            parentId,
 			HideParentReplyForm: parentId != "",
 		}),
 		hyper.DIV(

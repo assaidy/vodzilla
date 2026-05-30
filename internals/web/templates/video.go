@@ -51,7 +51,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_TITLE"),
-				AttrClass(IfElse(p.TitleErr == nil, "input w-full", "input input-error w-full")),
+				AttrClass(Classes("input w-full", IfElseZero(p.TitleErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("title"),
 				AttrValue(p.Title),
@@ -70,7 +70,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			),
 			TEXTAREA(
 				AttrId("FORM_DESCRIPTION"),
-				AttrClass("block w-full textarea"+IfElseZero(p.DescriptionErr != nil, " textarea-error")),
+				AttrClass(Classes("textarea block w-full", IfElseZero(p.DescriptionErr != nil, "textarea-error"))),
 				AttrName("description"),
 			)(
 				p.Description,
@@ -89,7 +89,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			INPUT(
 				// doesn't have a name, so htmx will not send it with the form
 				AttrId("FORM_VIDEO"),
-				AttrClass("file-input w-full "+IfElseZero(p.VideoErr != nil, "file-input-error")),
+				AttrClass(Classes("file-input w-full", IfElseZero(p.VideoErr != nil, "file-input-error"))),
 				AttrType(TypeFile),
 				AttrAccept("video/*"),
 				AttrRequired(true),
@@ -431,15 +431,12 @@ func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", IfElse(params.IsActive, "Remove from Watch Later", "Add to Watch Later")),
-			IfElse(params.IsActive,
-				Attr("hx-delete", fmt.Sprintf("/videos/%s/watch_later", params.VideoId)),
-				Attr("hx-post", fmt.Sprintf("/videos/%s/watch_later", params.VideoId)),
-			),
+			Attr(IfElse(params.IsActive, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/watch_later", params.VideoId)),
 			Attr("hx-target", "#WATCH_LATER_BUTTON"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="%s"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
-				IfElse(params.IsActive, "text-primary", ""),
+			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+				IfElseZero(params.IsActive, "text-primary"),
 			)),
 		),
 	)
@@ -459,10 +456,7 @@ func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
 			INPUT(
 				AttrType(TypeCheckbox),
 				AttrClass("checkbox checkbox-sm checkbox-primary"),
-				IfElse(params.Checked,
-					Attr("hx-delete", fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
-					Attr("hx-post", fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
-				),
+				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
 				Attr("hx-on::after:request", "if (evt.detail.ctx.response.ok) this.checked = !this.checked"),
 				Attr("hx-swap", "none"),
 				AttrChecked(params.Checked),
@@ -529,7 +523,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 		Attr("hx-post", "/playlists"),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-target", "this"),
-		Attr("hx-vals", fmt.Sprintf(`js:{videoId: %q}`, p.VideoId)),
+		Attr("hx-vals", Json(Object{"videoId": p.VideoId})),
 	)(
 		INPUT(
 			AttrId("FORM_PLAYLIST_NAME"),
@@ -537,7 +531,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 			AttrName("name"),
 			AttrValue(p.Name),
 			AttrPlaceholder("New playlist name..."),
-			AttrClass("input w-full"+IfElseZero(p.NameErr != nil, " input-error")),
+			AttrClass(Classes("input w-full", IfElseZero(p.NameErr != nil, "input-error"))),
 			AttrRequired(true),
 		),
 		BUTTON(

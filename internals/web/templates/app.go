@@ -277,9 +277,6 @@ type EditProfileFromParams struct {
 }
 
 func EditProfileFrom(params EditProfileFromParams) HyperNode {
-	inputClass := "input w-full"
-	erroredInputClass := "input input-error w-full"
-
 	return FORM(
 		AttrId("EDIT_PROFILE_FORM"),
 		AttrClass("space-y-4"),
@@ -294,7 +291,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_NAME"),
-				AttrClass(IfElse(params.NameErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(params.NameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("name"),
 				AttrValue(params.Name),
@@ -313,7 +310,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_USERNAME"),
-				AttrClass(IfElse(params.UsernameErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(params.UsernameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("username"),
 				AttrValue(params.Username),
@@ -332,7 +329,7 @@ func EditProfileFrom(params EditProfileFromParams) HyperNode {
 			),
 			TEXTAREA(
 				AttrId("FORM_BIO"),
-				AttrClass("block w-full textarea "+IfElseZero(params.BioErr != nil, "textarea-error")),
+				AttrClass(Classes("textarea block w-full", IfElseZero(params.BioErr != nil, "textarea-error"))),
 				AttrName("bio"),
 			)(
 				params.Bio,
@@ -457,7 +454,7 @@ type appPageButtonParams struct {
 func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
 		BUTTON(
-			AttrClass("p-2 btn btn-ghost "+IfElseZero(params.isActive, "btn-primary")),
+			AttrClass(Classes("btn btn-ghost p-2", IfElseZero(params.isActive, "btn-primary"))),
 			Attr("hx-get", fmt.Sprintf("%s/content", params.pageLink)),
 			Attr("hx-push-url", params.pageLink),
 			Attr("hx-target", "#APP_PAGE_CONTENT"),
@@ -589,32 +586,26 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Like"),
-			IfElse(!params.IsLiked,
-				Attr("hx-post", fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
-				Attr("hx-delete", fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
-			),
+			Attr(IfElse(params.IsLiked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="%s"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
-				IfElse(params.IsLiked, "text-primary", ""),
+			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
+				IfElseZero(params.IsLiked, "text-primary"),
 			)),
-			SPAN(AttrClass("text-sm"))(fmt.Sprint(params.LikesCount)),
+			SPAN(AttrClass("text-sm"))(params.LikesCount),
 		),
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Dislike"),
-			IfElse(!params.IsDisliked,
-				Attr("hx-post", fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
-				Attr("hx-delete", fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
-			),
+			Attr(IfElse(params.IsDisliked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="%s"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
-				IfElse(params.IsDisliked, "text-primary", ""),
+			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
+				IfElseZero(params.IsDisliked, "text-primary"),
 			)),
-			SPAN(AttrClass("text-sm"))(fmt.Sprint(params.DislikesCount)),
+			SPAN(AttrClass("text-sm"))(params.DislikesCount),
 		),
 	)
 }

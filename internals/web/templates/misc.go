@@ -29,18 +29,19 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
 					SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
-					// TODO: Rename clientId To websocketId and only use it when initializing the ws connection.
-					window._clientId = %q;
+						window._clientId = %q;
 
-					htmx.on('htmx:config:request', (event) => {
-						event.detail.ctx.request.headers['X-CSRF-Token'] = document.cookie
-							.split("; ")
-							.map((cookie) => cookie.split("="))
-							.find(([key]) => key === 'csrf_token')
-							?.map(decodeURIComponent)[1] || null;
-						event.detail.ctx.request.headers['X-Client-ID']  = window._clientId;
-					});
-				`, clientId))),
+						htmx.on('htmx:config:request', (event) => {
+							event.detail.ctx.request.headers['X-CSRF-Token'] = document.cookie
+								.split("; ")
+								.map((cookie) => cookie.split("="))
+								.find(([key]) => key === 'csrf_token')
+								?.map(decodeURIComponent)[1] || null;
+							event.detail.ctx.request.headers['X-Client-ID']  = window._clientId;
+						});
+					`,
+						clientId,
+					))),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),

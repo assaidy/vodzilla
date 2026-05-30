@@ -42,9 +42,6 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 		p = params[0]
 	}
 
-	inputClass := "input w-full"
-	erroredInputClass := "input input-error w-full"
-
 	return FORM(
 		AttrId("REGISTER_FORM"),
 		AttrClass("space-y-4"),
@@ -59,7 +56,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_NAME"),
-				AttrClass(IfElse(p.NameErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.NameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("name"),
 				AttrValue(p.Name),
@@ -78,7 +75,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_USERNAME"),
-				AttrClass(IfElse(p.UsernameErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.UsernameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("username"),
 				AttrValue(p.Username),
@@ -97,7 +94,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_EMAIL"),
-				AttrClass(IfElse(p.EmailErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.EmailErr != nil, "input-error"))),
 				AttrType(TypeEmail),
 				AttrName("email"),
 				AttrValue(p.Email),
@@ -116,7 +113,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_PASSWORD"),
-				AttrClass(IfElse(p.PasswordErr == nil, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.PasswordErr != nil, "input-error"))),
 				AttrType(TypePassword),
 				AttrName("password"),
 				AttrValue(p.Password),
@@ -251,9 +248,6 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 		p = params[0]
 	}
 
-	inputClass := "input w-full"
-	erroredInputClass := "input input-error w-full"
-
 	return FORM(
 		AttrId("LOGIN_FORM"),
 		AttrClass("space-y-4"),
@@ -268,7 +262,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_EMAIL"),
-				AttrClass(IfElse(p.Err != ErrInvalidCredentials, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
 				AttrType(TypeEmail),
 				AttrName("email"),
 				AttrValue(p.Email),
@@ -282,7 +276,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 			),
 			INPUT(
 				AttrId("FORM_PASSWORD"),
-				AttrClass(IfElse(p.Err != ErrInvalidCredentials, inputClass, erroredInputClass)),
+				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
 				AttrType(TypePassword),
 				AttrName("password"),
 				AttrValue(p.Password),
