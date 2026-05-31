@@ -76,7 +76,6 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-// TODO: I think this shuold be in media service and video service only stores is_ready.
 type VideoStatus string
 
 const (
@@ -542,6 +541,8 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
 			}
 
+			var deletedVideoIds []string
+
 			if err := func() error {
 				tx, err := me.db.BeginTx(ctx, nil)
 				if err != nil {
@@ -550,22 +551,8 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
-				deletedVideoIds, err := qtx.DeleteAllVideosForUser(ctx, payload.UserId)
-				if err != nil {
+				if deletedVideoIds, err = qtx.DeleteAllVideosForUser(ctx, payload.UserId); err != nil {
 					return fmt.Errorf("failed to deletd all videos for user: %w", err)
-				}
-				now := time.Now()
-				for _, id := range deletedVideoIds {
-					payload, err := json.Marshal(events.VideoDeletedEventPayload{
-						VideoId:   id,
-						Timestamp: now,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
-					}
-					if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
-						return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
-					}
 				}
 
 				if err := qtx.DeleteAllWatchlatersForUser(ctx, payload.UserId); err != nil {
@@ -583,6 +570,20 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				return nil
 			}(); err != nil {
 				return err
+			}
+
+			now := time.Now()
+			for _, id := range deletedVideoIds {
+				payload, err := json.Marshal(events.VideoDeletedEventPayload{
+					VideoId:   id,
+					Timestamp: now,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
+				}
+				if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
+					return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
+				}
 			}
 
 		case <-ctx.Done():

@@ -24,11 +24,10 @@ func CommentSection(videoId string) HyperNode {
 }
 
 type CreateCommentFormParams struct {
-	VideoId             string
-	ParentId            string
-	Content             string
-	ContentErr          error
-	HideParentReplyForm bool
+	VideoId    string
+	ParentId   string
+	Content    string
+	ContentErr error
 }
 
 // TODO: split comment form into two forms: create comment, create reply
@@ -54,7 +53,7 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	return Group(
 		FORM(
 			AttrId(formId),
-			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.HideParentReplyForm, "hidden"))),
+			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != "", "hidden"))),
 			Attr("hx-post", fmt.Sprintf("/videos/%s/comments", params.VideoId)),
 			Attr("hx-swap", "outerHTML"),
 			Attr("hx-indicator", "find .submit-btn"),
@@ -146,7 +145,7 @@ func Comment(params CommentParams) HyperNode {
 			DIV(AttrClass("flex items-center gap-1 mt-1"))(
 				BUTTON(
 					AttrClass("btn btn-ghost btn-xs"),
-					Attr("onclick", fmt.Sprintf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
+					AttrOnClick(fmt.Sprintf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
 				)("Reply"),
 
 				If(params.RepliesCount > 0,
@@ -175,7 +174,7 @@ func Comment(params CommentParams) HyperNode {
 						)(
 							LI()(
 								A(
-									Attr("onclick", fmt.Sprintf(`
+									AttrOnClick(fmt.Sprintf(`
 										COMMENT_CONTENT_%[1]s.classList.add('hidden');
 										EDIT_FORM_%[1]s.classList.remove('hidden');
 									`,
@@ -249,7 +248,7 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 			BUTTON(
 				AttrClass("btn btn-ghost btn-sm"),
 				AttrType(TypeButton),
-				Attr("onclick", fmt.Sprintf(`
+				AttrOnClick(fmt.Sprintf(`
 					COMMENT_CONTENT_%[1]s.classList.remove('hidden');
 					EDIT_FORM_%[1]s.classList.add('hidden');
 				`, params.CommentId)),

@@ -341,12 +341,16 @@ func (me *Service) expiredUploadsCleanupJob(ctx context.Context) error {
 		return fmt.Errorf("failed to delete expired uploads: %w", err)
 	}
 
-	videoIds, err := qtx.DeleteObjectKeysInList(ctx, objectKyes)
+	deletedVideoIds, err := qtx.DeleteObjectKeysInList(ctx, objectKyes)
 	if err != nil {
 		return fmt.Errorf("failed to delete object keys in list: %w", err)
 	}
 
-	for _, id := range videoIds {
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	for _, id := range deletedVideoIds {
 		payload, err := json.Marshal(events.UploadExpiredEventPayload{
 			VideoId:   id,
 			Timestamp: time.Now(),
@@ -357,10 +361,6 @@ func (me *Service) expiredUploadsCleanupJob(ctx context.Context) error {
 		if err := me.redis.Publish(ctx, events.UploadExpiredEvent, payload).Err(); err != nil {
 			return fmt.Errorf("failed to publish %q event: %w", events.UploadExpiredEvent, err)
 		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil

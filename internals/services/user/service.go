@@ -451,6 +451,10 @@ func (me *Service) DeleteUser(ctx context.Context, userId string) error {
 		return fmt.Errorf("failed to soft delete all email verification tokens for user: %w", err)
 	}
 
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
 	payload, err := json.Marshal(events.UserDeletedEventPayload{
 		UserId:    userId,
 		Timestamp: time.Now(),
@@ -460,10 +464,6 @@ func (me *Service) DeleteUser(ctx context.Context, userId string) error {
 	}
 	if err := me.redis.Publish(ctx, events.UserDeletedEvent, payload).Err(); err != nil {
 		return fmt.Errorf("failed to publish %q event: %w", events.UserDeletedEvent, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil

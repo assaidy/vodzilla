@@ -139,27 +139,23 @@ func HandleCreateComment(c fiber.Ctx) error {
 		oobSwap = "append"
 	}
 
-	newComment := templates.Comment(templates.CommentParams{
-		VideoId:       videoId,
-		CommentId:     commentId,
-		OwnerName:     owner.Name,
-		OwnerUsername: owner.Username,
-		Content:       content,
-		CreatedAt:     time.Now(),
-		RepliesCount:  0,
-		IsOwner:       true,
-	})
-
 	return render(c, hyper.Group(
 		templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:             videoId,
-			ParentId:            parentId,
-			HideParentReplyForm: parentId != "",
+			VideoId:  videoId,
+			ParentId: parentId,
 		}),
-		hyper.DIV(
-			hyper.AttrId(oobTargetId),
-			hyper.Attr("hx-swap-oob", oobSwap),
-		)(newComment),
+		hyper.DIV(hyper.AttrId(oobTargetId), hyper.Attr("hx-swap-oob", oobSwap))(
+			templates.Comment(templates.CommentParams{
+				VideoId:       videoId,
+				CommentId:     commentId,
+				OwnerName:     owner.Name,
+				OwnerUsername: owner.Username,
+				Content:       content,
+				CreatedAt:     time.Now(),
+				RepliesCount:  0,
+				IsOwner:       true,
+			}),
+		),
 	))
 }
 

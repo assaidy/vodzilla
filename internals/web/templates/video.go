@@ -129,6 +129,9 @@ type VideoUploaderParams struct {
 	UploadUrls     []string
 }
 
+// TODO: refactor this to use htmx and ws to store progress in media service
+// so all user sessions can see the uploading videos (with the initiating session)
+// and also the processing ones.
 func VideoUploader(params VideoUploaderParams) HyperNode {
 	encodedUrls, _ := json.Marshal(params.UploadUrls)
 
