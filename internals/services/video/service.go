@@ -572,12 +572,8 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				return err
 			}
 
-			now := time.Now()
 			for _, id := range deletedVideoIds {
-				payload, err := json.Marshal(events.VideoDeletedEventPayload{
-					VideoId:   id,
-					Timestamp: now,
-				})
+				payload, err := json.Marshal(events.VideoDeletedEventPayload{VideoId: id})
 				if err != nil {
 					return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
 				}
@@ -603,10 +599,7 @@ func (me *Service) DeleteVideo(ctx context.Context, videoId string, userId strin
 		return ErrVideoNotFound
 	}
 
-	payload, err := json.Marshal(events.VideoDeletedEventPayload{
-		VideoId:   videoId,
-		Timestamp: time.Now(),
-	})
+	payload, err := json.Marshal(events.VideoDeletedEventPayload{VideoId: videoId})
 	if err != nil {
 		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
 	}

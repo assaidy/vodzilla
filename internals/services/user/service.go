@@ -455,10 +455,7 @@ func (me *Service) DeleteUser(ctx context.Context, userId string) error {
 		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	payload, err := json.Marshal(events.UserDeletedEventPayload{
-		UserId:    userId,
-		Timestamp: time.Now(),
-	})
+	payload, err := json.Marshal(events.UserDeletedEventPayload{UserId: userId})
 	if err != nil {
 		return fmt.Errorf("failed to marshal %q event payload: %w", events.UserDeletedEvent, err)
 	}

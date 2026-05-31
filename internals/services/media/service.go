@@ -220,10 +220,7 @@ func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string,
 		return fmt.Errorf("failed to delete upload: %w", err)
 	}
 
-	payload, err := json.Marshal(events.VideoUploadedEventPayload{
-		VideoId:   videoId,
-		Timestamp: time.Now(),
-	})
+	payload, err := json.Marshal(events.VideoUploadedEventPayload{VideoId: videoId})
 	if err != nil {
 		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoUploadedEvent, err)
 	}
@@ -351,10 +348,7 @@ func (me *Service) expiredUploadsCleanupJob(ctx context.Context) error {
 	}
 
 	for _, id := range deletedVideoIds {
-		payload, err := json.Marshal(events.UploadExpiredEventPayload{
-			VideoId:   id,
-			Timestamp: time.Now(),
-		})
+		payload, err := json.Marshal(events.UploadExpiredEventPayload{VideoId: id})
 		if err != nil {
 			return fmt.Errorf("failed to marshal %q event payload: %w", events.UploadExpiredEvent, err)
 		}
