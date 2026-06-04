@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)

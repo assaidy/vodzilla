@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/assaidy/hyper/v2"
-	"github.com/google/uuid"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 func HandleGetVideoComments(c fiber.Ctx) error {
@@ -45,8 +45,8 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 			ownerCache[comment.OwnerId] = owner
 		}
 		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			VideoId:       videoId.String(),
-			CommentId:     comment.Id.String(),
+			VideoId:       videoId,
+			CommentId:     comment.Id,
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			Content:       comment.Content,
@@ -96,8 +96,8 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 			ownerCache[reply.OwnerId] = owner
 		}
 		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			VideoId:       videoId.String(),
-			CommentId:     reply.Id.String(),
+			VideoId:       videoId,
+			CommentId:     reply.Id,
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			Content:       reply.Content,
@@ -122,9 +122,16 @@ func HandleCreateComment(c fiber.Ctx) error {
 
 	contentErr := validation.Validate(content, validation.Required, validation.Length(1, 500))
 	if contentErr != nil {
+		var pId uuid.UUID
+		if parentIdStr != "" {
+			pId, err = uuid.Parse(parentIdStr)
+			if err != nil {
+				return fiber.ErrNotFound
+			}
+		}
 		return render(c, templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:    videoId.String(),
-			ParentId:   parentIdStr,
+			VideoId:    videoId,
+			ParentId:   pId,
 			Content:    content,
 			ContentErr: contentErr,
 		}))
@@ -155,20 +162,20 @@ func HandleCreateComment(c fiber.Ctx) error {
 
 	oobTargetId := "COMMENTS_LIST"
 	oobSwap := "prepend"
-	if parentIdStr != "" {
-		oobTargetId = fmt.Sprintf("REPLIES_%s", parentIdStr)
+	if parentId != uuid.Nil {
+		oobTargetId = fmt.Sprintf("REPLIES_%s", parentId)
 		oobSwap = "append"
 	}
 
 	return render(c, hyper.Group(
 		templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:  videoId.String(),
-			ParentId: parentIdStr,
+			VideoId:  videoId,
+			ParentId: parentId,
 		}),
 		hyper.DIV(hyper.AttrId(oobTargetId), hyper.Attr("hx-swap-oob", oobSwap))(
 			templates.Comment(templates.CommentParams{
-				VideoId:       videoId.String(),
-				CommentId:     commentId.String(),
+				VideoId:       videoId,
+				CommentId:     *commentId,
 				OwnerName:     owner.Name,
 				OwnerUsername: owner.Username,
 				Content:       content,
@@ -196,8 +203,8 @@ func HandleEditComment(c fiber.Ctx) error {
 	contentErr := validation.Validate(content, validation.Required, validation.Length(1, 500))
 	if contentErr != nil {
 		return render(c, templates.EditCommentForm(templates.EditCommentFormParams{
-			VideoId:    videoId.String(),
-			CommentId:  commentId.String(),
+			VideoId:    videoId,
+			CommentId:  commentId,
 			Content:    content,
 			ContentErr: contentErr,
 		}))
@@ -213,13 +220,13 @@ func HandleEditComment(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.EditCommentForm(templates.EditCommentFormParams{
-			VideoId:   videoId.String(),
-			CommentId: commentId.String(),
+			VideoId:   videoId,
+			CommentId: commentId,
 			Content:   content,
 			Hide:      true,
 		}),
 		hyper.DIV(
-			hyper.AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId.String())),
+			hyper.AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId)),
 			hyper.Attr("hx-swap-oob", "outerHTML"),
 		)(
 			hyper.P(hyper.AttrClass("text-sm"))(content),

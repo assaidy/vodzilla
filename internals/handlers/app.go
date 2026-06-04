@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
-	"github.com/google/uuid"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
@@ -14,6 +13,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 func HandleHomePage(c fiber.Ctx) error {
@@ -119,7 +119,7 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 		}
 
 		templateVideos = append(templateVideos, templates.VideoCardParams{
-			VideoId:       v.Id.String(),
+			VideoId:       v.Id,
 			Title:         v.Title,
 			Timestamp:     v.Timestamp,
 			OwnerName:     owner.Name,
@@ -167,7 +167,7 @@ func HandlePlaylistsPageContent(c fiber.Ctx) error {
 	templatePlaylists := make([]templates.PlaylistCardParams, 0, len(playlists))
 	for _, p := range playlists {
 		templatePlaylists = append(templatePlaylists, templates.PlaylistCardParams{
-			Id:          p.Id.String(),
+			Id:          p.Id,
 			Name:        p.Name,
 			VideosCount: p.VideosCount,
 		})
@@ -247,7 +247,7 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 		}
 
 		templateVideos = append(templateVideos, templates.VideoCardParams{
-			VideoId:       v.Id.String(),
+			VideoId:       v.Id,
 			Title:         v.Title,
 			Timestamp:     v.Timestamp,
 			OwnerName:     profileUser.Name,
@@ -368,9 +368,12 @@ func HandleVideoPage(c fiber.Ctx) error {
 		return err
 	}
 
-	videoIdStr := c.Params("video_id")
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
 
-	return render(c, templates.VideoPage(currentUser.Username, videoIdStr))
+	return render(c, templates.VideoPage(currentUser.Username, videoId))
 }
 
 func HandleVideoPageContent(c fiber.Ctx) error {
@@ -435,8 +438,8 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	templatePlaylists := make([]templates.PlaylistCheckboxParams, 0, len(playlists))
 	for _, p := range playlists {
 		templatePlaylists = append(templatePlaylists, templates.PlaylistCheckboxParams{
-			VideoId:    videoId.String(),
-			PlaylistId: p.Id.String(),
+			VideoId:    videoId,
+			PlaylistId: p.Id,
 			Name:       p.Name,
 			Checked:    p.HasVideo,
 		})
@@ -444,7 +447,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
-			Id:            video.Id.String(),
+			Id:            video.Id,
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			SourceUrl:     sourceUrl,
@@ -452,20 +455,20 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
-			CurrentUserId: currentUser.Id.String(),
+			CurrentUserId: currentUser.Id,
 			ReactionsParams: templates.ReactionsWidgetParams{
-				VideoId:       videoId.String(),
+				VideoId:       videoId,
 				LikesCount:    reactionCounts.Likes,
 				DislikesCount: reactionCounts.Dislikes,
 				IsLiked:       currentUserReaction.IsLike,
 				IsDisliked:    currentUserReaction.IsDislike,
 			},
 			WatchLaterButtonParams: templates.WatchLaterButtonParams{
-				VideoId:  videoId.String(),
+				VideoId:  videoId,
 				IsActive: isInWatchLater,
 			},
 			AddToPlaylistModalParams: templates.AddToPlaylistModalParams{
-				VideoId:   videoId.String(),
+				VideoId:   videoId,
 				Playlists: templatePlaylists,
 			},
 		}),
@@ -484,9 +487,12 @@ func HandlePlaylistDetailPage(c fiber.Ctx) error {
 		return err
 	}
 
-	playlistIdStr := c.Params("playlist_id")
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
 
-	return render(c, templates.PlaylistDetailPage(currentUser.Username, playlistIdStr))
+	return render(c, templates.PlaylistDetailPage(currentUser.Username, playlistId))
 }
 
 func HandlePlaylistDetailPageContent(c fiber.Ctx) error {
@@ -541,7 +547,7 @@ func HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 		}
 
 		templateVideos = append(templateVideos, templates.VideoCardParams{
-			VideoId:       v.Id.String(),
+			VideoId:       v.Id,
 			Title:         v.Title,
 			Timestamp:     v.Timestamp,
 			OwnerName:     owner.Name,
@@ -554,7 +560,7 @@ func HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 		templates.PlaylistDetailPageContent(templates.PlaylistDetailPageContentParams{
 			Username: currentUser.Username,
 			Playlist: templates.PlaylistCardParams{
-				Id:          playlist.Id.String(),
+				Id:          playlist.Id,
 				Name:        playlist.Name,
 				VideosCount: playlist.VideosCount,
 			},

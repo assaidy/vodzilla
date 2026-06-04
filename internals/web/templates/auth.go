@@ -8,7 +8,7 @@ var registerPageCache NodeCache
 
 func RegisterPage() HyperNode {
 	return Cache(&registerPageCache,
-		basicPageLayout(basicLayoutParams{title: "Register"})(
+		basicPageLayout("Register")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
@@ -142,7 +142,7 @@ var verificationEmailSentPageCache NodeCache
 
 func VerificationEmailSentPage() HyperNode {
 	return Cache(&verificationEmailSentPageCache,
-		basicPageLayout(basicLayoutParams{title: "Verification Email Sent"})(
+		basicPageLayout("Verification Email Sent")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -164,7 +164,7 @@ var emailVerifiedPageCache NodeCache
 
 func EmailVerifiedPage() HyperNode {
 	return Cache(&emailVerifiedPageCache,
-		basicPageLayout(basicLayoutParams{title: "Email Verified"})(
+		basicPageLayout("Email Verified")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -189,7 +189,7 @@ var invalidVerificationLinkPageCache NodeCache
 
 func InvalidVerificationLinkPage() HyperNode {
 	return Cache(&invalidVerificationLinkPageCache,
-		basicPageLayout(basicLayoutParams{title: "Invalid Verification Link"})(
+		basicPageLayout("Invalid Verification Link")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -211,7 +211,7 @@ var loginPageCache NodeCache
 
 func LoginPage() HyperNode {
 	return Cache(&loginPageCache,
-		basicPageLayout(basicLayoutParams{title: "Login"})(
+		basicPageLayout("Login")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(

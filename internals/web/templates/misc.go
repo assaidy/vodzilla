@@ -8,11 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type basicLayoutParams struct {
-	title string
-}
-
-func basicPageLayout(params basicLayoutParams) ChildrenInserter {
+func basicPageLayout(title string) ChildrenInserter {
 	clientId := uuid.New()
 
 	return func(children ...any) Element {
@@ -22,7 +18,7 @@ func basicPageLayout(params basicLayoutParams) ChildrenInserter {
 				HEAD()(
 					META(AttrCharset("UTF-8")),
 					META(AttrName("viewport"), AttrContent("width=device-width, initial-scale=1.0")),
-					TITLE()(params.title),
+					TITLE()(title),
 					LINK(AttrRel("preconnect"), AttrHref("https://fonts.googleapis.com")),
 					LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),

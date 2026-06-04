@@ -77,6 +77,9 @@ func (me *Service) Stop(ctx context.Context) error {
 }
 
 // TODO: move this to media service. also, create videos table in media service.
+//   - create a video table in media service that holds video id, status, ...etc.
+//   - when video finishes processing, media service will publish an event `vidoe_processed`
+//   - that will contain video length to store in video service.
 type VideoStatus string
 
 const (
@@ -124,7 +127,7 @@ func (me *Service) videoUploadedEventConsumerJob(ctx context.Context) error {
 				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
 			}
 
-					if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
+			if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
 				Id:     payload.VideoId,
 				Status: string(VideoStatusUploaded),
 			}); err != nil {

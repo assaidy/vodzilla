@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
-	"github.com/google/uuid"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 func HandlePostVideo(c fiber.Ctx) error {
@@ -21,7 +21,6 @@ func HandlePostVideo(c fiber.Ctx) error {
 	description := strings.TrimSpace(c.FormValue("description"))
 	contentType := strings.TrimSpace(c.FormValue("contentType"))
 	fileSize, _ := strconv.ParseInt(c.FormValue("fileSize"), 10, 0)
-	pendingVideoId := c.FormValue("pendingVideoId")
 
 	titleErr := validation.Validate(title, validation.Required, validation.Length(1, 256))
 	descriptionErr := validation.Validate(description, validation.Length(0, 500))
@@ -31,7 +30,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 		}
 		return nil
 	}))
-	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30)) // 32 GB max
+	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30))
 
 	if errors.Join(titleErr, descriptionErr, contentTypeErr, fileSizeErr) != nil {
 		return render(c, templates.PostVideoForm(templates.PostVideoFormParams{
@@ -41,6 +40,12 @@ func HandlePostVideo(c fiber.Ctx) error {
 			DescriptionErr: descriptionErr,
 			VideoErr:       errors.Join(contentTypeErr, fileSizeErr),
 		}))
+	}
+
+	pendingVideoIdStr := c.FormValue("pendingVideoId")
+	pendingVideoId, err := uuid.Parse(pendingVideoIdStr)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid pending video id")
 	}
 
 	currentUser := c.Locals("user_id").(uuid.UUID)
@@ -75,7 +80,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
-				VideoId:        videoId.String(),
+				VideoId:        *videoId,
 				UploadId:       presignedUpload.UploadId,
 				PartSize:       presignedUpload.PartSize,
 				UploadUrls:     presignedUpload.Urls,
@@ -193,7 +198,7 @@ func HandleAddVideoReaction(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
-		VideoId:       videoId.String(),
+		VideoId:       videoId,
 		LikesCount:    reactinCounts.Likes,
 		DislikesCount: reactinCounts.Dislikes,
 		IsLiked:       kind == ReactionLike,
@@ -231,7 +236,7 @@ func HandleDeleteVideoReaction(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
-		VideoId:       videoId.String(),
+		VideoId:       videoId,
 		LikesCount:    reactinCounts.Likes,
 		DislikesCount: reactinCounts.Dislikes,
 	}))
@@ -256,7 +261,7 @@ func HandleAddToWatchLater(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId.String(),
+		VideoId:  videoId,
 		IsActive: true,
 	}))
 }
@@ -277,7 +282,7 @@ func HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId.String(),
+		VideoId:  videoId,
 		IsActive: false,
 	}))
 }
@@ -286,11 +291,20 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 	name := strings.TrimSpace(c.FormValue("name"))
 	videoIdStr := c.FormValue("videoId")
 
+	var videoId uuid.UUID
+	if videoIdStr != "" {
+		var err error
+		videoId, err = uuid.Parse(videoIdStr)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid video id")
+		}
+	}
+
 	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 50))
 
 	if nameErr != nil {
 		return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoIdStr,
+			VideoId: videoId,
 			Name:    name,
 			NameErr: nameErr,
 		}))
@@ -303,7 +317,7 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNameConflict) {
 			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-				VideoId: videoIdStr,
+				VideoId: videoId,
 				Name:    name,
 				NameErr: fmt.Errorf("playlist with this name already exists"),
 			}))
@@ -313,7 +327,7 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoIdStr,
+			VideoId: videoId,
 		}),
 
 		hyper.DIV(
@@ -321,8 +335,8 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 			hyper.Attr("hx-swap-oob", "prepend"),
 		)(
 			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
-				VideoId:    videoIdStr,
-				PlaylistId: playlistId.String(),
+				VideoId:    videoId,
+				PlaylistId: *playlistId,
 				Name:       name,
 				Checked:    false,
 			}),

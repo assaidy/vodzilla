@@ -121,9 +121,9 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 }
 
 type VideoUploaderParams struct {
-	PendingVideoId string
+	PendingVideoId uuid.UUID
 	VideoTitle     string
-	VideoId        string
+	VideoId        uuid.UUID
 	UploadId       string
 	PartSize       int64
 	UploadUrls     []string
@@ -295,7 +295,7 @@ func profileVideosContainer(params profileVideosParams) HyperNode {
 }
 
 type VideoCardParams struct {
-	VideoId       string
+	VideoId       uuid.UUID
 	Title         string
 	Timestamp     time.Time
 	OwnerName     string
@@ -425,7 +425,7 @@ func videoCardAvatarPlaceholder() HyperNode {
 }
 
 type WatchLaterButtonParams struct {
-	VideoId  string
+	VideoId  uuid.UUID
 	IsActive bool
 }
 
@@ -446,8 +446,8 @@ func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
 }
 
 type PlaylistCheckboxParams struct {
-	VideoId    string
-	PlaylistId string
+	VideoId    uuid.UUID
+	PlaylistId uuid.UUID
 	Name       string
 	Checked    bool
 }
@@ -469,11 +469,11 @@ func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
 }
 
 type AddToPlaylistModalParams struct {
-	VideoId   string
+	VideoId   uuid.UUID
 	Playlists []PlaylistCheckboxParams
 }
 
-func AddToPlaylistButton(videoId string) HyperNode {
+func AddToPlaylistButton(videoId uuid.UUID) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-top"), Attr("data-tip", "Add to Playlist"))(
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm"),
@@ -509,7 +509,7 @@ func AddToPlaylistModal(params AddToPlaylistModalParams) HyperNode {
 }
 
 type CreatePlaylistFormParams struct {
-	VideoId string
+	VideoId uuid.UUID
 	Name    string
 	NameErr error
 }

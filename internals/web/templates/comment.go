@@ -5,11 +5,12 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/google/uuid"
 )
 
 // TODO: the indentation for replies is too big. use the menu
 // component from daisy ui; it comes with indentation styles.
-func CommentSection(videoId string) HyperNode {
+func CommentSection(videoId uuid.UUID) HyperNode {
 	return DIV(AttrId("COMMENT_SECTION"), AttrClass("mt-8"))(
 		H2(AttrClass("text-xl font-bold mb-4"))("Comments"),
 		CreateCommentForm(CreateCommentFormParams{VideoId: videoId}),
@@ -24,8 +25,8 @@ func CommentSection(videoId string) HyperNode {
 }
 
 type CreateCommentFormParams struct {
-	VideoId    string
-	ParentId   string
+	VideoId    uuid.UUID
+	ParentId   uuid.UUID
 	Content    string
 	ContentErr error
 }
@@ -43,7 +44,7 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	placeholder := "Add a comment..."
 	submitText := "Comment"
 
-	if params.ParentId != "" {
+	if params.ParentId != uuid.Nil {
 		formId = fmt.Sprintf("REPLY_FORM_INNER_%s", params.ParentId)
 		textareaId = fmt.Sprintf("REPLY_TEXTAREA_%s", params.ParentId)
 		placeholder = "Write a reply..."
@@ -53,12 +54,12 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	return Group(
 		FORM(
 			AttrId(formId),
-			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != "", "hidden"))),
+			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != uuid.Nil, "hidden"))),
 			Attr("hx-post", fmt.Sprintf("/videos/%s/comments", params.VideoId)),
 			Attr("hx-swap", "outerHTML"),
 			Attr("hx-indicator", "find .submit-btn"),
 		)(
-			If(params.ParentId == "",
+			If(params.ParentId == uuid.Nil,
 				commentAvatarPlaceholder(),
 			),
 			DIV(AttrClass("flex-1 flex gap-2"))(
@@ -75,8 +76,8 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 						SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
 					),
 				),
-				If(params.ParentId != "",
-					INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId)),
+				If(params.ParentId != uuid.Nil,
+					INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId.String())),
 				),
 				BUTTON(
 					AttrClass("btn btn-primary btn-sm submit-btn"),
@@ -88,8 +89,8 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 }
 
 type CommentParams struct {
-	VideoId       string
-	CommentId     string
+	VideoId       uuid.UUID
+	CommentId     uuid.UUID
 	OwnerName     string
 	OwnerUsername string
 	Content       string
@@ -215,8 +216,8 @@ func Comment(params CommentParams) HyperNode {
 }
 
 type EditCommentFormParams struct {
-	VideoId    string
-	CommentId  string
+	VideoId    uuid.UUID
+	CommentId  uuid.UUID
 	Content    string
 	ContentErr error
 	Hide       bool

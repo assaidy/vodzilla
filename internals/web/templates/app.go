@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/google/uuid"
 )
 
 func FeedPage(username string) HyperNode {
@@ -80,7 +81,7 @@ func WatchLaterPageContent(params WatchLaterPageContentParams) HyperNode {
 }
 
 type PlaylistCardParams struct {
-	Id          string
+	Id          uuid.UUID
 	Name        string
 	VideosCount int
 }
@@ -138,7 +139,7 @@ type PlaylistDetailPageContentParams struct {
 	Videos   []VideoCardParams
 }
 
-func PlaylistDetailPage(username string, playlistId string) HyperNode {
+func PlaylistDetailPage(username string, playlistId uuid.UUID) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PagePlaylists,
@@ -359,7 +360,7 @@ type appPageLayoutParams struct {
 
 func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 	return func(children ...any) Element {
-		return basicPageLayout(basicLayoutParams{title: "Vidzilla"})(
+		return basicPageLayout("Vidzilla")(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
 				DIV(
@@ -472,7 +473,7 @@ func profileCardAvatarPlaceholder() HyperNode {
 	)
 }
 
-func VideoPage(username string, videoId string) HyperNode {
+func VideoPage(username string, videoId uuid.UUID) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			Username: username,
@@ -483,7 +484,7 @@ func VideoPage(username string, videoId string) HyperNode {
 }
 
 type VideoPageContentParams struct {
-	Id                       string
+	Id                       uuid.UUID
 	OwnerName                string
 	OwnerUsername            string
 	SourceUrl                string
@@ -491,7 +492,7 @@ type VideoPageContentParams struct {
 	Description              string
 	Timestamp                time.Time
 	ViewsCount               int
-	CurrentUserId            string
+	CurrentUserId            uuid.UUID
 	ReactionsParams          ReactionsWidgetParams
 	WatchLaterButtonParams   WatchLaterButtonParams
 	AddToPlaylistModalParams AddToPlaylistModalParams
@@ -574,7 +575,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 }
 
 type ReactionsWidgetParams struct {
-	VideoId       string
+	VideoId       uuid.UUID
 	LikesCount    int
 	DislikesCount int
 	IsLiked       bool
