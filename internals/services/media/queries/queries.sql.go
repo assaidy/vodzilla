@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -43,7 +44,7 @@ const deleteObjectKeyForVideo = `-- name: DeleteObjectKeyForVideo :exec
 delete from media_service.object_keys where video_id = $1
 `
 
-func (q *Queries) DeleteObjectKeyForVideo(ctx context.Context, videoID string) error {
+func (q *Queries) DeleteObjectKeyForVideo(ctx context.Context, videoID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteObjectKeyForVideoStmt, deleteObjectKeyForVideo, videoID)
 	return err
 }
@@ -52,15 +53,15 @@ const deleteObjectKeysInList = `-- name: DeleteObjectKeysInList :many
 delete from media_service.object_keys where object_key = any ($1::varchar[]) returning video_id
 `
 
-func (q *Queries) DeleteObjectKeysInList(ctx context.Context, objectKeys []string) ([]string, error) {
+func (q *Queries) DeleteObjectKeysInList(ctx context.Context, objectKeys []string) ([]uuid.UUID, error) {
 	rows, err := q.query(ctx, q.deleteObjectKeysInListStmt, deleteObjectKeysInList, pq.Array(objectKeys))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var video_id string
+		var video_id uuid.UUID
 		if err := rows.Scan(&video_id); err != nil {
 			return nil, err
 		}
@@ -88,7 +89,7 @@ const getObjectKeyForVideo = `-- name: GetObjectKeyForVideo :one
 select object_key from media_service.object_keys where video_id = $1
 `
 
-func (q *Queries) GetObjectKeyForVideo(ctx context.Context, videoID string) (string, error) {
+func (q *Queries) GetObjectKeyForVideo(ctx context.Context, videoID uuid.UUID) (string, error) {
 	row := q.queryRow(ctx, q.getObjectKeyForVideoStmt, getObjectKeyForVideo, videoID)
 	var object_key string
 	err := row.Scan(&object_key)
@@ -111,7 +112,7 @@ insert into media_service.object_keys (video_id, object_key) values ($1, $2)
 `
 
 type InsertObjectKeyParams struct {
-	VideoId   string
+	VideoId   uuid.UUID
 	ObjectKey string
 }
 

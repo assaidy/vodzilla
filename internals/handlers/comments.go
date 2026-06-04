@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/assaidy/hyper/v2"
+	"github.com/google/uuid"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -15,8 +16,11 @@ import (
 )
 
 func HandleGetVideoComments(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	currentUserId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
@@ -26,10 +30,10 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 		return err
 	}
 
-	userCache := make(map[string]*user_service.User)
+	ownerCache := make(map[uuid.UUID]*user_service.User)
 	templateComments := make([]any, 0, len(comments))
 	for _, comment := range comments {
-		owner, ok := userCache[comment.OwnerId]
+		owner, ok := ownerCache[comment.OwnerId]
 		if !ok {
 			owner, err = userService.GetUserById(c.RequestCtx(), comment.OwnerId)
 			if err != nil {
@@ -38,11 +42,11 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 				}
 				return err
 			}
-			userCache[comment.OwnerId] = owner
+			ownerCache[comment.OwnerId] = owner
 		}
 		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			VideoId:       videoId,
-			CommentId:     comment.Id,
+			VideoId:       videoId.String(),
+			CommentId:     comment.Id.String(),
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			Content:       comment.Content,
@@ -56,9 +60,15 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 }
 
 func HandleGetCommentReplies(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	commentId := c.Params("comment_id")
-	currentUserId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
@@ -71,10 +81,10 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 		return err
 	}
 
-	userCache := make(map[string]*user_service.User)
+	ownerCache := make(map[uuid.UUID]*user_service.User)
 	templateComments := make([]any, 0, len(replies))
 	for _, reply := range replies {
-		owner, ok := userCache[reply.OwnerId]
+		owner, ok := ownerCache[reply.OwnerId]
 		if !ok {
 			owner, err = userService.GetUserById(c.RequestCtx(), reply.OwnerId)
 			if err != nil {
@@ -83,11 +93,11 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 				}
 				return err
 			}
-			userCache[reply.OwnerId] = owner
+			ownerCache[reply.OwnerId] = owner
 		}
 		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			VideoId:       videoId,
-			CommentId:     reply.Id,
+			VideoId:       videoId.String(),
+			CommentId:     reply.Id.String(),
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			Content:       reply.Content,
@@ -101,20 +111,31 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 }
 
 func HandleCreateComment(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	content := strings.TrimSpace(c.FormValue("content"))
-	parentId := strings.TrimSpace(c.FormValue("parent_id"))
+	parentIdStr := strings.TrimSpace(c.FormValue("parent_id"))
 
 	contentErr := validation.Validate(content, validation.Required, validation.Length(1, 500))
 	if contentErr != nil {
 		return render(c, templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:    videoId,
-			ParentId:   parentId,
+			VideoId:    videoId.String(),
+			ParentId:   parentIdStr,
 			Content:    content,
 			ContentErr: contentErr,
 		}))
+	}
+
+	var parentId uuid.UUID
+	if parentIdStr != "" {
+		parentId, err = uuid.Parse(parentIdStr)
+		if err != nil {
+			return fiber.ErrNotFound
+		}
 	}
 
 	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
@@ -134,20 +155,20 @@ func HandleCreateComment(c fiber.Ctx) error {
 
 	oobTargetId := "COMMENTS_LIST"
 	oobSwap := "prepend"
-	if parentId != "" {
-		oobTargetId = fmt.Sprintf("REPLIES_%s", parentId)
+	if parentIdStr != "" {
+		oobTargetId = fmt.Sprintf("REPLIES_%s", parentIdStr)
 		oobSwap = "append"
 	}
 
 	return render(c, hyper.Group(
 		templates.CreateCommentForm(templates.CreateCommentFormParams{
-			VideoId:  videoId,
-			ParentId: parentId,
+			VideoId:  videoId.String(),
+			ParentId: parentIdStr,
 		}),
 		hyper.DIV(hyper.AttrId(oobTargetId), hyper.Attr("hx-swap-oob", oobSwap))(
 			templates.Comment(templates.CommentParams{
-				VideoId:       videoId,
-				CommentId:     commentId,
+				VideoId:       videoId.String(),
+				CommentId:     commentId.String(),
 				OwnerName:     owner.Name,
 				OwnerUsername: owner.Username,
 				Content:       content,
@@ -160,17 +181,23 @@ func HandleCreateComment(c fiber.Ctx) error {
 }
 
 func HandleEditComment(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	commentId := c.Params("comment_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	content := strings.TrimSpace(c.FormValue("content"))
 
 	contentErr := validation.Validate(content, validation.Required, validation.Length(1, 500))
 	if contentErr != nil {
 		return render(c, templates.EditCommentForm(templates.EditCommentFormParams{
-			VideoId:    videoId,
-			CommentId:  commentId,
+			VideoId:    videoId.String(),
+			CommentId:  commentId.String(),
 			Content:    content,
 			ContentErr: contentErr,
 		}))
@@ -186,13 +213,13 @@ func HandleEditComment(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.EditCommentForm(templates.EditCommentFormParams{
-			VideoId:   videoId,
-			CommentId: commentId,
+			VideoId:   videoId.String(),
+			CommentId: commentId.String(),
 			Content:   content,
 			Hide:      true,
 		}),
 		hyper.DIV(
-			hyper.AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId)),
+			hyper.AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId.String())),
 			hyper.Attr("hx-swap-oob", "outerHTML"),
 		)(
 			hyper.P(hyper.AttrClass("text-sm"))(content),
@@ -201,8 +228,11 @@ func HandleEditComment(c fiber.Ctx) error {
 }
 
 func HandleDeleteComment(c fiber.Ctx) error {
-	commentId := c.Params("comment_id")
-	userId := c.Locals("user_id").(string)
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 	if err := reactionService.DeleteComment(c.RequestCtx(), userId, commentId); err != nil {

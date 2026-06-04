@@ -5,28 +5,29 @@
 package queries
 
 import (
-	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type ReactionServiceComment struct {
-	Id        string
-	VideoId   string
-	OwnerId   string
+	Id        uuid.UUID
+	VideoId   uuid.UUID
+	OwnerId   uuid.UUID
 	Content   string
 	CreatedAt time.Time
-	ParentId  sql.NullString
+	ParentId  uuid.NullUUID
 }
 
 type ReactionServiceReaction struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 	Kind    string
 	AddedAt time.Time
 }
 
 type ReactionServiceView struct {
-	VideoId   string
-	UserId    string
+	VideoId   uuid.UUID
+	UserId    uuid.UUID
 	CreatedAt time.Time
 }

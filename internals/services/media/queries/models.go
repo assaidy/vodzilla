@@ -6,10 +6,12 @@ package queries
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type MediaServiceObjectKey struct {
-	VideoId   string
+	VideoId   uuid.UUID
 	ObjectKey string
 }
 

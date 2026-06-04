@@ -1,7 +1,7 @@
 -- +goose Up
 create table reaction_service.reactions (
-  video_id varchar     not null,
-  user_id  varchar     not null,
+  video_id uuid        not null,
+  user_id  uuid        not null,
   kind     varchar     not null,
   added_at timestamptz not null default now(),
 

@@ -13,7 +13,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/video/queries"
 	"github.com/assaidy/workers"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -76,6 +76,7 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
+// TODO: move this to media service. also, create videos table in media service.
 type VideoStatus string
 
 const (
@@ -89,13 +90,13 @@ const (
 )
 
 type CreateVideoParams struct {
-	OwnerId     string
+	OwnerId     uuid.UUID
 	Title       string
 	Description string
 }
 
-func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (string, error) {
-	videoId := ulid.Make().String()
+func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (*uuid.UUID, error) {
+	videoId := uuid.Must(uuid.NewV7())
 
 	if err := me.queries.InsertVideo(ctx, queries.InsertVideoParams{
 		Id:          videoId,
@@ -104,10 +105,10 @@ func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (s
 		Description: sql.NullString{Valid: params.Description != "", String: params.Description},
 		Status:      string(VideoStatusUploading),
 	}); err != nil {
-		return "", fmt.Errorf("failed to insert video: %w", err)
+		return nil, fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	return videoId, nil
+	return &videoId, nil
 }
 
 func (me *Service) videoUploadedEventConsumerJob(ctx context.Context) error {
@@ -123,7 +124,7 @@ func (me *Service) videoUploadedEventConsumerJob(ctx context.Context) error {
 				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
 			}
 
-			if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
+					if err := me.queries.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
 				Id:     payload.VideoId,
 				Status: string(VideoStatusUploaded),
 			}); err != nil {
@@ -137,14 +138,14 @@ func (me *Service) videoUploadedEventConsumerJob(ctx context.Context) error {
 }
 
 type Video struct {
-	Id          string
-	OwnerId     string
+	Id          uuid.UUID
+	OwnerId     uuid.UUID
 	Timestamp   time.Time
 	Title       string
 	Description string
 }
 
-func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) {
+func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
 	video, err := me.queries.GetVideoById(ctx, queries.GetVideoByIdParams{
 		Id:     id,
 		Status: string(VideoStatusReady),
@@ -165,7 +166,7 @@ func (me *Service) GetVideoById(ctx context.Context, id string) (*Video, error) 
 	}, nil
 }
 
-func (me *Service) GetAllUserVideos(ctx context.Context, id string) ([]Video, error) {
+func (me *Service) GetAllUserVideos(ctx context.Context, id uuid.UUID) ([]Video, error) {
 	videos, err := me.queries.GetAllVideosForUser(ctx, queries.GetAllVideosForUserParams{
 		OwnerId: id,
 		Status:  string(VideoStatusReady),
@@ -186,10 +187,9 @@ func (me *Service) GetAllUserVideos(ctx context.Context, id string) ([]Video, er
 	}
 
 	return result, nil
-
 }
 
-func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) {
+func (me *Service) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckVideo(ctx, queries.CheckVideoParams{
 		Id:     id,
 		Status: string(VideoStatusReady),
@@ -201,14 +201,14 @@ func (me *Service) DoesVideoExist(ctx context.Context, id string) (bool, error) 
 	return ok, nil
 }
 
-func (me *Service) IsInWatchLater(ctx context.Context, videoId, userId string) (bool, error) {
+func (me *Service) IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
 	return me.queries.CheckVideoInWatchlaters(ctx, queries.CheckVideoInWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	})
 }
 
-func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId string) error {
+func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -248,7 +248,7 @@ func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId str
 	return nil
 }
 
-func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId string) error {
+func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
 	if n, err := me.queries.DeleteFromWatchlaters(ctx, queries.DeleteFromWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -261,7 +261,7 @@ func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userI
 	return nil
 }
 
-func (me *Service) GetAllVideosInWatchlater(ctx context.Context, userId string) ([]Video, error) {
+func (me *Service) GetAllVideosInWatchlater(ctx context.Context, userId uuid.UUID) ([]Video, error) {
 	videos, err := me.queries.GetAllVideosInWatchlatersForUser(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get videos in watchlater: %w", err)
@@ -281,10 +281,10 @@ func (me *Service) GetAllVideosInWatchlater(ctx context.Context, userId string) 
 	return result, nil
 }
 
-func (me *Service) CreatePlaylist(ctx context.Context, userId, playlistName string) (string, error) {
+func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (*uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to begin tx: %w", err)
+		return nil, fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
@@ -293,28 +293,28 @@ func (me *Service) CreatePlaylist(ctx context.Context, userId, playlistName stri
 		Name:    playlistName,
 		OwnerId: userId,
 	}); err != nil {
-		return "", fmt.Errorf("failed to check playlist by name for user: %w", err)
+		return nil, fmt.Errorf("failed to check playlist by name for user: %w", err)
 	} else if ok {
-		return "", ErrPlaylistNameConflict
+		return nil, ErrPlaylistNameConflict
 	}
 
-	playlistId := ulid.Make().String()
+	playlistId := uuid.Must(uuid.NewV7())
 	if err := qtx.InsertPlaylist(ctx, queries.InsertPlaylistParams{
 		Id:      playlistId,
 		Name:    playlistName,
 		OwnerId: userId,
 	}); err != nil {
-		return "", fmt.Errorf("failed to insert playlist: %w", err)
+		return nil, fmt.Errorf("failed to insert playlist: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("failed to commit tx: %w", err)
+		return nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	return playlistId, nil
+	return &playlistId, nil
 }
 
-func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId string) error {
+func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error {
 	if n, err := me.queries.DeletePlaylist(ctx, queries.DeletePlaylistParams{
 		Id:      playlistId,
 		OwnerId: userId,
@@ -327,7 +327,7 @@ func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId string
 	return nil
 }
 
-func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, playlistId string) error {
+func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -373,7 +373,7 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, play
 	return nil
 }
 
-func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, videoId, userId, playlistId string) error {
+func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, videoId, userId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -407,18 +407,18 @@ func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, videoId, userId,
 }
 
 type Playlist struct {
-	Id          string
+	Id          uuid.UUID
 	Name        string
 	VideosCount int
 }
 
 type PlaylistWithVideoStatus struct {
-	Id       string
+	Id       uuid.UUID
 	Name     string
 	HasVideo bool
 }
 
-func (me *Service) GetAllPlaylists(ctx context.Context, userId string) ([]Playlist, error) {
+func (me *Service) GetAllPlaylists(ctx context.Context, userId uuid.UUID) ([]Playlist, error) {
 	playlists, err := me.queries.GetAllPlaylistsForUser(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all playlists for user: %w", err)
@@ -436,7 +436,7 @@ func (me *Service) GetAllPlaylists(ctx context.Context, userId string) ([]Playli
 	return result, nil
 }
 
-func (me *Service) GetAllPlaylistsWithVideoStatus(ctx context.Context, userId, videoId string) ([]PlaylistWithVideoStatus, error) {
+func (me *Service) GetAllPlaylistsWithVideoStatus(ctx context.Context, userId, videoId uuid.UUID) ([]PlaylistWithVideoStatus, error) {
 	playlists, err := me.queries.GetAllPlaylistsForUser(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all playlists for user: %w", err)
@@ -462,7 +462,7 @@ func (me *Service) GetAllPlaylistsWithVideoStatus(ctx context.Context, userId, v
 	return result, nil
 }
 
-func (me *Service) GetPlaylist(ctx context.Context, userId, playlistId string) (*Playlist, error) {
+func (me *Service) GetPlaylist(ctx context.Context, userId, playlistId uuid.UUID) (*Playlist, error) {
 	playlist, err := me.queries.GetPlaylistForUser(ctx, queries.GetPlaylistForUserParams{
 		Id:      playlistId,
 		OwnerId: userId,
@@ -481,7 +481,7 @@ func (me *Service) GetPlaylist(ctx context.Context, userId, playlistId string) (
 	}, nil
 }
 
-func (me *Service) GetAllVideosInPlaylist(ctx context.Context, userId, playlistId string) ([]Video, error) {
+func (me *Service) GetAllVideosInPlaylist(ctx context.Context, userId, playlistId uuid.UUID) ([]Video, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -521,7 +521,7 @@ func (me *Service) GetAllVideosInPlaylist(ctx context.Context, userId, playlistI
 	return result, nil
 }
 
-func (me *Service) IsInPlaylist(ctx context.Context, videoId, playlistId string) (bool, error) {
+func (me *Service) IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error) {
 	return me.queries.CheckVideoInPlaylist(ctx, queries.CheckVideoInPlaylistParams{
 		VideoId:    videoId,
 		PlaylistId: playlistId,
@@ -541,7 +541,7 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoUploadedEvent, err)
 			}
 
-			var deletedVideoIds []string
+			var deletedVideoIds []uuid.UUID
 
 			if err := func() error {
 				tx, err := me.db.BeginTx(ctx, nil)
@@ -588,7 +588,7 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 	}
 }
 
-func (me *Service) DeleteVideo(ctx context.Context, videoId string, userId string) error {
+func (me *Service) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error {
 	if n, err := me.queries.DeleteVideoByIdForUser(ctx, queries.DeleteVideoByIdForUserParams{
 		Id:      videoId,
 		OwnerId: userId,

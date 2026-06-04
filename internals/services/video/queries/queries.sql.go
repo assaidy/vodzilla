@@ -8,13 +8,15 @@ package queries
 import (
 	"context"
 	"database/sql"
+
+	"github.com/google/uuid"
 )
 
 const checkPlaylist = `-- name: CheckPlaylist :one
 select exists (select 1 from video_service.playlists where id = $1 for update)
 `
 
-func (q *Queries) CheckPlaylist(ctx context.Context, id string) (bool, error) {
+func (q *Queries) CheckPlaylist(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.queryRow(ctx, q.checkPlaylistStmt, checkPlaylist, id)
 	var exists bool
 	err := row.Scan(&exists)
@@ -27,7 +29,7 @@ select exists (select 1 from video_service.playlists where name = $1 and owner_i
 
 type CheckPlaylistByNameForUserParams struct {
 	Name    string
-	OwnerId string
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) CheckPlaylistByNameForUser(ctx context.Context, arg CheckPlaylistByNameForUserParams) (bool, error) {
@@ -42,8 +44,8 @@ select exists (select 1 from video_service.playlists where id = $1 and owner_id 
 `
 
 type CheckPlaylistForUserParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) CheckPlaylistForUser(ctx context.Context, arg CheckPlaylistForUserParams) (bool, error) {
@@ -58,7 +60,7 @@ select exists (select 1 from video_service.videos where id = $1 and status = $2 
 `
 
 type CheckVideoParams struct {
-	Id     string
+	Id     uuid.UUID
 	Status string
 }
 
@@ -74,8 +76,8 @@ select exists (select 1 from video_service.playlist_videos where playlist_id = $
 `
 
 type CheckVideoInPlaylistParams struct {
-	PlaylistId string
-	VideoId    string
+	PlaylistId uuid.UUID
+	VideoId    uuid.UUID
 }
 
 func (q *Queries) CheckVideoInPlaylist(ctx context.Context, arg CheckVideoInPlaylistParams) (bool, error) {
@@ -90,8 +92,8 @@ select exists (select 1 from video_service.watchlaters where video_id = $1 and u
 `
 
 type CheckVideoInWatchlatersParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 }
 
 func (q *Queries) CheckVideoInWatchlaters(ctx context.Context, arg CheckVideoInWatchlatersParams) (bool, error) {
@@ -105,7 +107,7 @@ const deleteAllPlaylistsForUser = `-- name: DeleteAllPlaylistsForUser :exec
 delete from video_service.playlists where owner_id = $1
 `
 
-func (q *Queries) DeleteAllPlaylistsForUser(ctx context.Context, ownerID string) error {
+func (q *Queries) DeleteAllPlaylistsForUser(ctx context.Context, ownerID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllPlaylistsForUserStmt, deleteAllPlaylistsForUser, ownerID)
 	return err
 }
@@ -114,15 +116,15 @@ const deleteAllVideosForUser = `-- name: DeleteAllVideosForUser :many
 delete from video_service.videos where owner_id = $1 returning id
 `
 
-func (q *Queries) DeleteAllVideosForUser(ctx context.Context, ownerID string) ([]string, error) {
+func (q *Queries) DeleteAllVideosForUser(ctx context.Context, ownerID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.query(ctx, q.deleteAllVideosForUserStmt, deleteAllVideosForUser, ownerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []string{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var id string
+		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
@@ -141,7 +143,7 @@ const deleteAllWatchlatersForUser = `-- name: DeleteAllWatchlatersForUser :exec
 delete from video_service.watchlaters where user_id= $1
 `
 
-func (q *Queries) DeleteAllWatchlatersForUser(ctx context.Context, userID string) error {
+func (q *Queries) DeleteAllWatchlatersForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllWatchlatersForUserStmt, deleteAllWatchlatersForUser, userID)
 	return err
 }
@@ -151,8 +153,8 @@ delete from video_service.watchlaters where video_id = $1 and user_id = $2
 `
 
 type DeleteFromWatchlatersParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 }
 
 func (q *Queries) DeleteFromWatchlaters(ctx context.Context, arg DeleteFromWatchlatersParams) (int64, error) {
@@ -168,8 +170,8 @@ delete from video_service.playlists where id = $1 and owner_id = $2
 `
 
 type DeletePlaylistParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) DeletePlaylist(ctx context.Context, arg DeletePlaylistParams) (int64, error) {
@@ -184,7 +186,7 @@ const deleteVideoById = `-- name: DeleteVideoById :exec
 delete from video_service.videos where id = $1
 `
 
-func (q *Queries) DeleteVideoById(ctx context.Context, id string) error {
+func (q *Queries) DeleteVideoById(ctx context.Context, id uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteVideoByIdStmt, deleteVideoById, id)
 	return err
 }
@@ -194,8 +196,8 @@ delete from video_service.videos where id = $1 and owner_id = $2 and status = $3
 `
 
 type DeleteVideoByIdForUserParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 	Status  string
 }
 
@@ -212,8 +214,8 @@ delete from video_service.playlist_videos where playlist_id = $1 and video_id = 
 `
 
 type DeleteVideoFromPlaylistParams struct {
-	PlaylistId string
-	VideoId    string
+	PlaylistId uuid.UUID
+	VideoId    uuid.UUID
 }
 
 func (q *Queries) DeleteVideoFromPlaylist(ctx context.Context, arg DeleteVideoFromPlaylistParams) (int64, error) {
@@ -237,12 +239,12 @@ order by p.created_at desc
 `
 
 type GetAllPlaylistsForUserRow struct {
-	Id          string
+	Id          uuid.UUID
 	Name        string
 	VideosCount int64
 }
 
-func (q *Queries) GetAllPlaylistsForUser(ctx context.Context, ownerID string) ([]GetAllPlaylistsForUserRow, error) {
+func (q *Queries) GetAllPlaylistsForUser(ctx context.Context, ownerID uuid.UUID) ([]GetAllPlaylistsForUserRow, error) {
 	rows, err := q.query(ctx, q.getAllPlaylistsForUserStmt, getAllPlaylistsForUser, ownerID)
 	if err != nil {
 		return nil, err
@@ -270,7 +272,7 @@ select id, owner_id, title, description, created_at, status from video_service.v
 `
 
 type GetAllVideosForUserParams struct {
-	OwnerId string
+	OwnerId uuid.UUID
 	Status  string
 }
 
@@ -312,7 +314,7 @@ where pv.playlist_id = $1
 order by pv.added_at desc
 `
 
-func (q *Queries) GetAllVideosInPlaylist(ctx context.Context, playlistID string) ([]VideoServiceVideo, error) {
+func (q *Queries) GetAllVideosInPlaylist(ctx context.Context, playlistID uuid.UUID) ([]VideoServiceVideo, error) {
 	rows, err := q.query(ctx, q.getAllVideosInPlaylistStmt, getAllVideosInPlaylist, playlistID)
 	if err != nil {
 		return nil, err
@@ -350,7 +352,7 @@ where wl.user_id = $1
 order by wl.added_at desc
 `
 
-func (q *Queries) GetAllVideosInWatchlatersForUser(ctx context.Context, userID string) ([]VideoServiceVideo, error) {
+func (q *Queries) GetAllVideosInWatchlatersForUser(ctx context.Context, userID uuid.UUID) ([]VideoServiceVideo, error) {
 	rows, err := q.query(ctx, q.getAllVideosInWatchlatersForUserStmt, getAllVideosInWatchlatersForUser, userID)
 	if err != nil {
 		return nil, err
@@ -392,12 +394,12 @@ group by p.id
 `
 
 type GetPlaylistForUserParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 }
 
 type GetPlaylistForUserRow struct {
-	Id          string
+	Id          uuid.UUID
 	Name        string
 	VideosCount int64
 }
@@ -414,7 +416,7 @@ select id, owner_id, title, description, created_at, status from video_service.v
 `
 
 type GetVideoByIdParams struct {
-	Id     string
+	Id     uuid.UUID
 	Status string
 }
 
@@ -437,8 +439,8 @@ insert into video_service.playlist_videos (playlist_id, video_id) values ($1, $2
 `
 
 type InsertIntoPlaylistParams struct {
-	PlaylistId string
-	VideoId    string
+	PlaylistId uuid.UUID
+	VideoId    uuid.UUID
 }
 
 func (q *Queries) InsertIntoPlaylist(ctx context.Context, arg InsertIntoPlaylistParams) error {
@@ -451,8 +453,8 @@ insert into video_service.watchlaters (video_id, user_id) values ($1, $2)
 `
 
 type InsertIntoWatchlatersParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 }
 
 func (q *Queries) InsertIntoWatchlaters(ctx context.Context, arg InsertIntoWatchlatersParams) error {
@@ -465,9 +467,9 @@ insert into video_service.playlists (id, name, owner_id) values ($1, $2, $3)
 `
 
 type InsertPlaylistParams struct {
-	Id      string
+	Id      uuid.UUID
 	Name    string
-	OwnerId string
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) error {
@@ -480,8 +482,8 @@ insert into video_service.videos (id, owner_id, title, description, status) valu
 `
 
 type InsertVideoParams struct {
-	Id          string
-	OwnerId     string
+	Id          uuid.UUID
+	OwnerId     uuid.UUID
 	Title       string
 	Description sql.NullString
 	Status      string
@@ -506,7 +508,7 @@ where id = $2
 
 type UpdateVideoStatusParams struct {
 	Status string
-	Id     string
+	Id     uuid.UUID
 }
 
 func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error {

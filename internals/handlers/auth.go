@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -14,6 +16,8 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/gofiber/fiber/v3"
 )
+
+var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
 
 func HandleRegisterPage(c fiber.Ctx) error {
 	return render(c, templates.RegisterPage())
@@ -126,7 +130,7 @@ func HandleLogin(c fiber.Ctx) error {
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "session_id",
-		Value:    session.Id,
+		Value:    session.Id.String(),
 		Expires:  session.ExpiresAt,
 		HTTPOnly: true,
 	})
@@ -146,10 +150,15 @@ func HandleLogin(c fiber.Ctx) error {
 }
 
 func WithSession(c fiber.Ctx) error {
-	sessionId := c.Cookies("session_id")
+	sessionIdStr := c.Cookies("session_id")
 	sessionToken := c.Cookies("session_token")
 
-	if sessionId == "" || sessionToken == "" {
+	if sessionIdStr == "" || sessionToken == "" {
+		return redirect(c, "/login")
+	}
+
+	sessionId, err := uuid.Parse(sessionIdStr)
+	if err != nil {
 		return redirect(c, "/login")
 	}
 

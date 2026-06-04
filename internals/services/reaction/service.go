@@ -13,7 +13,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/reaction/queries"
 	"github.com/assaidy/workers"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -68,7 +68,7 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (me *Service) ViewVideo(ctx context.Context, videoId, userId string) error {
+func (me *Service) ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error {
 	_, err := me.queries.InsertView(ctx, queries.InsertViewParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -80,7 +80,7 @@ func (me *Service) ViewVideo(ctx context.Context, videoId, userId string) error 
 	return nil
 }
 
-func (me *Service) GetVideoViewsCount(ctx context.Context, videoId string) (int, error) {
+func (me *Service) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
 	count, err := me.queries.GetViewsCount(ctx, videoId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get views count: %w", err)
@@ -89,7 +89,7 @@ func (me *Service) GetVideoViewsCount(ctx context.Context, videoId string) (int,
 	return int(count), nil
 }
 
-func (me *Service) AddVidoeReaction(ctx context.Context, videoId, userId, kind string) error {
+func (me *Service) AddVidoeReaction(ctx context.Context, videoId, userId uuid.UUID, kind string) error {
 	if err := me.queries.InsertReaction(ctx, queries.InsertReactionParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -101,7 +101,7 @@ func (me *Service) AddVidoeReaction(ctx context.Context, videoId, userId, kind s
 	return nil
 }
 
-func (me *Service) DeleteVidoeReaction(ctx context.Context, videoId, userId, kind string) error {
+func (me *Service) DeleteVidoeReaction(ctx context.Context, videoId, userId uuid.UUID, kind string) error {
 	if err := me.queries.DeleteReaction(ctx, queries.DeleteReactionParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -118,7 +118,7 @@ type VideoReactionCounts struct {
 	Dislikes int
 }
 
-func (me *Service) GetVideoReactionCounts(ctx context.Context, videoId string) (*VideoReactionCounts, error) {
+func (me *Service) GetVideoReactionCounts(ctx context.Context, videoId uuid.UUID) (*VideoReactionCounts, error) {
 	reactions, err := me.queries.GetVideoReactions(ctx, videoId)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get video reactions: %w", err)
@@ -135,7 +135,7 @@ type VideoReactionForUser struct {
 	IsDislike bool
 }
 
-func (me *Service) GetVideoReactionForUser(ctx context.Context, videoId string, userId string) (*VideoReactionForUser, error) {
+func (me *Service) GetVideoReactionForUser(ctx context.Context, videoId, userId uuid.UUID) (*VideoReactionForUser, error) {
 	reaction, err := me.queries.GetVideoReactionForUser(ctx, queries.GetVideoReactionForUserParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -150,41 +150,41 @@ func (me *Service) GetVideoReactionForUser(ctx context.Context, videoId string, 
 	}, nil
 }
 
-func (me *Service) CreateComment(ctx context.Context, videoId string, userId string, content string, parentId string) (string, error) {
+func (me *Service) CreateComment(ctx context.Context, videoId, userId uuid.UUID, content string, parentId uuid.UUID) (*uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to begin tx: %w", err)
+		return nil, fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if parentId != "" {
+	if parentId != uuid.Nil {
 		if ok, err := qtx.CheckComment(ctx, parentId); err != nil {
-			return "", fmt.Errorf("failed to check parent comment: %w", err)
+			return nil, fmt.Errorf("failed to check parent comment: %w", err)
 		} else if !ok {
-			return "", ErrParentCommentNotFound
+			return nil, ErrParentCommentNotFound
 		}
 	}
 
-	commentId := ulid.Make().String()
+	commentId := uuid.Must(uuid.NewV7())
 	if err := qtx.InsertComment(ctx, queries.InsertCommentParams{
 		Id:       commentId,
 		OwnerId:  userId,
 		VideoId:  videoId,
 		Content:  content,
-		ParentId: sql.NullString{Valid: parentId != "", String: parentId},
+		ParentId: uuid.NullUUID{Valid: parentId != uuid.Nil, UUID: parentId},
 	}); err != nil {
-		return "", fmt.Errorf("failed to insert comment: %w", err)
+		return nil, fmt.Errorf("failed to insert comment: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return "", fmt.Errorf("failed to commit tx: %w", err)
+		return nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	return commentId, nil
+	return &commentId, nil
 }
 
-func (me *Service) EditComment(ctx context.Context, userId string, commentId string, newContent string) error {
+func (me *Service) EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -215,7 +215,7 @@ func (me *Service) EditComment(ctx context.Context, userId string, commentId str
 	return nil
 }
 
-func (me *Service) DeleteComment(ctx context.Context, userId string, commentId string) error {
+func (me *Service) DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error {
 	if n, err := me.queries.DeleteComment(ctx, queries.DeleteCommentParams{
 		Id:      commentId,
 		OwnerId: userId,
@@ -229,14 +229,14 @@ func (me *Service) DeleteComment(ctx context.Context, userId string, commentId s
 }
 
 type Comment struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	Content      string
 	CreatedAt    time.Time
 	RepliesCount int
 }
 
-func (me *Service) GetAllVideoComments(ctx context.Context, videoId string) ([]Comment, error) {
+func (me *Service) GetAllVideoComments(ctx context.Context, videoId uuid.UUID) ([]Comment, error) {
 	dbComments, err := me.queries.GetAllVideoComments(ctx, videoId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get comments on video: %w", err)
@@ -256,7 +256,7 @@ func (me *Service) GetAllVideoComments(ctx context.Context, videoId string) ([]C
 	return result, nil
 }
 
-func (me *Service) GetAllCommentReplies(ctx context.Context, commentId string) ([]Comment, error) {
+func (me *Service) GetAllCommentReplies(ctx context.Context, commentId uuid.UUID) ([]Comment, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)

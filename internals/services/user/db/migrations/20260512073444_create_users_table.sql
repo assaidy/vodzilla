@@ -1,6 +1,6 @@
 -- +goose Up
 create table user_service.users (
-  id            varchar       primary key,
+  id            uuid          primary key,
   email         varchar(256)  not null unique,
   password_hash varchar(256)  not null,
   name          varchar(256)  not null,

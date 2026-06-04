@@ -7,19 +7,21 @@ package queries
 import (
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type UserServiceEmailVerificationToken struct {
-	Id        string
-	OwnerId   string
+	Id        uuid.UUID
+	OwnerId   uuid.UUID
 	Token     string
 	CreatedAt time.Time
 	ExpiresAt time.Time
 }
 
 type UserServiceSession struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	SessionToken string
 	CsrfToken    string
 	CreatedAt    time.Time
@@ -27,7 +29,7 @@ type UserServiceSession struct {
 }
 
 type UserServiceUser struct {
-	Id           string
+	Id           uuid.UUID
 	Email        string
 	PasswordHash string
 	Name         string

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"log/slog"
 	"slices"
 	"time"
@@ -88,7 +89,7 @@ type PresignedUpload struct {
 	Urls     []string
 }
 
-func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
+func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId uuid.UUID, objectKey, contentType string, fileSize int64) (*PresignedUpload, error) {
 	createResult, err := me.s3.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(videosBucket),
 		Key:         aws.String(objectKey),
@@ -177,7 +178,7 @@ type CompleteUploadPart struct {
 	PartNumber int
 }
 
-func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string, parts []CompleteUploadPart) error {
+func (me *Service) CompleteUpload(ctx context.Context, videoId uuid.UUID, uploadId string, parts []CompleteUploadPart) error {
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -233,7 +234,7 @@ func (me *Service) CompleteUpload(ctx context.Context, videoId, uploadId string,
 
 const presignedGetExpiration = 1 * time.Hour
 
-func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId string) (string, error) {
+func (me *Service) GeneratePresignedGetUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -7,24 +7,26 @@ package queries
 import (
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type VideoServicePlaylist struct {
-	Id        string
+	Id        uuid.UUID
 	Name      string
-	OwnerId   string
+	OwnerId   uuid.UUID
 	CreatedAt time.Time
 }
 
 type VideoServicePlaylistVideo struct {
-	PlaylistId string
-	VideoId    string
+	PlaylistId uuid.UUID
+	VideoId    uuid.UUID
 	AddedAt    time.Time
 }
 
 type VideoServiceVideo struct {
-	Id          string
-	OwnerId     string
+	Id          uuid.UUID
+	OwnerId     uuid.UUID
 	Title       string
 	Description sql.NullString
 	CreatedAt   time.Time
@@ -32,7 +34,7 @@ type VideoServiceVideo struct {
 }
 
 type VideoServiceWatchlater struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 	AddedAt time.Time
 }

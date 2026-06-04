@@ -28,7 +28,7 @@ import (
 )
 
 // FIX: current roadmap
-// [/] implement backend todos
+// [x] implement backend todos
 // [ ] refactor client scripts and event listeners(including hx-on) to use hyperscript
 // [ ] add retries to video upload
 

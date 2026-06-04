@@ -6,7 +6,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 )
 
 type PostVideoFormParams struct {
@@ -24,7 +24,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		p = params[0]
 	}
 
-	pendingVideoId := ulid.Make()
+	pendingVideoId := uuid.New()
 
 	return FORM(
 		AttrId("POST_VIDEO_FORM"),

@@ -9,6 +9,8 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const batchDeleteExpiredEmailVerificationTokens = `-- name: BatchDeleteExpiredEmailVerificationTokens :exec
@@ -89,7 +91,7 @@ const deleteAllEmailVerificationTokensForUser = `-- name: DeleteAllEmailVerifica
 delete from user_service.email_verification_tokens where owner_id = $1 and expires_at > now()
 `
 
-func (q *Queries) DeleteAllEmailVerificationTokensForUser(ctx context.Context, ownerID string) error {
+func (q *Queries) DeleteAllEmailVerificationTokensForUser(ctx context.Context, ownerID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllEmailVerificationTokensForUserStmt, deleteAllEmailVerificationTokensForUser, ownerID)
 	return err
 }
@@ -98,7 +100,7 @@ const deleteAllSessionsForUser = `-- name: DeleteAllSessionsForUser :exec
 delete from user_service.sessions where owner_id = $1 and expires_at > now()
 `
 
-func (q *Queries) DeleteAllSessionsForUser(ctx context.Context, ownerID string) error {
+func (q *Queries) DeleteAllSessionsForUser(ctx context.Context, ownerID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllSessionsForUserStmt, deleteAllSessionsForUser, ownerID)
 	return err
 }
@@ -108,8 +110,8 @@ delete from user_service.sessions where id = $1 and owner_id = $2
 `
 
 type DeleteSessionForUserParams struct {
-	SessionId string
-	UserId    string
+	SessionId uuid.UUID
+	UserId    uuid.UUID
 }
 
 func (q *Queries) DeleteSessionForUser(ctx context.Context, arg DeleteSessionForUserParams) (int64, error) {
@@ -124,7 +126,7 @@ const getSessionById = `-- name: GetSessionById :one
 select id, owner_id, session_token, csrf_token, created_at, expires_at from user_service.sessions where id = $1
 `
 
-func (q *Queries) GetSessionById(ctx context.Context, id string) (UserServiceSession, error) {
+func (q *Queries) GetSessionById(ctx context.Context, id uuid.UUID) (UserServiceSession, error) {
 	row := q.queryRow(ctx, q.getSessionByIdStmt, getSessionById, id)
 	var i UserServiceSession
 	err := row.Scan(
@@ -163,7 +165,7 @@ const getUserById = `-- name: GetUserById :one
 select id, email, password_hash, name, username, bio, created_at, is_verified, is_deleted from user_service.users where id = $1 and is_deleted = false for update
 `
 
-func (q *Queries) GetUserById(ctx context.Context, id string) (UserServiceUser, error) {
+func (q *Queries) GetUserById(ctx context.Context, id uuid.UUID) (UserServiceUser, error) {
 	row := q.queryRow(ctx, q.getUserByIdStmt, getUserById, id)
 	var i UserServiceUser
 	err := row.Scan(
@@ -207,8 +209,8 @@ values ($1, $2, $3, $4)
 `
 
 type InsertEmailVerificationTokenParams struct {
-	Id        string
-	OwnerId   string
+	Id        uuid.UUID
+	OwnerId   uuid.UUID
 	Token     string
 	ExpiresAt time.Time
 }
@@ -229,8 +231,8 @@ values ($1, $2, $3, $4, $5)
 `
 
 type InsertSessionParams struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -253,7 +255,7 @@ values ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertUserParams struct {
-	Id           string
+	Id           uuid.UUID
 	Email        string
 	PasswordHash string
 	Name         string
@@ -277,7 +279,7 @@ const softDeleteUserById = `-- name: SoftDeleteUserById :execrows
 update user_service.users set is_deleted = true where id = $1
 `
 
-func (q *Queries) SoftDeleteUserById(ctx context.Context, id string) (int64, error) {
+func (q *Queries) SoftDeleteUserById(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.exec(ctx, q.softDeleteUserByIdStmt, softDeleteUserById, id)
 	if err != nil {
 		return 0, err
@@ -298,7 +300,7 @@ type UpdateProfileParams struct {
 	Name     string
 	Username string
 	Bio      sql.NullString
-	UserId   string
+	UserId   uuid.UUID
 }
 
 func (q *Queries) UpdateProfile(ctx context.Context, arg UpdateProfileParams) error {

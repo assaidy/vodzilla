@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
+	"github.com/google/uuid"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
@@ -42,7 +43,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 		}))
 	}
 
-	currentUser := c.Locals("user_id").(string)
+	currentUser := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	videoId, err := videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
@@ -59,7 +60,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	presignedUpload, err := mediaService.GeneratePresignedPutUrls(
 		c.RequestCtx(),
-		videoId,
+		*videoId,
 		objectKey,
 		contentType,
 		fileSize,
@@ -69,14 +70,12 @@ func HandlePostVideo(c fiber.Ctx) error {
 	}
 
 	return render(c, hyper.Group(
-		// reset the form and close dialog modal
 		templates.PostVideoForm(templates.PostVideoFormParams{CloseDialogModal: true}),
 
-		// upload the video
 		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
-				VideoId:        videoId,
+				VideoId:        videoId.String(),
 				UploadId:       presignedUpload.UploadId,
 				PartSize:       presignedUpload.PartSize,
 				UploadUrls:     presignedUpload.Urls,
@@ -88,8 +87,8 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 func HandleCompleteVideoUpload(c fiber.Ctx) error {
 	var request struct {
-		VideoId  string `json:"videoId"`
-		UploadId string `json:"uploadId"`
+		VideoId  uuid.UUID `json:"videoId"`
+		UploadId string    `json:"uploadId"`
 		Parts    []struct {
 			ETag       string `json:"etag"`
 			PartNumber int    `json:"partNumber"`
@@ -120,7 +119,10 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 }
 
 func HandleGetVideoStreamUrl(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
 
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
@@ -135,8 +137,11 @@ func HandleGetVideoStreamUrl(c fiber.Ctx) error {
 }
 
 func HandleViewVideo(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if ok, err := videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
@@ -159,8 +164,11 @@ const (
 )
 
 func HandleAddVideoReaction(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 	kind := c.Query("kind")
 
 	if kind != ReactionLike && kind != ReactionDislike {
@@ -185,7 +193,7 @@ func HandleAddVideoReaction(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
-		VideoId:       videoId,
+		VideoId:       videoId.String(),
 		LikesCount:    reactinCounts.Likes,
 		DislikesCount: reactinCounts.Dislikes,
 		IsLiked:       kind == ReactionLike,
@@ -194,8 +202,11 @@ func HandleAddVideoReaction(c fiber.Ctx) error {
 }
 
 func HandleDeleteVideoReaction(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 	kind := c.Query("kind")
 
 	if kind != ReactionLike && kind != ReactionDislike {
@@ -220,15 +231,18 @@ func HandleDeleteVideoReaction(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.ReactionsWidget(templates.ReactionsWidgetParams{
-		VideoId:       videoId,
+		VideoId:       videoId.String(),
 		LikesCount:    reactinCounts.Likes,
 		DislikesCount: reactinCounts.Dislikes,
 	}))
 }
 
 func HandleAddToWatchLater(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
@@ -242,14 +256,17 @@ func HandleAddToWatchLater(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId,
+		VideoId:  videoId.String(),
 		IsActive: true,
 	}))
 }
 
 func HandleDeleteFromWatchLater(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
@@ -260,33 +277,33 @@ func HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	}
 
 	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
-		VideoId:  videoId,
+		VideoId:  videoId.String(),
 		IsActive: false,
 	}))
 }
 
 func HandleCreatePlaylist(c fiber.Ctx) error {
 	name := strings.TrimSpace(c.FormValue("name"))
-	videoId := c.FormValue("videoId")
+	videoIdStr := c.FormValue("videoId")
 
 	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 50))
 
 	if nameErr != nil {
 		return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoId,
+			VideoId: videoIdStr,
 			Name:    name,
 			NameErr: nameErr,
 		}))
 	}
 
-	userId := c.Locals("user_id").(string)
+	userId := c.Locals("user_id").(uuid.UUID)
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 
 	playlistId, err := videoService.CreatePlaylist(c.RequestCtx(), userId, name)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNameConflict) {
 			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-				VideoId: videoId,
+				VideoId: videoIdStr,
 				Name:    name,
 				NameErr: fmt.Errorf("playlist with this name already exists"),
 			}))
@@ -296,7 +313,7 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 
 	return render(c, hyper.Group(
 		templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoId,
+			VideoId: videoIdStr,
 		}),
 
 		hyper.DIV(
@@ -304,8 +321,8 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 			hyper.Attr("hx-swap-oob", "prepend"),
 		)(
 			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
-				VideoId:    videoId,
-				PlaylistId: playlistId,
+				VideoId:    videoIdStr,
+				PlaylistId: playlistId.String(),
 				Name:       name,
 				Checked:    false,
 			}),
@@ -314,9 +331,15 @@ func HandleCreatePlaylist(c fiber.Ctx) error {
 }
 
 func HandleAddVideoToPlaylist(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	playlistId := c.Params("playlist_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
@@ -335,9 +358,15 @@ func HandleAddVideoToPlaylist(c fiber.Ctx) error {
 }
 
 func HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
-	videoId := c.Params("video_id")
-	playlistId := c.Params("playlist_id")
-	userId := c.Locals("user_id").(string)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+	userId := c.Locals("user_id").(uuid.UUID)
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
 	if err := videoService.DeleteVideoFromPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {

@@ -7,15 +7,16 @@ package queries
 
 import (
 	"context"
-	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const checkComment = `-- name: CheckComment :one
 select exists (select 1 from reaction_service.comments where id = $1 for update)
 `
 
-func (q *Queries) CheckComment(ctx context.Context, id string) (bool, error) {
+func (q *Queries) CheckComment(ctx context.Context, id uuid.UUID) (bool, error) {
 	row := q.queryRow(ctx, q.checkCommentStmt, checkComment, id)
 	var exists bool
 	err := row.Scan(&exists)
@@ -27,8 +28,8 @@ select exists (select 1 from reaction_service.comments where id = $1 and owner_i
 `
 
 type CheckCommentForUserParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) CheckCommentForUser(ctx context.Context, arg CheckCommentForUserParams) (bool, error) {
@@ -42,7 +43,7 @@ const deleteAllCommentsForUser = `-- name: DeleteAllCommentsForUser :exec
 delete from reaction_service.comments where owner_id = $1
 `
 
-func (q *Queries) DeleteAllCommentsForUser(ctx context.Context, ownerID string) error {
+func (q *Queries) DeleteAllCommentsForUser(ctx context.Context, ownerID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllCommentsForUserStmt, deleteAllCommentsForUser, ownerID)
 	return err
 }
@@ -51,7 +52,7 @@ const deleteAllCommentsForVideo = `-- name: DeleteAllCommentsForVideo :exec
 delete from reaction_service.comments where video_id = $1
 `
 
-func (q *Queries) DeleteAllCommentsForVideo(ctx context.Context, videoID string) error {
+func (q *Queries) DeleteAllCommentsForVideo(ctx context.Context, videoID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllCommentsForVideoStmt, deleteAllCommentsForVideo, videoID)
 	return err
 }
@@ -60,7 +61,7 @@ const deleteAllReactionsForUser = `-- name: DeleteAllReactionsForUser :exec
 delete from reaction_service.reactions where user_id = $1
 `
 
-func (q *Queries) DeleteAllReactionsForUser(ctx context.Context, userID string) error {
+func (q *Queries) DeleteAllReactionsForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllReactionsForUserStmt, deleteAllReactionsForUser, userID)
 	return err
 }
@@ -69,7 +70,7 @@ const deleteAllReactionsForVideo = `-- name: DeleteAllReactionsForVideo :exec
 delete from reaction_service.reactions where video_id = $1
 `
 
-func (q *Queries) DeleteAllReactionsForVideo(ctx context.Context, videoID string) error {
+func (q *Queries) DeleteAllReactionsForVideo(ctx context.Context, videoID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllReactionsForVideoStmt, deleteAllReactionsForVideo, videoID)
 	return err
 }
@@ -78,7 +79,7 @@ const deleteAllViewsForUser = `-- name: DeleteAllViewsForUser :exec
 delete from reaction_service.views where user_id = $1
 `
 
-func (q *Queries) DeleteAllViewsForUser(ctx context.Context, userID string) error {
+func (q *Queries) DeleteAllViewsForUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllViewsForUserStmt, deleteAllViewsForUser, userID)
 	return err
 }
@@ -87,7 +88,7 @@ const deleteAllViewsForVideo = `-- name: DeleteAllViewsForVideo :exec
 delete from reaction_service.views where video_id = $1
 `
 
-func (q *Queries) DeleteAllViewsForVideo(ctx context.Context, videoID string) error {
+func (q *Queries) DeleteAllViewsForVideo(ctx context.Context, videoID uuid.UUID) error {
 	_, err := q.exec(ctx, q.deleteAllViewsForVideoStmt, deleteAllViewsForVideo, videoID)
 	return err
 }
@@ -97,8 +98,8 @@ delete from reaction_service.comments where id = $1 and owner_id = $2
 `
 
 type DeleteCommentParams struct {
-	Id      string
-	OwnerId string
+	Id      uuid.UUID
+	OwnerId uuid.UUID
 }
 
 func (q *Queries) DeleteComment(ctx context.Context, arg DeleteCommentParams) (int64, error) {
@@ -114,8 +115,8 @@ delete from reaction_service.reactions where video_id = $1 and user_id = $2 and 
 `
 
 type DeleteReactionParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 	Kind    string
 }
 
@@ -133,20 +134,20 @@ select
   count(r.id) as replies_count
 from reaction_service.comments c
 left join reaction_service.comments r on c.id = r.parent_id
-where c.parent_id = $1::varchar
+where c.parent_id = $1::uuid
 group by c.id, c.owner_id, c.content, c.created_at
 order by c.created_at asc
 `
 
 type GetAllCommentRepliesRow struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	Content      string
 	CreatedAt    time.Time
 	RepliesCount int64
 }
 
-func (q *Queries) GetAllCommentReplies(ctx context.Context, commentID string) ([]GetAllCommentRepliesRow, error) {
+func (q *Queries) GetAllCommentReplies(ctx context.Context, commentID uuid.UUID) ([]GetAllCommentRepliesRow, error) {
 	rows, err := q.query(ctx, q.getAllCommentRepliesStmt, getAllCommentReplies, commentID)
 	if err != nil {
 		return nil, err
@@ -190,14 +191,14 @@ order by c.created_at desc
 `
 
 type GetAllVideoCommentsRow struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	Content      string
 	CreatedAt    time.Time
 	RepliesCount int64
 }
 
-func (q *Queries) GetAllVideoComments(ctx context.Context, videoID string) ([]GetAllVideoCommentsRow, error) {
+func (q *Queries) GetAllVideoComments(ctx context.Context, videoID uuid.UUID) ([]GetAllVideoCommentsRow, error) {
 	rows, err := q.query(ctx, q.getAllVideoCommentsStmt, getAllVideoComments, videoID)
 	if err != nil {
 		return nil, err
@@ -235,8 +236,8 @@ where video_id = $1 and user_id = $2
 `
 
 type GetVideoReactionForUserParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 }
 
 type GetVideoReactionForUserRow struct {
@@ -264,7 +265,7 @@ type GetVideoReactionsRow struct {
 	Dislikes int64
 }
 
-func (q *Queries) GetVideoReactions(ctx context.Context, videoID string) (GetVideoReactionsRow, error) {
+func (q *Queries) GetVideoReactions(ctx context.Context, videoID uuid.UUID) (GetVideoReactionsRow, error) {
 	row := q.queryRow(ctx, q.getVideoReactionsStmt, getVideoReactions, videoID)
 	var i GetVideoReactionsRow
 	err := row.Scan(&i.Likes, &i.Dislikes)
@@ -275,7 +276,7 @@ const getViewsCount = `-- name: GetViewsCount :one
 select count(*) from reaction_service.views where video_id = $1
 `
 
-func (q *Queries) GetViewsCount(ctx context.Context, videoID string) (int64, error) {
+func (q *Queries) GetViewsCount(ctx context.Context, videoID uuid.UUID) (int64, error) {
 	row := q.queryRow(ctx, q.getViewsCountStmt, getViewsCount, videoID)
 	var count int64
 	err := row.Scan(&count)
@@ -287,11 +288,11 @@ insert into reaction_service.comments (id, owner_id, video_id, content, parent_i
 `
 
 type InsertCommentParams struct {
-	Id       string
-	OwnerId  string
-	VideoId  string
+	Id       uuid.UUID
+	OwnerId  uuid.UUID
+	VideoId  uuid.UUID
 	Content  string
-	ParentId sql.NullString
+	ParentId uuid.NullUUID
 }
 
 func (q *Queries) InsertComment(ctx context.Context, arg InsertCommentParams) error {
@@ -313,8 +314,8 @@ on conflict (video_id, user_id) do update set
 `
 
 type InsertReactionParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 	Kind    string
 }
 
@@ -329,8 +330,8 @@ on conflict (video_id, user_id) do nothing
 `
 
 type InsertViewParams struct {
-	VideoId string
-	UserId  string
+	VideoId uuid.UUID
+	UserId  uuid.UUID
 }
 
 func (q *Queries) InsertView(ctx context.Context, arg InsertViewParams) (int64, error) {
@@ -349,7 +350,7 @@ where id = $2
 
 type UpdateCommentParams struct {
 	Content string
-	Id      string
+	Id      uuid.UUID
 }
 
 func (q *Queries) UpdateComment(ctx context.Context, arg UpdateCommentParams) error {

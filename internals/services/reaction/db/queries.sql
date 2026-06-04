@@ -67,7 +67,7 @@ select
   count(r.id) as replies_count
 from reaction_service.comments c
 left join reaction_service.comments r on c.id = r.parent_id
-where c.parent_id = @comment_id::varchar
+where c.parent_id = @comment_id::uuid
 group by c.id, c.owner_id, c.content, c.created_at
 order by c.created_at asc;
 

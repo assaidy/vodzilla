@@ -5,7 +5,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 )
 
 type basicLayoutParams struct {
@@ -13,7 +13,7 @@ type basicLayoutParams struct {
 }
 
 func basicPageLayout(params basicLayoutParams) ChildrenInserter {
-	clientId := ulid.Make()
+	clientId := uuid.New()
 
 	return func(children ...any) Element {
 		return Group(

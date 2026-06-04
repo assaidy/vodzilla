@@ -19,7 +19,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/oklog/ulid/v2"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -142,7 +142,7 @@ func (me *Service) Register(ctx context.Context, email, password, name, username
 		return ErrUsernameConflict
 	}
 
-	userId := ulid.Make().String()
+	userId := uuid.Must(uuid.NewV7())
 	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
@@ -190,7 +190,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 		return fmt.Errorf("failed to get user by email: %w", err)
 	}
 
-	verificationTokenId := ulid.Make().String()
+	verificationTokenId := uuid.Must(uuid.NewV7())
 	verificationToken := fmt.Sprintf("%s_%s", verificationTokenId, generateCryptoRandomHex(32))
 
 	if err := qtx.InsertEmailVerificationToken(ctx, queries.InsertEmailVerificationTokenParams{
@@ -239,8 +239,8 @@ func (me *Service) emailVerificationTokensCleanupJob(ctx context.Context) error 
 }
 
 type Session struct {
-	Id           string
-	OwnerId      string
+	Id           uuid.UUID
+	OwnerId      uuid.UUID
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -271,7 +271,7 @@ func (me *Service) Login(ctx context.Context, email, password string) (*Session,
 		return nil, ErrUnverified
 	}
 
-	sessionId := ulid.Make().String()
+	sessionId := uuid.Must(uuid.NewV7())
 	// session id prefix ensures uniqueness
 	sessionToken := fmt.Sprintf("%s_%s", sessionId, generateCryptoRandomHex(32))
 	csrfToken := fmt.Sprintf("%s_%s", sessionId, generateCryptoRandomHex(32))
@@ -306,7 +306,7 @@ func generateCryptoRandomHex(nBytes uint) string {
 	return hex.EncodeToString(buf)
 }
 
-func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, error) {
+func (me *Service) GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, error) {
 	session, err := me.queries.GetSessionById(ctx, sessionId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -324,7 +324,7 @@ func (me *Service) GetSession(ctx context.Context, sessionId string) (*Session, 
 	}, nil
 }
 
-func (me *Service) Logout(ctx context.Context, userId string, sessionId string) error {
+func (me *Service) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error {
 	if nDeleted, err := me.queries.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
 		SessionId: sessionId,
 		UserId:    userId,
@@ -346,14 +346,14 @@ func (me *Service) sessionsCleanupJob(ctx context.Context) error {
 }
 
 type User struct {
-	Id       string
+	Id       uuid.UUID
 	Name     string
 	Username string
 	Email    string
 	Bio      string
 }
 
-func (me *Service) GetUserById(ctx context.Context, userId string) (*User, error) {
+func (me *Service) GetUserById(ctx context.Context, userId uuid.UUID) (*User, error) {
 	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -389,7 +389,7 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	}, nil
 }
 
-func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio string) error {
+func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -429,7 +429,7 @@ func (me *Service) EditProfile(ctx context.Context, userId, name, username, bio 
 	return nil
 }
 
-func (me *Service) DeleteUser(ctx context.Context, userId string) error {
+func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)

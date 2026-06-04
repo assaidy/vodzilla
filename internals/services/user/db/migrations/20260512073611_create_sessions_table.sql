@@ -1,7 +1,7 @@
 -- +goose Up
 create table user_service.sessions (
-  id            varchar      primary key,
-  owner_id      varchar      not null references user_service.users (id) on delete cascade,
+  id            uuid         primary key,
+  owner_id      uuid         not null references user_service.users (id) on delete cascade,
   session_token varchar(256) not null unique, 
   csrf_token    varchar(256) not null,
   created_at    timestamptz  not null default now(),
