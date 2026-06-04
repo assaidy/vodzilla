@@ -4,11 +4,9 @@ import (
 	. "github.com/assaidy/hyper/v2"
 )
 
-var registerPageCache NodeCache
-
 func RegisterPage() HyperNode {
-	return Cache(&registerPageCache,
-		basicPageLayout("Register")(
+	return Once(func() HyperNode {
+		return basicPageLayout("Register")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
@@ -21,8 +19,8 @@ func RegisterPage() HyperNode {
 					),
 				),
 			),
-		),
-	)
+		)
+	})
 }
 
 type RegisterFormParams struct {
@@ -138,11 +136,9 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 	)
 }
 
-var verificationEmailSentPageCache NodeCache
-
 func VerificationEmailSentPage() HyperNode {
-	return Cache(&verificationEmailSentPageCache,
-		basicPageLayout("Verification Email Sent")(
+	return Once(func() HyperNode {
+		return basicPageLayout("Verification Email Sent")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -156,15 +152,13 @@ func VerificationEmailSentPage() HyperNode {
 					),
 				),
 			),
-		),
-	)
+		)
+	})
 }
 
-var emailVerifiedPageCache NodeCache
-
 func EmailVerifiedPage() HyperNode {
-	return Cache(&emailVerifiedPageCache,
-		basicPageLayout("Email Verified")(
+	return Once(func() HyperNode {
+		return basicPageLayout("Email Verified")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -181,15 +175,13 @@ func EmailVerifiedPage() HyperNode {
 					),
 				),
 			),
-		),
-	)
+		)
+	})
 }
 
-var invalidVerificationLinkPageCache NodeCache
-
 func InvalidVerificationLinkPage() HyperNode {
-	return Cache(&invalidVerificationLinkPageCache,
-		basicPageLayout("Invalid Verification Link")(
+	return Once(func() HyperNode {
+		return basicPageLayout("Invalid Verification Link")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
@@ -203,15 +195,13 @@ func InvalidVerificationLinkPage() HyperNode {
 					),
 				),
 			),
-		),
-	)
+		)
+	})
 }
 
-var loginPageCache NodeCache
-
 func LoginPage() HyperNode {
-	return Cache(&loginPageCache,
-		basicPageLayout("Login")(
+	return Once(func() HyperNode {
+		return basicPageLayout("Login")(
 			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body"))(
@@ -224,8 +214,8 @@ func LoginPage() HyperNode {
 					),
 				),
 			),
-		),
-	)
+		)
+	})
 }
 
 type LoginFormParams struct {
