@@ -30,7 +30,7 @@ type VideoServiceVideo struct {
 	Title       string
 	Description sql.NullString
 	CreatedAt   time.Time
-	Status      string
+	IsPublished bool
 }
 
 type VideoServiceWatchlater struct {

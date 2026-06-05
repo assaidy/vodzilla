@@ -10,128 +10,93 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
-const deleteExpiredUploads = `-- name: DeleteExpiredUploads :many
-delete from media_service.uploads where expires_at <= now() returning object_key
+const deleteVideoById = `-- name: DeleteVideoById :exec
+delete from media_service.videos where id = $1
 `
 
-func (q *Queries) DeleteExpiredUploads(ctx context.Context) ([]string, error) {
-	rows, err := q.query(ctx, q.deleteExpiredUploadsStmt, deleteExpiredUploads)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var object_key string
-		if err := rows.Scan(&object_key); err != nil {
-			return nil, err
-		}
-		items = append(items, object_key)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const deleteObjectKeyForVideo = `-- name: DeleteObjectKeyForVideo :exec
-delete from media_service.object_keys where video_id = $1
-`
-
-func (q *Queries) DeleteObjectKeyForVideo(ctx context.Context, videoID uuid.UUID) error {
-	_, err := q.exec(ctx, q.deleteObjectKeyForVideoStmt, deleteObjectKeyForVideo, videoID)
-	return err
-}
-
-const deleteObjectKeysInList = `-- name: DeleteObjectKeysInList :many
-delete from media_service.object_keys where object_key = any ($1::varchar[]) returning video_id
-`
-
-func (q *Queries) DeleteObjectKeysInList(ctx context.Context, objectKeys []string) ([]uuid.UUID, error) {
-	rows, err := q.query(ctx, q.deleteObjectKeysInListStmt, deleteObjectKeysInList, pq.Array(objectKeys))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var video_id uuid.UUID
-		if err := rows.Scan(&video_id); err != nil {
-			return nil, err
-		}
-		items = append(items, video_id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const deleteUpload = `-- name: DeleteUpload :exec
-delete from media_service.uploads where id = $1
-`
-
-func (q *Queries) DeleteUpload(ctx context.Context, id string) error {
-	_, err := q.exec(ctx, q.deleteUploadStmt, deleteUpload, id)
+func (q *Queries) DeleteVideoById(ctx context.Context, id uuid.UUID) error {
+	_, err := q.exec(ctx, q.deleteVideoByIdStmt, deleteVideoById, id)
 	return err
 }
 
 const getObjectKeyForVideo = `-- name: GetObjectKeyForVideo :one
-select object_key from media_service.object_keys where video_id = $1
+select object_key from media_service.videos where id = $1 for update
 `
 
-func (q *Queries) GetObjectKeyForVideo(ctx context.Context, videoID uuid.UUID) (string, error) {
-	row := q.queryRow(ctx, q.getObjectKeyForVideoStmt, getObjectKeyForVideo, videoID)
+func (q *Queries) GetObjectKeyForVideo(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.queryRow(ctx, q.getObjectKeyForVideoStmt, getObjectKeyForVideo, id)
 	var object_key string
 	err := row.Scan(&object_key)
 	return object_key, err
 }
 
-const getUploadIdForObject = `-- name: GetUploadIdForObject :one
-select id from media_service.uploads where object_key = $1 and expires_at > now()
+const getUploadForVideo = `-- name: GetUploadForVideo :one
+select id, video_id, expires_at, completed_at from media_service.uploads where video_id = $1 for update
 `
 
-func (q *Queries) GetUploadIdForObject(ctx context.Context, objectKey string) (string, error) {
-	row := q.queryRow(ctx, q.getUploadIdForObjectStmt, getUploadIdForObject, objectKey)
-	var id string
-	err := row.Scan(&id)
-	return id, err
-}
-
-const insertObjectKey = `-- name: InsertObjectKey :exec
-insert into media_service.object_keys (video_id, object_key) values ($1, $2)
-`
-
-type InsertObjectKeyParams struct {
-	VideoId   uuid.UUID
-	ObjectKey string
-}
-
-func (q *Queries) InsertObjectKey(ctx context.Context, arg InsertObjectKeyParams) error {
-	_, err := q.exec(ctx, q.insertObjectKeyStmt, insertObjectKey, arg.VideoId, arg.ObjectKey)
-	return err
+func (q *Queries) GetUploadForVideo(ctx context.Context, videoID uuid.UUID) (MediaServiceUpload, error) {
+	row := q.queryRow(ctx, q.getUploadForVideoStmt, getUploadForVideo, videoID)
+	var i MediaServiceUpload
+	err := row.Scan(
+		&i.Id,
+		&i.VideoId,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+	)
+	return i, err
 }
 
 const insertUpload = `-- name: InsertUpload :exec
-insert into media_service.uploads (id, object_key, expires_at) values ($1, $2, $3)
+insert into media_service.uploads (id, video_id, expires_at) values ($1, $2, $3)
 `
 
 type InsertUploadParams struct {
 	Id        string
-	ObjectKey string
+	VideoId   uuid.UUID
 	ExpiresAt time.Time
 }
 
 func (q *Queries) InsertUpload(ctx context.Context, arg InsertUploadParams) error {
-	_, err := q.exec(ctx, q.insertUploadStmt, insertUpload, arg.Id, arg.ObjectKey, arg.ExpiresAt)
+	_, err := q.exec(ctx, q.insertUploadStmt, insertUpload, arg.Id, arg.VideoId, arg.ExpiresAt)
+	return err
+}
+
+const insertVideo = `-- name: InsertVideo :exec
+insert into media_service.videos (id, object_key, status) values ($1, $2, $3)
+`
+
+type InsertVideoParams struct {
+	Id        uuid.UUID
+	ObjectKey string
+	Status    string
+}
+
+func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error {
+	_, err := q.exec(ctx, q.insertVideoStmt, insertVideo, arg.Id, arg.ObjectKey, arg.Status)
+	return err
+}
+
+const markUploadAsCompleted = `-- name: MarkUploadAsCompleted :exec
+update media_service.uploads set completed_at = now() where video_id = $1
+`
+
+func (q *Queries) MarkUploadAsCompleted(ctx context.Context, videoID uuid.UUID) error {
+	_, err := q.exec(ctx, q.markUploadAsCompletedStmt, markUploadAsCompleted, videoID)
+	return err
+}
+
+const updateVideoStatus = `-- name: UpdateVideoStatus :exec
+update media_service.videos set status = $1 where id = $2
+`
+
+type UpdateVideoStatusParams struct {
+	Status string
+	Id     uuid.UUID
+}
+
+func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error {
+	_, err := q.exec(ctx, q.updateVideoStatusStmt, updateVideoStatus, arg.Status, arg.Id)
 	return err
 }

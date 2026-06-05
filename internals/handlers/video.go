@@ -114,7 +114,14 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 
 	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
 	if err := mediaService.CompleteUpload(c.RequestCtx(), request.VideoId, request.UploadId, parts); err != nil {
-		if errors.Is(err, media_service.ErrInvalidCompleteUploadData) {
+		switch {
+		case errors.Is(err, media_service.ErrObjectNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "object not found")
+		case errors.Is(err, media_service.ErrUploadExpired):
+			return fiber.NewError(fiber.StatusForbidden, "upload expired")
+		case errors.Is(err, media_service.ErrUploadAlreadyCompleted):
+			return fiber.NewError(fiber.StatusForbidden, "upload already completed")
+		case errors.Is(err, media_service.ErrInvalidCompleteUploadData):
 			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
 		}
 		return err

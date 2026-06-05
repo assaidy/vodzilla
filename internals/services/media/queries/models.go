@@ -5,18 +5,21 @@
 package queries
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type MediaServiceObjectKey struct {
-	VideoId   uuid.UUID
-	ObjectKey string
+type MediaServiceUpload struct {
+	Id          string
+	VideoId     uuid.UUID
+	ExpiresAt   time.Time
+	CompletedAt sql.NullTime
 }
 
-type MediaServiceUpload struct {
-	Id        string
+type MediaServiceVideo struct {
+	Id        uuid.UUID
 	ObjectKey string
-	ExpiresAt time.Time
+	Status    string
 }

@@ -1,19 +1,19 @@
 -- name: InsertVideo :exec
-insert into video_service.videos (id, owner_id, title, description, status) values ($1, $2, $3, $4, $5);
+insert into video_service.videos (id, owner_id, title, description) values ($1, $2, $3, $4);
 
 -- name: GetVideoById :one
-select * from video_service.videos where id = $1 and status = $2 for update;
+select * from video_service.videos where id = $1 for update;
 
--- name: UpdateVideoStatus :exec
+-- name: MarkVideoAsPublished :exec
 update video_service.videos
-set status = $1
-where id = $2;
+set is_published = true
+where id = $1;
 
--- name: GetAllVideosForUser :many
-select * from video_service.videos where owner_id = $1 and status = $2;
+-- name: GetAllPublishedVideosForUser :many
+select * from video_service.videos where owner_id = $1 and is_published = true;
 
 -- name: CheckVideo :one
-select exists (select 1 from video_service.videos where id = $1 and status = $2 for update);
+select exists (select 1 from video_service.videos where id = $1 and is_published = $2 for update);
 
 -- name: CheckVideoInWatchlaters :one
 select exists (select 1 from video_service.watchlaters where video_id = $1 and user_id = $2 for update);
@@ -93,7 +93,7 @@ delete from video_service.watchlaters where user_id= $1;
 delete from video_service.playlists where owner_id = $1;
 
 -- name: DeleteVideoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2 and status = $3;
+delete from video_service.videos where id = $1 and owner_id = $2 and is_published = $3;
 
 -- name: DeleteVideoById :exec
 delete from video_service.videos where id = $1;

@@ -69,8 +69,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getAllPlaylistsForUserStmt, err = db.PrepareContext(ctx, getAllPlaylistsForUser); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllPlaylistsForUser: %w", err)
 	}
-	if q.getAllVideosForUserStmt, err = db.PrepareContext(ctx, getAllVideosForUser); err != nil {
-		return nil, fmt.Errorf("error preparing query GetAllVideosForUser: %w", err)
+	if q.getAllPublishedVideosForUserStmt, err = db.PrepareContext(ctx, getAllPublishedVideosForUser); err != nil {
+		return nil, fmt.Errorf("error preparing query GetAllPublishedVideosForUser: %w", err)
 	}
 	if q.getAllVideosInPlaylistStmt, err = db.PrepareContext(ctx, getAllVideosInPlaylist); err != nil {
 		return nil, fmt.Errorf("error preparing query GetAllVideosInPlaylist: %w", err)
@@ -96,8 +96,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.insertVideoStmt, err = db.PrepareContext(ctx, insertVideo); err != nil {
 		return nil, fmt.Errorf("error preparing query InsertVideo: %w", err)
 	}
-	if q.updateVideoStatusStmt, err = db.PrepareContext(ctx, updateVideoStatus); err != nil {
-		return nil, fmt.Errorf("error preparing query UpdateVideoStatus: %w", err)
+	if q.markVideoAsPublishedStmt, err = db.PrepareContext(ctx, markVideoAsPublished); err != nil {
+		return nil, fmt.Errorf("error preparing query MarkVideoAsPublished: %w", err)
 	}
 	return &q, nil
 }
@@ -179,9 +179,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getAllPlaylistsForUserStmt: %w", cerr)
 		}
 	}
-	if q.getAllVideosForUserStmt != nil {
-		if cerr := q.getAllVideosForUserStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getAllVideosForUserStmt: %w", cerr)
+	if q.getAllPublishedVideosForUserStmt != nil {
+		if cerr := q.getAllPublishedVideosForUserStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getAllPublishedVideosForUserStmt: %w", cerr)
 		}
 	}
 	if q.getAllVideosInPlaylistStmt != nil {
@@ -224,9 +224,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing insertVideoStmt: %w", cerr)
 		}
 	}
-	if q.updateVideoStatusStmt != nil {
-		if cerr := q.updateVideoStatusStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing updateVideoStatusStmt: %w", cerr)
+	if q.markVideoAsPublishedStmt != nil {
+		if cerr := q.markVideoAsPublishedStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing markVideoAsPublishedStmt: %w", cerr)
 		}
 	}
 	return err
@@ -283,7 +283,7 @@ type Queries struct {
 	deleteVideoByIdForUserStmt           *sql.Stmt
 	deleteVideoFromPlaylistStmt          *sql.Stmt
 	getAllPlaylistsForUserStmt           *sql.Stmt
-	getAllVideosForUserStmt              *sql.Stmt
+	getAllPublishedVideosForUserStmt     *sql.Stmt
 	getAllVideosInPlaylistStmt           *sql.Stmt
 	getAllVideosInWatchlatersForUserStmt *sql.Stmt
 	getPlaylistForUserStmt               *sql.Stmt
@@ -292,7 +292,7 @@ type Queries struct {
 	insertIntoWatchlatersStmt            *sql.Stmt
 	insertPlaylistStmt                   *sql.Stmt
 	insertVideoStmt                      *sql.Stmt
-	updateVideoStatusStmt                *sql.Stmt
+	markVideoAsPublishedStmt             *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -314,7 +314,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		deleteVideoByIdForUserStmt:           q.deleteVideoByIdForUserStmt,
 		deleteVideoFromPlaylistStmt:          q.deleteVideoFromPlaylistStmt,
 		getAllPlaylistsForUserStmt:           q.getAllPlaylistsForUserStmt,
-		getAllVideosForUserStmt:              q.getAllVideosForUserStmt,
+		getAllPublishedVideosForUserStmt:     q.getAllPublishedVideosForUserStmt,
 		getAllVideosInPlaylistStmt:           q.getAllVideosInPlaylistStmt,
 		getAllVideosInWatchlatersForUserStmt: q.getAllVideosInWatchlatersForUserStmt,
 		getPlaylistForUserStmt:               q.getPlaylistForUserStmt,
@@ -323,6 +323,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		insertIntoWatchlatersStmt:            q.insertIntoWatchlatersStmt,
 		insertPlaylistStmt:                   q.insertPlaylistStmt,
 		insertVideoStmt:                      q.insertVideoStmt,
-		updateVideoStatusStmt:                q.updateVideoStatusStmt,
+		markVideoAsPublishedStmt:             q.markVideoAsPublishedStmt,
 	}
 }

@@ -53,15 +53,6 @@ func New(db *sql.DB, s3 *s3.Client, redis *redis.Client, logger *slog.Logger) *S
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 		),
 	)
-	service.workerManager.RegisterWorker(
-		workers.NewWorker(
-			"expired uploads cleanup",
-			service.expiredUploadsCleanupJob,
-			workers.WithSchedules(workers.DailyAt(2, 0)),
-			workers.WithTimeout(5*time.Minute),
-			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
-		),
-	)
 
 	return service
 }
@@ -75,6 +66,13 @@ func (me *Service) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
+
+type VideoStatus string
+
+const (
+	VideoStatusUploading VideoStatus = "uploading"
+	VideoStatusUploaded  VideoStatus = "uploaded"
+)
 
 const (
 	videosBucket              = "videos"
@@ -134,17 +132,18 @@ func (me *Service) GeneratePresignedPutUrls(ctx context.Context, videoId uuid.UU
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if err := qtx.InsertObjectKey(ctx, queries.InsertObjectKeyParams{
-		VideoId:   videoId,
+	if err := qtx.InsertVideo(ctx, queries.InsertVideoParams{
+		Id:        videoId,
 		ObjectKey: objectKey,
+		Status:    string(VideoStatusUploading),
 	}); err != nil {
 		me.abortUploadWithErrorLogging(ctx, objectKey, uploadId)
-		return nil, fmt.Errorf("failed to insert object key: %w", err)
+		return nil, fmt.Errorf("failed to insert video: %w", err)
 	}
 
 	if err := qtx.InsertUpload(ctx, queries.InsertUploadParams{
 		Id:        uploadId,
-		ObjectKey: objectKey,
+		VideoId:   videoId,
 		ExpiresAt: time.Now().Add(presignedUploadExpiration),
 	}); err != nil {
 		me.abortUploadWithErrorLogging(ctx, objectKey, uploadId)
@@ -179,12 +178,31 @@ type CompleteUploadPart struct {
 }
 
 func (me *Service) CompleteUpload(ctx context.Context, videoId uuid.UUID, uploadId string, parts []CompleteUploadPart) error {
-	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	objectKey, err := qtx.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrObjectNotFound
 		}
 		return fmt.Errorf("failed to get object key: %w", err)
+	}
+
+	upload, err := qtx.GetUploadForVideo(ctx, videoId)
+	if err != nil {
+		return fmt.Errorf("failed to check unexpired upload for video: %w", err)
+	}
+
+	if upload.CompletedAt.Valid {
+		return ErrUploadAlreadyCompleted
+	}
+	if !upload.ExpiresAt.After(time.Now()) {
+		return ErrUploadExpired
 	}
 
 	completedParts := make([]types.CompletedPart, 0, len(parts))
@@ -217,16 +235,27 @@ func (me *Service) CompleteUpload(ctx context.Context, videoId uuid.UUID, upload
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	if err := me.queries.DeleteUpload(ctx, uploadId); err != nil {
+	if err := qtx.MarkUploadAsCompleted(ctx, videoId); err != nil {
 		return fmt.Errorf("failed to delete upload: %w", err)
 	}
 
-	payload, err := json.Marshal(events.VideoUploadedEventPayload{VideoId: videoId})
-	if err != nil {
-		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoUploadedEvent, err)
+	if err := qtx.UpdateVideoStatus(ctx, queries.UpdateVideoStatusParams{
+		Id:     videoId,
+		Status: string(VideoStatusUploaded),
+	}); err != nil {
+		return fmt.Errorf("failed to update video status: %w", err)
 	}
-	if err := me.redis.Publish(ctx, events.VideoUploadedEvent, payload).Err(); err != nil {
-		return fmt.Errorf("failed to publish %q event: %w", events.VideoUploadedEvent, err)
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	payload, err := json.Marshal(events.VideoIsReadyEventPayload{VideoId: videoId})
+	if err != nil {
+		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoIsReadyEvent, err)
+	}
+	if err := me.redis.Publish(ctx, events.VideoIsReadyEvent, payload).Err(); err != nil {
+		return fmt.Errorf("failed to publish %q event: %w", events.VideoIsReadyEvent, err)
 	}
 
 	return nil
@@ -279,36 +308,36 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
+				upload, err := qtx.GetUploadForVideo(ctx, payload.VideoId)
+				if err != nil {
+					return fmt.Errorf("failed to get upload for object: %w", err)
+				}
+
 				objectKey, err := qtx.GetObjectKeyForVideo(ctx, payload.VideoId)
 				if err != nil {
 					return fmt.Errorf("failed to get object key for video: %w", err)
 				}
 
-				if uploadId, err := qtx.GetUploadIdForObject(ctx, objectKey); err != nil {
-					if errors.Is(err, sql.ErrNoRows) {
-						// Not found; Upload finished or expired. Try deleting the object in case upload finished.
-						if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
-							Bucket: aws.String(videosBucket),
-							Key:    aws.String(objectKey),
-						}); err != nil {
-							// DeleteObject never returns NoSuchKey in S3.
-							return fmt.Errorf("failed to delete S3 object: %w", err)
-						}
-					} else {
-						return fmt.Errorf("failed to get upload for object: %w", err)
+				if upload.CompletedAt.Valid {
+					if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+						Bucket: aws.String(videosBucket),
+						Key:    aws.String(objectKey),
+					}); err != nil {
+						// DeleteObject never returns NoSuchKey in S3.
+						return fmt.Errorf("failed to delete S3 object: %w", err)
 					}
-				} else {
+				} else if upload.ExpiresAt.After(time.Now()) {
 					if _, err := me.s3.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 						Bucket:   aws.String(videosBucket),
 						Key:      aws.String(objectKey),
-						UploadId: aws.String(uploadId),
+						UploadId: aws.String(upload.Id),
 					}); err != nil {
 						return fmt.Errorf("failed to abort multipart upload: %w", err)
 					}
 				}
 
-				if err := qtx.DeleteObjectKeyForVideo(ctx, payload.VideoId); err != nil {
-					return fmt.Errorf("failed to delete object key for video: %w", err)
+				if err := qtx.DeleteVideoById(ctx, payload.VideoId); err != nil {
+					return fmt.Errorf("failed to delete video by id: %w", err)
 				}
 
 				if err := tx.Commit(); err != nil {
@@ -324,39 +353,4 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		}
 	}
-}
-
-func (me *Service) expiredUploadsCleanupJob(ctx context.Context) error {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	objectKyes, err := qtx.DeleteExpiredUploads(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to delete expired uploads: %w", err)
-	}
-
-	deletedVideoIds, err := qtx.DeleteObjectKeysInList(ctx, objectKyes)
-	if err != nil {
-		return fmt.Errorf("failed to delete object keys in list: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	for _, id := range deletedVideoIds {
-		payload, err := json.Marshal(events.UploadExpiredEventPayload{VideoId: id})
-		if err != nil {
-			return fmt.Errorf("failed to marshal %q event payload: %w", events.UploadExpiredEvent, err)
-		}
-		if err := me.redis.Publish(ctx, events.UploadExpiredEvent, payload).Err(); err != nil {
-			return fmt.Errorf("failed to publish %q event: %w", events.UploadExpiredEvent, err)
-		}
-	}
-
-	return nil
 }

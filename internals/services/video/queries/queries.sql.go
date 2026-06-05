@@ -56,16 +56,16 @@ func (q *Queries) CheckPlaylistForUser(ctx context.Context, arg CheckPlaylistFor
 }
 
 const checkVideo = `-- name: CheckVideo :one
-select exists (select 1 from video_service.videos where id = $1 and status = $2 for update)
+select exists (select 1 from video_service.videos where id = $1 and is_published = $2 for update)
 `
 
 type CheckVideoParams struct {
-	Id     uuid.UUID
-	Status string
+	Id          uuid.UUID
+	IsPublished bool
 }
 
 func (q *Queries) CheckVideo(ctx context.Context, arg CheckVideoParams) (bool, error) {
-	row := q.queryRow(ctx, q.checkVideoStmt, checkVideo, arg.Id, arg.Status)
+	row := q.queryRow(ctx, q.checkVideoStmt, checkVideo, arg.Id, arg.IsPublished)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -192,17 +192,17 @@ func (q *Queries) DeleteVideoById(ctx context.Context, id uuid.UUID) error {
 }
 
 const deleteVideoByIdForUser = `-- name: DeleteVideoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2 and status = $3
+delete from video_service.videos where id = $1 and owner_id = $2 and is_published = $3
 `
 
 type DeleteVideoByIdForUserParams struct {
-	Id      uuid.UUID
-	OwnerId uuid.UUID
-	Status  string
+	Id          uuid.UUID
+	OwnerId     uuid.UUID
+	IsPublished bool
 }
 
 func (q *Queries) DeleteVideoByIdForUser(ctx context.Context, arg DeleteVideoByIdForUserParams) (int64, error) {
-	result, err := q.exec(ctx, q.deleteVideoByIdForUserStmt, deleteVideoByIdForUser, arg.Id, arg.OwnerId, arg.Status)
+	result, err := q.exec(ctx, q.deleteVideoByIdForUserStmt, deleteVideoByIdForUser, arg.Id, arg.OwnerId, arg.IsPublished)
 	if err != nil {
 		return 0, err
 	}
@@ -267,17 +267,12 @@ func (q *Queries) GetAllPlaylistsForUser(ctx context.Context, ownerID uuid.UUID)
 	return items, nil
 }
 
-const getAllVideosForUser = `-- name: GetAllVideosForUser :many
-select id, owner_id, title, description, created_at, status from video_service.videos where owner_id = $1 and status = $2
+const getAllPublishedVideosForUser = `-- name: GetAllPublishedVideosForUser :many
+select id, owner_id, title, description, created_at, is_published from video_service.videos where owner_id = $1 and is_published = true
 `
 
-type GetAllVideosForUserParams struct {
-	OwnerId uuid.UUID
-	Status  string
-}
-
-func (q *Queries) GetAllVideosForUser(ctx context.Context, arg GetAllVideosForUserParams) ([]VideoServiceVideo, error) {
-	rows, err := q.query(ctx, q.getAllVideosForUserStmt, getAllVideosForUser, arg.OwnerId, arg.Status)
+func (q *Queries) GetAllPublishedVideosForUser(ctx context.Context, ownerID uuid.UUID) ([]VideoServiceVideo, error) {
+	rows, err := q.query(ctx, q.getAllPublishedVideosForUserStmt, getAllPublishedVideosForUser, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +286,7 @@ func (q *Queries) GetAllVideosForUser(ctx context.Context, arg GetAllVideosForUs
 			&i.Title,
 			&i.Description,
 			&i.CreatedAt,
-			&i.Status,
+			&i.IsPublished,
 		); err != nil {
 			return nil, err
 		}
@@ -307,7 +302,7 @@ func (q *Queries) GetAllVideosForUser(ctx context.Context, arg GetAllVideosForUs
 }
 
 const getAllVideosInPlaylist = `-- name: GetAllVideosInPlaylist :many
-select v.id, v.owner_id, v.title, v.description, v.created_at, v.status
+select v.id, v.owner_id, v.title, v.description, v.created_at, v.is_published
 from video_service.playlist_videos pv
 join video_service.videos v on v.id = pv.video_id
 where pv.playlist_id = $1
@@ -329,7 +324,7 @@ func (q *Queries) GetAllVideosInPlaylist(ctx context.Context, playlistID uuid.UU
 			&i.Title,
 			&i.Description,
 			&i.CreatedAt,
-			&i.Status,
+			&i.IsPublished,
 		); err != nil {
 			return nil, err
 		}
@@ -345,7 +340,7 @@ func (q *Queries) GetAllVideosInPlaylist(ctx context.Context, playlistID uuid.UU
 }
 
 const getAllVideosInWatchlatersForUser = `-- name: GetAllVideosInWatchlatersForUser :many
-select v.id, v.owner_id, v.title, v.description, v.created_at, v.status
+select v.id, v.owner_id, v.title, v.description, v.created_at, v.is_published
 from video_service.watchlaters wl
 join video_service.videos v on v.id = wl.video_id and v.owner_id = wl.user_id
 where wl.user_id = $1
@@ -367,7 +362,7 @@ func (q *Queries) GetAllVideosInWatchlatersForUser(ctx context.Context, userID u
 			&i.Title,
 			&i.Description,
 			&i.CreatedAt,
-			&i.Status,
+			&i.IsPublished,
 		); err != nil {
 			return nil, err
 		}
@@ -412,16 +407,11 @@ func (q *Queries) GetPlaylistForUser(ctx context.Context, arg GetPlaylistForUser
 }
 
 const getVideoById = `-- name: GetVideoById :one
-select id, owner_id, title, description, created_at, status from video_service.videos where id = $1 and status = $2 for update
+select id, owner_id, title, description, created_at, is_published from video_service.videos where id = $1 for update
 `
 
-type GetVideoByIdParams struct {
-	Id     uuid.UUID
-	Status string
-}
-
-func (q *Queries) GetVideoById(ctx context.Context, arg GetVideoByIdParams) (VideoServiceVideo, error) {
-	row := q.queryRow(ctx, q.getVideoByIdStmt, getVideoById, arg.Id, arg.Status)
+func (q *Queries) GetVideoById(ctx context.Context, id uuid.UUID) (VideoServiceVideo, error) {
+	row := q.queryRow(ctx, q.getVideoByIdStmt, getVideoById, id)
 	var i VideoServiceVideo
 	err := row.Scan(
 		&i.Id,
@@ -429,7 +419,7 @@ func (q *Queries) GetVideoById(ctx context.Context, arg GetVideoByIdParams) (Vid
 		&i.Title,
 		&i.Description,
 		&i.CreatedAt,
-		&i.Status,
+		&i.IsPublished,
 	)
 	return i, err
 }
@@ -478,7 +468,7 @@ func (q *Queries) InsertPlaylist(ctx context.Context, arg InsertPlaylistParams) 
 }
 
 const insertVideo = `-- name: InsertVideo :exec
-insert into video_service.videos (id, owner_id, title, description, status) values ($1, $2, $3, $4, $5)
+insert into video_service.videos (id, owner_id, title, description) values ($1, $2, $3, $4)
 `
 
 type InsertVideoParams struct {
@@ -486,7 +476,6 @@ type InsertVideoParams struct {
 	OwnerId     uuid.UUID
 	Title       string
 	Description sql.NullString
-	Status      string
 }
 
 func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error {
@@ -495,23 +484,17 @@ func (q *Queries) InsertVideo(ctx context.Context, arg InsertVideoParams) error 
 		arg.OwnerId,
 		arg.Title,
 		arg.Description,
-		arg.Status,
 	)
 	return err
 }
 
-const updateVideoStatus = `-- name: UpdateVideoStatus :exec
+const markVideoAsPublished = `-- name: MarkVideoAsPublished :exec
 update video_service.videos
-set status = $1
-where id = $2
+set is_published = true
+where id = $1
 `
 
-type UpdateVideoStatusParams struct {
-	Status string
-	Id     uuid.UUID
-}
-
-func (q *Queries) UpdateVideoStatus(ctx context.Context, arg UpdateVideoStatusParams) error {
-	_, err := q.exec(ctx, q.updateVideoStatusStmt, updateVideoStatus, arg.Status, arg.Id)
+func (q *Queries) MarkVideoAsPublished(ctx context.Context, id uuid.UUID) error {
+	_, err := q.exec(ctx, q.markVideoAsPublishedStmt, markVideoAsPublished, id)
 	return err
 }

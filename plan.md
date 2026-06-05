@@ -1,5 +1,15 @@
 # Implementation Plan
 
+- [x] move video state to media service
+- [x] add is_published column to video_service.videos
+- [ ] add follow & feed system
+- [ ] use hyperscript for client side
+- [ ] refactor comments section in video page
+- [ ] redesign video upload
+- [ ] add profile avatar
+- [ ] add search: https://share.google/aimode/9BQA5GdefK2uEFli5
+- [ ] add explore & recommendations system
+
 A staged, event-driven backend using schema-per-service architecture.
 
 ---
