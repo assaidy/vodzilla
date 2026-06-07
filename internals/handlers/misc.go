@@ -29,8 +29,8 @@ func WithLogging(c fiber.Ctx) error {
 			"error", err,
 		)
 
-	// I don't return handlers chain error intentionally.
-	// All errors were handled and request was finalized in [WithErrorResolver].
+	// Handler error is intentionally not returned.
+	// All errors are handled and the request is finalized in [WithErrorResolver].
 	return nil
 }
 
@@ -46,14 +46,21 @@ func WithErrorResolver(c fiber.Ctx) error {
 	}
 	c.Status(code)
 
+	var writeErr error
 	if code == fiber.StatusInternalServerError {
-		// Hide internal error from client; It has been catched by [WithLogging].
-		render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
+		// Hide internal error from client; it will be caught by [WithLogging].
+		writeErr = render(c, templates.Alert(templates.AlertError, "We had a server error. Please try again later."))
 	} else {
-		c.SendString(err.Error())
+		writeErr = c.SendString(err.Error())
 	}
 
-	// Pass error to logger.
+	// Log write error without passing it to logger middleware;
+	// we only want [WithLogging] to log the handler error.
+	if writeErr != nil {
+		fiber.MustGetState[*slog.Logger](c.App().State(), "logger").
+			Error("failed to write error response", "error", writeErr)
+	}
+
 	return err
 }
 
@@ -89,24 +96,34 @@ func HandleWebsocket(c *websocket.Conn) {
 	defer sub.Close()
 	subChan := sub.Channel()
 
+	doneChan := make(chan struct{})
+	defer close(doneChan)
+
+	logger := fiber.MustGetState[*slog.Logger](app.State(), "logger")
+
 	wsReadChan := make(chan []byte, 100)
-	defer close(wsReadChan)
 	wsClosedChan := make(chan struct{})
 
 	go func() {
 		for {
+			close(wsClosedChan)
+			close(wsReadChan)
+
 			_, msg, err := c.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err) {
-					close(wsClosedChan)
 					return
 				} else {
-					fiber.MustGetState[*slog.Logger](app.State(), "logger").
-						Error("failed to read websocket message", "error", err)
+					logger.Error("failed to read websocket message", "error", err)
 					continue
 				}
 			}
-			wsReadChan <- msg
+
+			select {
+			case <-doneChan:
+				return
+			case wsReadChan <- msg:
+			}
 		}
 	}()
 
@@ -121,8 +138,7 @@ func HandleWebsocket(c *websocket.Conn) {
 				return
 			}
 			if err := c.WriteMessage(websocket.TextMessage, []byte(msg.Payload)); err != nil {
-				fiber.MustGetState[*slog.Logger](app.State(), "logger").
-					Error("failed to write websocket message", "error", err)
+				logger.Error("failed to write websocket message", "error", err)
 			}
 		}
 	}
