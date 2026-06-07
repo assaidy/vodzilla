@@ -3,3 +3,6 @@ bin/
 plan.md
 AGENTS.md
 seed_videos/
+
+# sqlc generated code
+**/queries/
