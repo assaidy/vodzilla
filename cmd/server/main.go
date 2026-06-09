@@ -28,6 +28,7 @@ import (
 )
 
 // TODO: add profile avatar upload
+// TODO: use github.com/assaidy/lucide pacakge for lucide icons
 
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 // TODO: rethink all cleanup workers and deletion of data. we might need data.
@@ -75,7 +76,10 @@ func main() {
 		reaction_service.Name,
 		reaction_service.New(postgres, redis, logger.WithGroup("reaction service")),
 	)
-	registry.AddServiceWithInjection(social_service.Name, social_service.New())
+	registry.AddServiceWithInjection(
+		social_service.Name,
+		social_service.New(postgres, redis, logger.WithGroup("social service")),
+	)
 	registry.AddServiceWithInjection(search_service.Name, search_service.New())
 	registry.AddServiceWithInjection(feed_service.Name, feed_service.New())
 	registry.AddServiceWithInjection(history_service.Name, history_service.New())

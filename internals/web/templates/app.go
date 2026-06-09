@@ -192,11 +192,15 @@ func ProfilePage(username string, profileUsername string) HyperNode {
 }
 
 type ProfilePageContentParams struct {
-	Name     string
-	Username string
-	Bio      string
-	IsOwner  bool
-	Videos   []VideoCardParams
+	OwnerId        uuid.UUID
+	Name           string
+	Username       string
+	Bio            string
+	IsOwner        bool
+	Videos         []VideoCardParams
+	FollowersCount uint
+	PostsCount     uint
+	IsFollowed     bool
 }
 
 func ProfilePageContent(params ProfilePageContentParams) HyperNode {
@@ -204,12 +208,22 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 		// profile card ==================================================
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col md:flex-row overflow-hidden"))(
 			profileCardAvatarPlaceholder(),
-			DIV(AttrClass("p-4"))(
-				H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold"))(params.Name),
-				P(AttrId("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
+			DIV(AttrClass("p-4 min-w-0"))(
+				DIV(AttrClass("flex items-start justify-between gap-2"))(
+					DIV(AttrClass("min-w-0 flex-1"))(
+						H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold truncate"))(params.Name),
+						P(AttrId("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
+					),
+					If(!params.IsOwner,
+						FollowButton(FollowButtonParams{
+							ProfileOwnerId: params.OwnerId,
+							IsFollowed:     params.IsFollowed,
+						}),
+					),
+				),
 				DIV(AttrClass("mt-2 flex gap-6"))(
-					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" following")),
-					P()(SPAN(AttrClass("font-bold"))("0"), SPAN(AttrClass("text-base-content/60"))(" followers")),
+					P()(SPAN(AttrClass("font-bold"))(params.FollowersCount), SPAN(AttrClass("text-base-content/60"))(" followers")),
+					P()(SPAN(AttrClass("font-bold"))(params.PostsCount), SPAN(AttrClass("text-base-content/60"))(" posts")),
 				),
 				P(AttrId("PROFILE_CARD_BIO"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
 			),
@@ -257,7 +271,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 				),
 			),
 		).Else(
-			// profiel viewer actions ==================================================
+			// profile viewer actions ==================================================
 			Group(),
 		),
 
@@ -265,6 +279,36 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 		profileVideosContainer(profileVideosParams{
 			videoCards: params.Videos,
 		}),
+	)
+}
+
+type FollowButtonParams struct {
+	ProfileOwnerId uuid.UUID
+	IsFollowed     bool
+}
+
+func FollowButton(params FollowButtonParams) HyperNode {
+	return DIV(AttrId("FOLLOW_BUTTON"))(
+		If(params.IsFollowed,
+			BUTTON(
+				AttrClass("btn btn-outline btn-accent hover:btn-error group/follow"),
+				Attr("hx-delete", fmt.Sprintf("/follow/%s", params.ProfileOwnerId)),
+				Attr("hx-target", "#FOLLOW_BUTTON"),
+				Attr("hx-swap", "outerHTML"),
+				Attr("hx-disable", "this"),
+			)(
+				SPAN(AttrClass("group-hover/follow:hidden"))("Following"),
+				SPAN(AttrClass("hidden group-hover/follow:inline"))("Unfollow"),
+			),
+		).Else(
+			BUTTON(
+				AttrClass("btn btn-accent"),
+				Attr("hx-post", fmt.Sprintf("/follow/%s", params.ProfileOwnerId)),
+				Attr("hx-target", "#FOLLOW_BUTTON"),
+				Attr("hx-swap", "outerHTML"),
+				Attr("hx-disable", "this"),
+			)("Follow"),
+		),
 	)
 }
 
@@ -485,6 +529,7 @@ func VideoPage(username string, videoId uuid.UUID) HyperNode {
 
 type VideoPageContentParams struct {
 	Id                       uuid.UUID
+	OwnerId                  uuid.UUID
 	OwnerName                string
 	OwnerUsername            string
 	SourceUrl                string
@@ -493,6 +538,7 @@ type VideoPageContentParams struct {
 	Timestamp                time.Time
 	ViewsCount               int
 	CurrentUserId            uuid.UUID
+	IsFollowed               bool
 	ReactionsParams          ReactionsWidgetParams
 	WatchLaterButtonParams   WatchLaterButtonParams
 	AddToPlaylistModalParams AddToPlaylistModalParams
@@ -527,6 +573,13 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				),
 				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
 					params.OwnerName,
+				),
+
+				If(params.CurrentUserId != params.OwnerId,
+					FollowButton(FollowButtonParams{
+						ProfileOwnerId: params.OwnerId,
+						IsFollowed:     params.IsFollowed,
+					}),
 				),
 
 				// like,dislike

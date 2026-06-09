@@ -35,3 +35,11 @@ sql:
       go:
         <<: *go-base
         out: "./internals/services/reaction/queries/"
+
+  - engine: "postgresql"
+    schema: "./internals/services/social/db/migrations/"
+    queries: "./internals/services/social/db/queries.sql"
+    gen:
+      go:
+        <<: *go-base
+        out: "./internals/services/social/queries/"

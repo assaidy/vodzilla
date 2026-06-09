@@ -318,15 +318,15 @@ func VideoCard(params VideoCardParams) HyperNode {
 	}
 
 	return DIV(
-		AttrClass("card bg-base-100 transition-shadow duration-200 cursor-pointer"),
+		AttrClass("card bg-base-100 cursor-pointer"),
 		Attr("hx-get", fmt.Sprintf("%s/content", videoPageLink)),
 		Attr("hx-push-url", videoPageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 	)(
-		FIGURE(AttrClass("relative aspect-video overflow-hidden group"))(
-			DIV(AttrClass("w-full h-full transition-transform duration-200 group-hover:scale-105"))(
+		FIGURE(AttrClass("relative aspect-video overflow-hidden"))(
+			DIV(AttrClass("w-full h-full"))(
 				If(params.ThumbnailUrl != "",
 					IMG(
 						AttrClass("w-full h-full object-cover"),
@@ -335,9 +335,6 @@ func VideoCard(params VideoCardParams) HyperNode {
 				).Else(
 					videoCardThumbnailPlaceholder(),
 				),
-			),
-			DIV(AttrClass("absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"))(
-				RawText(`<svg class="w-12 h-12 text-white drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`),
 			),
 		),
 		DIV(AttrClass("card-body flex flex-row gap-3 p-3"))(

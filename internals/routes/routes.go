@@ -48,6 +48,9 @@ func RegisterRoutes(app *fiber.App) {
 	app.Put("/profiles", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleEditProfile)
 	// TODO: edit account: email, password, delete account
 
+	app.Post("/follow/:id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleFollow)
+	app.Delete("/follow/:id", handlers.WithSession, handlers.WithCsrfToken, handlers.HandleUnfollow)
+
 	app.Post("/videos", handlers.WithSession, handlers.WithCsrfToken, handlers.HandlePostVideo)
 	app.Post("/videos/complete_upload", handlers.WithSession, handlers.HandleCompleteVideoUpload)
 	app.Get("/videos/:video_id", handlers.WithSession, handlers.HandleVideoPage)

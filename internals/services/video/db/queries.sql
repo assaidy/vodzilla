@@ -12,6 +12,9 @@ where id = $1;
 -- name: GetAllPublishedVideosForUser :many
 select * from video_service.videos where owner_id = $1 and is_published = true;
 
+-- name: GetPublishedVideosCountForUser :one
+select count(*) from video_service.videos where owner_id = $1 and is_published = true;
+
 -- name: CheckVideo :one
 select exists (select 1 from video_service.videos where id = $1 and is_published = $2 for update);
 

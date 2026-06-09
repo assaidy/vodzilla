@@ -150,8 +150,17 @@ func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, erro
 	}, nil
 }
 
-func (me *Service) GetAllUserVideos(ctx context.Context, id uuid.UUID) ([]Video, error) {
-	videos, err := me.queries.GetAllPublishedVideosForUser(ctx, id)
+func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (uint, error) {
+	n, err := me.queries.GetPublishedVideosCountForUser(ctx, userId)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get videos count for user: %w", err)
+	}
+
+	return uint(n), nil
+}
+
+func (me *Service) GetAllVideosForUser(ctx context.Context, userId uuid.UUID) ([]Video, error) {
+	videos, err := me.queries.GetAllPublishedVideosForUser(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all published videos for user: %w", err)
 	}

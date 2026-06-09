@@ -8,6 +8,7 @@ import (
 	"github.com/assaidy/hyper/v2"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
+	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -232,7 +233,12 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 	}
 
 	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videos, err := videoService.GetAllUserVideos(c.RequestCtx(), profileUser.Id)
+	videosCount, err := videoService.GetVideosCountForUser(c.RequestCtx(), profileUser.Id)
+	if err != nil {
+		return err
+	}
+
+	videos, err := videoService.GetAllVideosForUser(c.RequestCtx(), profileUser.Id)
 	if err != nil {
 		return err
 	}
@@ -256,13 +262,28 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 		})
 	}
 
+	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
+	followersCount, err := socialService.GetFollowersCount(c.RequestCtx(), profileUser.Id)
+	if err != nil {
+		return err
+	}
+
+	isFollowed, err := socialService.IsFollower(c.RequestCtx(), currentUser.Id, profileUser.Id)
+	if err != nil {
+		return err
+	}
+
 	return render(c, hyper.Group(
 		templates.ProfilePageContent(templates.ProfilePageContentParams{
-			Username: profileUser.Username,
-			Name:     profileUser.Name,
-			Bio:      profileUser.Bio,
-			IsOwner:  profileUser.Username == currentUser.Username,
-			Videos:   templateVideos,
+			OwnerId:        profileUser.Id,
+			Username:       profileUser.Username,
+			Name:           profileUser.Name,
+			Bio:            profileUser.Bio,
+			IsOwner:        profileUser.Username == currentUser.Username,
+			Videos:         templateVideos,
+			FollowersCount: followersCount,
+			PostsCount:     videosCount,
+			IsFollowed:     isFollowed,
 		}),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
@@ -445,9 +466,16 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		})
 	}
 
+	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
+	isFollowed, err := socialService.IsFollower(c.RequestCtx(), currentUser.Id, video.OwnerId)
+	if err != nil {
+		return err
+	}
+
 	return render(c, hyper.Group(
 		templates.VideoPageContent(templates.VideoPageContentParams{
 			Id:            video.Id,
+			OwnerId:       video.OwnerId,
 			OwnerName:     owner.Name,
 			OwnerUsername: owner.Username,
 			SourceUrl:     sourceUrl,
@@ -456,6 +484,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
 			CurrentUserId: currentUser.Id,
+			IsFollowed:    isFollowed,
 			ReactionsParams: templates.ReactionsWidgetParams{
 				VideoId:       videoId,
 				LikesCount:    reactionCounts.Likes,
