@@ -9,9 +9,12 @@ import (
 func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
+
+	me.videoLock(videoId)
+	defer me.videoUnlock(videoId)
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
@@ -34,7 +37,7 @@ const (
 func (me *Handler) HandleAddVideoReaction(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 	kind := c.Query("kind")
@@ -42,6 +45,9 @@ func (me *Handler) HandleAddVideoReaction(c fiber.Ctx) error {
 	if kind != ReactionLike && kind != ReactionDislike {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid reaction kind")
 	}
+
+	me.videoLock(videoId)
+	defer me.videoUnlock(videoId)
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
@@ -70,7 +76,7 @@ func (me *Handler) HandleAddVideoReaction(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteVideoReaction(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 	kind := c.Query("kind")

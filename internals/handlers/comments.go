@@ -18,9 +18,15 @@ import (
 func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
 
 	comments, err := me.reactionService.GetAllVideoComments(c.RequestCtx(), videoId)
 	if err != nil {
@@ -59,18 +65,18 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "comment not found")
 	}
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	replies, err := me.reactionService.GetAllCommentReplies(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "comment not found")
 		}
 		return err
 	}
@@ -107,7 +113,7 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
@@ -120,7 +126,7 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 		if parentIdStr != "" {
 			pId, err = uuid.Parse(parentIdStr)
 			if err != nil {
-				return fiber.ErrNotFound
+				return fiber.NewError(fiber.StatusNotFound, "parent comment not found")
 			}
 		}
 		return render(c, templates.CreateCommentForm(templates.CreateCommentFormParams{
@@ -135,14 +141,23 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 	if parentIdStr != "" {
 		parentId, err = uuid.Parse(parentIdStr)
 		if err != nil {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "parent comment not found")
 		}
+	}
+
+	me.videoLock(videoId)
+	defer me.videoUnlock(videoId)
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
 	commentId, err := me.reactionService.CreateComment(c.RequestCtx(), videoId, userId, content, parentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrParentCommentNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "parent comment not found")
 		}
 		return err
 	}
@@ -182,11 +197,11 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "comment not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
@@ -204,7 +219,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 
 	if err := me.reactionService.EditComment(c.RequestCtx(), userId, commentId, content); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "comment not found")
 		}
 		return err
 	}
@@ -228,13 +243,13 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "comment not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.reactionService.DeleteComment(c.RequestCtx(), userId, commentId); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "comment not found")
 		}
 		return err
 	}

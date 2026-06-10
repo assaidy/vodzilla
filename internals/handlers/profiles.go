@@ -106,7 +106,7 @@ func (me *Handler) getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User
 	profileUser, err := me.userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
-			return nil, nil, fiber.ErrNotFound
+			return nil, nil, fiber.NewError(fiber.StatusNotFound, "user not found")
 		}
 		return nil, nil, fmt.Errorf("failed to get profile user: %w", err)
 	}
@@ -177,8 +177,8 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.UserLock(currentUserId)
-	defer me.UserUnlock(currentUserId)
+	me.userLock(currentUserId)
+	defer me.userUnlock(currentUserId)
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {

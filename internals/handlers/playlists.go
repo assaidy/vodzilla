@@ -73,11 +73,11 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
@@ -99,11 +99,11 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
@@ -181,7 +181,7 @@ func (me *Handler) HandlePlaylistDetailPage(c fiber.Ctx) error {
 
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
 
 	return render(c, templates.PlaylistDetailPage(currentUser.Username, playlistId))
@@ -195,13 +195,13 @@ func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
 
 	playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 		}
 		return err
 	}
@@ -209,7 +209,7 @@ func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 	videos, err := me.videoService.GetAllVideosInPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 		}
 		return err
 	}

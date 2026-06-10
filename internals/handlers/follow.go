@@ -15,11 +15,11 @@ import (
 func (me *Handler) HandleFollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
+		return fiber.NewError(fiber.StatusNotFound, "user not found")
 	}
 
-	me.UserLock(userId)
-	defer me.UserUnlock(userId)
+	me.userLock(userId)
+	defer me.userUnlock(userId)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -49,14 +49,14 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
+		return fiber.NewError(fiber.StatusNotFound, "user not found")
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.socialService.Unfollow(c.RequestCtx(), currentUserId, userId); err != nil {
 		if errors.Is(err, social_service.ErrNotFollowing) {
-			return fiber.NewError(fiber.StatusNotFound, "user not followed")
+			return fiber.NewError(fiber.StatusNotFound, "not following")
 		}
 		return err
 	}

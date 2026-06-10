@@ -14,7 +14,7 @@ import (
 func (me *Handler) HandleAddToWatchLater(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
@@ -37,7 +37,7 @@ func (me *Handler) HandleAddToWatchLater(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 

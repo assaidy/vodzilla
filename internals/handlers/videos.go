@@ -135,7 +135,7 @@ func (me *Handler) HandleVideoPage(c fiber.Ctx) error {
 
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
 	return render(c, templates.VideoPage(currentUser.Username, videoId))
@@ -144,13 +144,13 @@ func (me *Handler) HandleVideoPage(c fiber.Ctx) error {
 func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
 	video, err := me.videoService.GetVideoById(c.RequestCtx(), videoId)
 	if err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
 		}
 		return err
 	}
@@ -158,7 +158,7 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 	owner, err := me.userService.GetUserById(c.RequestCtx(), video.OwnerId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
-			return fiber.ErrNotFound
+			return fiber.NewError(fiber.StatusNotFound, "video owner not found")
 		}
 		return err
 	}
@@ -252,16 +252,37 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.ErrNotFound
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
 	url, err := me.mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
 	if err != nil {
 		if errors.Is(err, media_service.ErrObjectNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "video not found")
+			return fiber.NewError(fiber.StatusNotFound, "video source not found")
 		}
 		return err
 	}
 
 	return c.JSON(fiber.Map{"url": url})
+}
+
+// TODO: add route for this.
+func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	me.videoLock(videoId)
+	defer me.videoUnlock(videoId)
+
+	if err := me.videoService.DeleteVideo(c.RequestCtx(), videoId, currentUserId); err != nil {
+		if errors.Is(err, user_service.ErrUserNotFound) {
+			return redirect(c, "/login")
+		}
+		return err
+	}
+
+	return redirect(c, "/login")
 }
