@@ -190,3 +190,21 @@ func WithCsrfToken(c fiber.Ctx) error {
 
 	return c.Next()
 }
+
+// TODO: add a route for this
+func HandleDeleteProfile(c fiber.Ctx) error {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	userService.AquireUserLock(currentUserId)
+	defer userService.ReleaseUserLock(currentUserId)
+
+	if err := userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
+		if errors.Is(err, user_service.ErrUserNotFound) {
+			return redirect(c, "/login")
+		}
+		return err
+	}
+
+	return redirect(c, "/login")
+}

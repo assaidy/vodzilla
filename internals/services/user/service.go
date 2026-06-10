@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/assaidy/vodzilla/internals/events"
@@ -36,6 +37,7 @@ type Service struct {
 	mailer        *mailer.Mailer
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
+	userMutexes   sync.Map
 }
 
 func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
@@ -389,6 +391,15 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	}, nil
 }
 
+func (me *Service) DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error) {
+	ok, err := me.queries.CheckUserId(ctx, userId)
+	if err != nil {
+		return false, fmt.Errorf("failed to check user id: %w", err)
+	}
+
+	return ok, nil
+}
+
 func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -427,6 +438,18 @@ func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, user
 	}
 
 	return nil
+}
+
+func (me *Service) AquireUserLock(userId uuid.UUID) {
+	mu, _ := me.userMutexes.LoadOrStore(userId, new(sync.Mutex))
+	mu.(*sync.Mutex).Lock()
+}
+
+// TODO: I need to delete the lock from the map if it's no longer aquired.
+func (me *Service) ReleaseUserLock(userId uuid.UUID) {
+	if mu, ok := me.userMutexes.Load(userId); ok {
+		mu.(*sync.Mutex).Unlock()
+	}
 }
 
 func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {

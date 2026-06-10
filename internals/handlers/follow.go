@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
+	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -16,6 +17,18 @@ func HandleFollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
+	}
+
+	// Aquire a lock from user service and release it after adding the follow.
+	// This prevents deleting the user until creating the follow.
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	userService.AquireUserLock(userId)
+	defer userService.ReleaseUserLock(userId)
+
+	if ok, err := userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "user not found")
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

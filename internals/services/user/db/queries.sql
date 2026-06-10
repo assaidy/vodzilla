@@ -6,6 +6,9 @@ select exists (select 1 from user_service.users where email = $1 and is_deleted 
 -- We don't need unexpected profiles when navigating a url.
 select exists (select 1 from user_service.users where username = $1 for update);
 
+-- name: CheckUserId :one
+select exists (select 1 from user_service.users where id = $1 and is_deleted = false for update);
+
 -- name: InsertUser :exec
 insert into user_service.users (id, email, password_hash, name, username, bio)
 values ($1, $2, $3, $4, $5, $6);
