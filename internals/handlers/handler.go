@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log/slog"
+	"sync"
 
 	"github.com/assaidy/hyper/v2"
 	"github.com/assaidy/vodzilla/internals/services/media"
@@ -10,6 +11,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -21,6 +23,7 @@ type Handler struct {
 	mediaService    *media.Service
 	reactionService *reaction.Service
 	socialService   *social.Service
+	userMutexes     sync.Map
 }
 
 func New(
@@ -43,6 +46,18 @@ func New(
 	}
 
 	return handler
+}
+
+func (me *Handler) UserLock(userId uuid.UUID) {
+	mu, _ := me.userMutexes.LoadOrStore(userId, new(sync.Mutex))
+	mu.(*sync.Mutex).Lock()
+}
+
+// TODO: I need to delete the lock from the map if it's no longer aquired.
+func (me *Handler) UserUnlock(userId uuid.UUID) {
+	if mu, ok := me.userMutexes.Load(userId); ok {
+		mu.(*sync.Mutex).Unlock()
+	}
 }
 
 func render(c fiber.Ctx, node hyper.HyperNode) error {

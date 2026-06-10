@@ -94,9 +94,9 @@ func main() {
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		port, _ := utils.GetEnv("PORT", "8080")
 		// TODO: Before enabling prefork, make sure to implement Consumer Groups to
 		// prevent multiple instances of a service from consuming the same event multiple times.
+		port, _ := utils.GetEnv("PORT", "8080")
 		if err := app.Listen(fmt.Sprintf(":%s", port)); err != nil {
 			logger.Error("failed to start server", "error", err, "pid", os.Getpid())
 			os.Exit(1)

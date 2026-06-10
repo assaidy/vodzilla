@@ -18,10 +18,8 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
 	}
 
-	// Aquire a lock from user service and release it after adding the follow.
-	// This prevents deleting the user until creating the follow.
-	me.userService.AquireUserLock(userId)
-	defer me.userService.ReleaseUserLock(userId)
+	me.UserLock(userId)
+	defer me.UserUnlock(userId)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
