@@ -17,8 +17,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const Name = "video"
-
 var _ services.Service = (*Service)(nil)
 
 type Service struct {

@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/assaidy/hyper/v2"
-	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -12,15 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandleAddToWatchLater(c fiber.Ctx) error {
+func (me *Handler) HandleAddToWatchLater(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
+	if err := me.videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
 		if errors.Is(err, video_service.ErrWatchlaterConflict) {
 			return fiber.NewError(fiber.StatusConflict, "already in watch later")
 		}
@@ -36,15 +34,14 @@ func HandleAddToWatchLater(c fiber.Ctx) error {
 	}))
 }
 
-func HandleDeleteFromWatchLater(c fiber.Ctx) error {
+func (me *Handler) HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	if err := videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
+	if err := me.videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
 		}
@@ -57,8 +54,8 @@ func HandleDeleteFromWatchLater(c fiber.Ctx) error {
 	}))
 }
 
-func HandleWatchLaterPage(c fiber.Ctx) error {
-	currentUser, err := getCurrentUser(c)
+func (me *Handler) HandleWatchLaterPage(c fiber.Ctx) error {
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -66,27 +63,23 @@ func HandleWatchLaterPage(c fiber.Ctx) error {
 	return render(c, templates.WatchLaterPage(currentUser.Username))
 }
 
-func HandleWatchLaterPageContent(c fiber.Ctx) error {
-	currentUser, err := getCurrentUser(c)
+func (me *Handler) HandleWatchLaterPageContent(c fiber.Ctx) error {
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videos, err := videoService.GetAllVideosInWatchlater(c.RequestCtx(), currentUser.Id)
+	videos, err := me.videoService.GetAllVideosInWatchlater(c.RequestCtx(), currentUser.Id)
 	if err != nil {
 		return err
 	}
-
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 
 	ownerCache := make(map[uuid.UUID]*user_service.User)
 	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
 	for _, v := range videos {
 		owner, ok := ownerCache[v.OwnerId]
 		if !ok {
-			owner, err = userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			owner, err = me.userService.GetUserById(c.RequestCtx(), v.OwnerId)
 			if err != nil {
 				if errors.Is(err, user_service.ErrUserNotFound) {
 					continue
@@ -96,7 +89,7 @@ func HandleWatchLaterPageContent(c fiber.Ctx) error {
 			ownerCache[v.OwnerId] = owner
 		}
 
-		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
 		if err != nil {
 			return err
 		}

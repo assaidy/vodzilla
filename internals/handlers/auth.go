@@ -19,11 +19,11 @@ import (
 
 var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
 
-func HandleRegisterPage(c fiber.Ctx) error {
+func (me *Handler) HandleRegisterPage(c fiber.Ctx) error {
 	return render(c, templates.RegisterPage())
 }
 
-func HandleRegister(c fiber.Ctx) error {
+func (me *Handler) HandleRegister(c fiber.Ctx) error {
 	email := strings.ToLower(strings.TrimSpace(c.FormValue("email")))
 	password := c.FormValue("password")
 	name := strings.TrimSpace(c.FormValue("name"))
@@ -48,9 +48,7 @@ func HandleRegister(c fiber.Ctx) error {
 		}))
 	}
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-
-	if err := userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
+	if err := me.userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
 		if errors.Is(err, user_service.ErrEmailConflict) {
 			return render(c, templates.RegisterForm(templates.RegisterFormParams{
 				Name:     name,
@@ -76,22 +74,21 @@ func HandleRegister(c fiber.Ctx) error {
 	if err != nil {
 		return fmt.Errorf("failed to general email verification url")
 	}
-	if err := userService.SendVerificationEmail(c.RequestCtx(), email, url); err != nil {
+	if err := me.userService.SendVerificationEmail(c.RequestCtx(), email, url); err != nil {
 		return err
 	}
 
 	return redirect(c, "/verification_email/sent")
 }
 
-func HandleVerificationEmailSentPage(c fiber.Ctx) error {
+func (me *Handler) HandleVerificationEmailSentPage(c fiber.Ctx) error {
 	return render(c, templates.VerificationEmailSentPage())
 }
 
-func HandleVerifyEmailPage(c fiber.Ctx) error {
+func (me *Handler) HandleVerifyEmailPage(c fiber.Ctx) error {
 	token := fiber.Query[string](c, "token")
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	if err := userService.VerifyEmail(c.RequestCtx(), token); err != nil {
+	if err := me.userService.VerifyEmail(c.RequestCtx(), token); err != nil {
 		if errors.Is(err, user_service.ErrTokenNotFound) {
 			return render(c, templates.InvalidVerificationLinkPage())
 		}
@@ -101,15 +98,14 @@ func HandleVerifyEmailPage(c fiber.Ctx) error {
 	return render(c, templates.EmailVerifiedPage())
 }
 
-func HandleLoginPage(c fiber.Ctx) error {
+func (me *Handler) HandleLoginPage(c fiber.Ctx) error {
 	return render(c, templates.LoginPage())
 }
 
-func HandleLogin(c fiber.Ctx) error {
+func (me *Handler) HandleLogin(c fiber.Ctx) error {
 	email := c.FormValue("email")
 	password := c.FormValue("password")
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	session, err := userService.Login(c.RequestCtx(), email, password)
+	session, err := me.userService.Login(c.RequestCtx(), email, password)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUnauthorized) {
 			return render(c, templates.LoginForm(templates.LoginFormParams{
@@ -149,7 +145,7 @@ func HandleLogin(c fiber.Ctx) error {
 	return redirect(c, "/")
 }
 
-func WithSession(c fiber.Ctx) error {
+func (me *Handler) WithSession(c fiber.Ctx) error {
 	sessionIdStr := c.Cookies("session_id")
 	sessionToken := c.Cookies("session_token")
 
@@ -162,8 +158,7 @@ func WithSession(c fiber.Ctx) error {
 		return redirect(c, "/login")
 	}
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	session, err := userService.GetSession(c.RequestCtx(), sessionId)
+	session, err := me.userService.GetSession(c.RequestCtx(), sessionId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrSessionNotFound) {
 			return redirect(c, "/login")
@@ -183,10 +178,9 @@ func WithSession(c fiber.Ctx) error {
 }
 
 // must go through [WithSession] first
-func WithCsrfToken(c fiber.Ctx) error {
+func (me *Handler) WithCsrfToken(c fiber.Ctx) error {
 	if c.Locals("csrf_token").(string) != c.Get("X-CSRF-Token") {
-		return fiber.ErrForbidden
+		return fiber.NewError(fiber.StatusForbidden, "missing CSRF token")
 	}
-
 	return c.Next()
 }

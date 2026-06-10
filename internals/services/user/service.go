@@ -25,8 +25,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const Name = "user"
-
 var _ services.Service = (*Service)(nil)
 
 type Service struct {

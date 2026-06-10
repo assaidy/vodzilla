@@ -22,8 +22,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const Name = "media"
-
 var _ services.Service = (*Service)(nil)
 
 type Service struct {
@@ -35,7 +33,7 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, s3 *s3.Client, redis *redis.Client, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) *Service {
 	service := &Service{
 		db:            db,
 		queries:       queries.New(db),

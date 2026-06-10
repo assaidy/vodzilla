@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
-	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -13,7 +12,7 @@ import (
 // TODO: implement notifications for new comments/follows.
 // also, update video comment/follow counts for all user's online clients.
 
-func HandleFollow(c fiber.Ctx) error {
+func (me *Handler) HandleFollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
@@ -21,11 +20,10 @@ func HandleFollow(c fiber.Ctx) error {
 
 	// Aquire a lock from user service and release it after adding the follow.
 	// This prevents deleting the user until creating the follow.
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	userService.AquireUserLock(userId)
-	defer userService.ReleaseUserLock(userId)
+	me.userService.AquireUserLock(userId)
+	defer me.userService.ReleaseUserLock(userId)
 
-	if ok, err := userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return fiber.NewError(fiber.StatusNotFound, "user not found")
@@ -33,8 +31,7 @@ func HandleFollow(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
-	if err := socialService.Follow(c.RequestCtx(), currentUserId, userId); err != nil {
+	if err := me.socialService.Follow(c.RequestCtx(), currentUserId, userId); err != nil {
 		switch {
 		case errors.Is(err, social_service.ErrSelfFollowNotAllowed):
 			return fiber.NewError(fiber.StatusForbidden, "self follow is not allowed")
@@ -51,7 +48,7 @@ func HandleFollow(c fiber.Ctx) error {
 	}))
 }
 
-func HandleUnfollow(c fiber.Ctx) error {
+func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid user id format")
@@ -59,8 +56,7 @@ func HandleUnfollow(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
-	if err := socialService.Unfollow(c.RequestCtx(), currentUserId, userId); err != nil {
+	if err := me.socialService.Unfollow(c.RequestCtx(), currentUserId, userId); err != nil {
 		if errors.Is(err, social_service.ErrNotFollowing) {
 			return fiber.NewError(fiber.StatusNotFound, "user not followed")
 		}

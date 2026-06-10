@@ -6,8 +6,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func HandleNotificationsPageContent(c fiber.Ctx) error {
-	currentUser, err := getCurrentUser(c)
+func (me *Handler) HandleNotificationsPageContent(c fiber.Ctx) error {
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return err
 	}

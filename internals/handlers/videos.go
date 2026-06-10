@@ -8,8 +8,6 @@ import (
 
 	"github.com/assaidy/hyper/v2"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
-	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
-	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
@@ -18,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandlePostVideo(c fiber.Ctx) error {
+func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	title := strings.TrimSpace(c.FormValue("title"))
 	description := strings.TrimSpace(c.FormValue("description"))
 	contentType := strings.TrimSpace(c.FormValue("contentType"))
@@ -52,8 +50,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 	currentUser := c.Locals("user_id").(uuid.UUID)
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videoId, err := videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
+	videoId, err := me.videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
 		OwnerId:     currentUser,
 		Title:       title,
 		Description: description,
@@ -64,8 +61,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 
 	objectKey := fmt.Sprintf("%s/%s", currentUser, videoId)
 
-	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	presignedUpload, err := mediaService.GeneratePresignedPutUrls(
+	presignedUpload, err := me.mediaService.GeneratePresignedPutUrls(
 		c.RequestCtx(),
 		*videoId,
 		objectKey,
@@ -92,7 +88,7 @@ func HandlePostVideo(c fiber.Ctx) error {
 	))
 }
 
-func HandleCompleteVideoUpload(c fiber.Ctx) error {
+func (me *Handler) HandleCompleteVideoUpload(c fiber.Ctx) error {
 	var request struct {
 		VideoId  uuid.UUID `json:"videoId"`
 		UploadId string    `json:"uploadId"`
@@ -114,8 +110,7 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 		})
 	}
 
-	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	if err := mediaService.CompleteUpload(c.RequestCtx(), request.VideoId, request.UploadId, parts); err != nil {
+	if err := me.mediaService.CompleteUpload(c.RequestCtx(), request.VideoId, request.UploadId, parts); err != nil {
 		switch {
 		case errors.Is(err, media_service.ErrObjectNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "object not found")
@@ -132,8 +127,8 @@ func HandleCompleteVideoUpload(c fiber.Ctx) error {
 	return nil
 }
 
-func HandleVideoPage(c fiber.Ctx) error {
-	currentUser, err := getCurrentUser(c)
+func (me *Handler) HandleVideoPage(c fiber.Ctx) error {
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -146,14 +141,13 @@ func HandleVideoPage(c fiber.Ctx) error {
 	return render(c, templates.VideoPage(currentUser.Username, videoId))
 }
 
-func HandleVideoPageContent(c fiber.Ctx) error {
+func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
+	video, err := me.videoService.GetVideoById(c.RequestCtx(), videoId)
 	if err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return fiber.ErrNotFound
@@ -161,8 +155,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	owner, err := userService.GetUserById(c.RequestCtx(), video.OwnerId)
+	owner, err := me.userService.GetUserById(c.RequestCtx(), video.OwnerId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
 			return fiber.ErrNotFound
@@ -170,37 +163,35 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.Id)
+	sourceUrl, err := me.mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.Id)
 	if err != nil {
 		return err
 	}
 
-	currentUser, err := getCurrentUser(c)
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), videoId)
+	viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
-	reactionCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	reactionCounts, err := me.reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
-	currentUserReaction, err := reactionService.GetVideoReactionForUser(c.RequestCtx(), videoId, currentUser.Id)
-	if err != nil {
-		return err
-	}
-
-	isInWatchLater, err := videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
+	currentUserReaction, err := me.reactionService.GetVideoReactionForUser(c.RequestCtx(), videoId, currentUser.Id)
 	if err != nil {
 		return err
 	}
 
-	playlists, err := videoService.GetAllPlaylistsWithVideoStatus(c.RequestCtx(), currentUser.Id, videoId)
+	isInWatchLater, err := me.videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	playlists, err := me.videoService.GetAllPlaylistsWithVideoStatus(c.RequestCtx(), currentUser.Id, videoId)
 	if err != nil {
 		return err
 	}
@@ -215,8 +206,7 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 		})
 	}
 
-	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
-	isFollowed, err := socialService.IsFollower(c.RequestCtx(), currentUser.Id, video.OwnerId)
+	isFollowed, err := me.socialService.IsFollower(c.RequestCtx(), currentUser.Id, video.OwnerId)
 	if err != nil {
 		return err
 	}
@@ -259,14 +249,13 @@ func HandleVideoPageContent(c fiber.Ctx) error {
 	))
 }
 
-func HandleGetVideoStreamUrl(c fiber.Ctx) error {
+func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 
-	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
-	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
+	url, err := me.mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
 	if err != nil {
 		if errors.Is(err, media_service.ErrObjectNotFound) {
 			return fiber.NewError(fiber.StatusNotFound, "video not found")

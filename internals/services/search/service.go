@@ -6,8 +6,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-const Name = "search"
-
 var _ services.Service = (*Service)(nil)
 
 type Service struct{}

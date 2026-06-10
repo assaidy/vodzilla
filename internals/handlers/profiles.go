@@ -6,18 +6,15 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
-	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
-	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
-	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-func HandleProfilePage(c fiber.Ctx) error {
-	profileUser, currentUser, err := getProfileUserAndCurrentUser(c)
+func (me *Handler) HandleProfilePage(c fiber.Ctx) error {
+	profileUser, currentUser, err := me.getProfileUserAndCurrentUser(c)
 	if err != nil {
 		return err
 	}
@@ -26,28 +23,25 @@ func HandleProfilePage(c fiber.Ctx) error {
 }
 
 // TODO: we can do a lot of lazy loading and pagination here and in other places
-func HandleProfilePageContent(c fiber.Ctx) error {
-	profileUser, currentUser, err := getProfileUserAndCurrentUser(c)
+func (me *Handler) HandleProfilePageContent(c fiber.Ctx) error {
+	profileUser, currentUser, err := me.getProfileUserAndCurrentUser(c)
 	if err != nil {
 		return err
 	}
 
-	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
-	videosCount, err := videoService.GetVideosCountForUser(c.RequestCtx(), profileUser.Id)
+	videosCount, err := me.videoService.GetVideosCountForUser(c.RequestCtx(), profileUser.Id)
 	if err != nil {
 		return err
 	}
 
-	videos, err := videoService.GetAllVideosForUser(c.RequestCtx(), profileUser.Id)
+	videos, err := me.videoService.GetAllVideosForUser(c.RequestCtx(), profileUser.Id)
 	if err != nil {
 		return err
 	}
-
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
 
 	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
 	for _, v := range videos {
-		viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
 		if err != nil {
 			return err
 		}
@@ -62,13 +56,12 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 		})
 	}
 
-	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
-	followersCount, err := socialService.GetFollowersCount(c.RequestCtx(), profileUser.Id)
+	followersCount, err := me.socialService.GetFollowersCount(c.RequestCtx(), profileUser.Id)
 	if err != nil {
 		return err
 	}
 
-	isFollowed, err := socialService.IsFollower(c.RequestCtx(), currentUser.Id, profileUser.Id)
+	isFollowed, err := me.socialService.IsFollower(c.RequestCtx(), currentUser.Id, profileUser.Id)
 	if err != nil {
 		return err
 	}
@@ -95,11 +88,10 @@ func HandleProfilePageContent(c fiber.Ctx) error {
 	))
 }
 
-func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
+func (me *Handler) getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 	userId := c.Locals("user_id").(uuid.UUID)
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
-	user, err := userService.GetUserById(c.RequestCtx(), userId)
+	user, err := me.userService.GetUserById(c.RequestCtx(), userId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
 			return nil, redirect(c, "/login")
@@ -110,9 +102,8 @@ func getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
 	return user, nil
 }
 
-func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	profileUser, err := userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
+func (me *Handler) getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
+	profileUser, err := me.userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
 			return nil, nil, fiber.ErrNotFound
@@ -120,7 +111,7 @@ func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_servic
 		return nil, nil, fmt.Errorf("failed to get profile user: %w", err)
 	}
 
-	currentUser, err := getCurrentUser(c)
+	currentUser, err := me.getCurrentUser(c)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current user: %w", err)
 	}
@@ -128,7 +119,7 @@ func getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_servic
 	return profileUser, currentUser, nil
 }
 
-func HandleEditProfile(c fiber.Ctx) error {
+func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 	name := strings.TrimSpace(c.FormValue("name"))
 	username := strings.TrimSpace(c.FormValue("username"))
 	bio := strings.TrimSpace(c.FormValue("bio"))
@@ -150,9 +141,8 @@ func HandleEditProfile(c fiber.Ctx) error {
 	}
 
 	userId := c.Locals("user_id").(uuid.UUID)
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
 
-	if err := userService.EditProfile(c.RequestCtx(), userId, name, username, bio); err != nil {
+	if err := me.userService.EditProfile(c.RequestCtx(), userId, name, username, bio); err != nil {
 		switch {
 		case errors.Is(err, fiber.ErrNotFound):
 			return redirect(c, "/login")
@@ -184,14 +174,13 @@ func HandleEditProfile(c fiber.Ctx) error {
 }
 
 // TODO: add a route for this
-func HandleDeleteProfile(c fiber.Ctx) error {
+func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	userService.AquireUserLock(currentUserId)
-	defer userService.ReleaseUserLock(currentUserId)
+	me.userService.AquireUserLock(currentUserId)
+	defer me.userService.ReleaseUserLock(currentUserId)
 
-	if err := userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
+	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
 			return redirect(c, "/login")
 		}

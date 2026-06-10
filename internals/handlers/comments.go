@@ -15,17 +15,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandleGetVideoComments(c fiber.Ctx) error {
+func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-
-	comments, err := reactionService.GetAllVideoComments(c.RequestCtx(), videoId)
+	comments, err := me.reactionService.GetAllVideoComments(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
@@ -35,7 +32,7 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 	for _, comment := range comments {
 		owner, ok := ownerCache[comment.OwnerId]
 		if !ok {
-			owner, err = userService.GetUserById(c.RequestCtx(), comment.OwnerId)
+			owner, err = me.userService.GetUserById(c.RequestCtx(), comment.OwnerId)
 			if err != nil {
 				if errors.Is(err, user_service.ErrUserNotFound) {
 					continue
@@ -59,7 +56,7 @@ func HandleGetVideoComments(c fiber.Ctx) error {
 	return render(c, hyper.Group(templateComments...))
 }
 
-func HandleGetCommentReplies(c fiber.Ctx) error {
+func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
@@ -70,10 +67,7 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 	}
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-
-	replies, err := reactionService.GetAllCommentReplies(c.RequestCtx(), commentId)
+	replies, err := me.reactionService.GetAllCommentReplies(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return fiber.ErrNotFound
@@ -86,7 +80,7 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 	for _, reply := range replies {
 		owner, ok := ownerCache[reply.OwnerId]
 		if !ok {
-			owner, err = userService.GetUserById(c.RequestCtx(), reply.OwnerId)
+			owner, err = me.userService.GetUserById(c.RequestCtx(), reply.OwnerId)
 			if err != nil {
 				if errors.Is(err, user_service.ErrUserNotFound) {
 					continue
@@ -110,7 +104,7 @@ func HandleGetCommentReplies(c fiber.Ctx) error {
 	return render(c, hyper.Group(templateComments...))
 }
 
-func HandleCreateComment(c fiber.Ctx) error {
+func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
@@ -145,8 +139,7 @@ func HandleCreateComment(c fiber.Ctx) error {
 		}
 	}
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	commentId, err := reactionService.CreateComment(c.RequestCtx(), videoId, userId, content, parentId)
+	commentId, err := me.reactionService.CreateComment(c.RequestCtx(), videoId, userId, content, parentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrParentCommentNotFound) {
 			return fiber.ErrNotFound
@@ -154,8 +147,7 @@ func HandleCreateComment(c fiber.Ctx) error {
 		return err
 	}
 
-	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
-	owner, err := userService.GetUserById(c.RequestCtx(), userId)
+	owner, err := me.userService.GetUserById(c.RequestCtx(), userId)
 	if err != nil {
 		return err
 	}
@@ -187,7 +179,7 @@ func HandleCreateComment(c fiber.Ctx) error {
 	))
 }
 
-func HandleEditComment(c fiber.Ctx) error {
+func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return fiber.ErrNotFound
@@ -210,8 +202,7 @@ func HandleEditComment(c fiber.Ctx) error {
 		}))
 	}
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	if err := reactionService.EditComment(c.RequestCtx(), userId, commentId, content); err != nil {
+	if err := me.reactionService.EditComment(c.RequestCtx(), userId, commentId, content); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return fiber.ErrNotFound
 		}
@@ -234,15 +225,14 @@ func HandleEditComment(c fiber.Ctx) error {
 	))
 }
 
-func HandleDeleteComment(c fiber.Ctx) error {
+func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return fiber.ErrNotFound
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
-	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
-	if err := reactionService.DeleteComment(c.RequestCtx(), userId, commentId); err != nil {
+	if err := me.reactionService.DeleteComment(c.RequestCtx(), userId, commentId); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return fiber.ErrNotFound
 		}

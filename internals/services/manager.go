@@ -1,48 +1,34 @@
-package registry
+package services
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/assaidy/vodzilla/internals/services"
-	"github.com/gofiber/fiber/v3"
 )
 
-type Registry struct {
+type Manager struct {
 	logger          *slog.Logger
-	app             *fiber.App
-	services        map[string]services.Service
-	startedServices map[string]services.Service
+	services        map[string]Service
+	startedServices map[string]Service
 }
 
-func NewRegistry(logger *slog.Logger, app *fiber.App) *Registry {
-	return &Registry{
+func NewManager(logger *slog.Logger) *Manager {
+	return &Manager{
 		logger:          logger,
-		app:             app,
-		services:        make(map[string]services.Service),
-		startedServices: make(map[string]services.Service),
+		services:        make(map[string]Service),
+		startedServices: make(map[string]Service),
 	}
 }
 
-func (me *Registry) AddService(name string, service services.Service) {
+func (me *Manager) Add(name string, service Service) {
 	if _, ok := me.services[name]; ok {
 		panic(fmt.Sprintf("double registration of service: %s", name))
 	}
 	me.services[name] = service
 }
 
-func (me *Registry) AddServiceWithInjection(name string, service services.Service) {
-	me.AddService(name, service)
-	me.Inject(name, service)
-}
-
-func (me *Registry) Inject(name string, dependency any) {
-	me.app.State().Set(name, dependency)
-}
-
-func (me *Registry) Start(ctx context.Context) {
+func (me *Manager) StartAll(ctx context.Context) {
 	me.logger.Info("starting all services", "pid", os.Getpid())
 	defer me.logger.Info("started all services successfully", "pid", os.Getpid())
 
@@ -56,7 +42,7 @@ func (me *Registry) Start(ctx context.Context) {
 	}
 }
 
-func (me *Registry) Stop(ctx context.Context) {
+func (me *Manager) StopAll(ctx context.Context) {
 	me.logger.Info("stopping all services", "pid", os.Getpid())
 	defer me.logger.Info("stopped all services successfully", "pid", os.Getpid())
 
