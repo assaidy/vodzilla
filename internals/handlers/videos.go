@@ -1,0 +1,278 @@
+package handlers
+
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/assaidy/hyper/v2"
+	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
+	social_service "github.com/assaidy/vodzilla/internals/services/social"
+	user_service "github.com/assaidy/vodzilla/internals/services/user"
+	video_service "github.com/assaidy/vodzilla/internals/services/video"
+	"github.com/assaidy/vodzilla/internals/web/templates"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
+)
+
+func HandlePostVideo(c fiber.Ctx) error {
+	title := strings.TrimSpace(c.FormValue("title"))
+	description := strings.TrimSpace(c.FormValue("description"))
+	contentType := strings.TrimSpace(c.FormValue("contentType"))
+	fileSize, _ := strconv.ParseInt(c.FormValue("fileSize"), 10, 0)
+
+	titleErr := validation.Validate(title, validation.Required, validation.Length(1, 256))
+	descriptionErr := validation.Validate(description, validation.Length(0, 500))
+	contentTypeErr := validation.Validate(contentType, validation.Required, validation.By(func(value any) error {
+		if !strings.HasPrefix(value.(string), "video/") {
+			return fmt.Errorf("must be a video file")
+		}
+		return nil
+	}))
+	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30))
+
+	if errors.Join(titleErr, descriptionErr, contentTypeErr, fileSizeErr) != nil {
+		return render(c, templates.PostVideoForm(templates.PostVideoFormParams{
+			Title:          title,
+			TitleErr:       titleErr,
+			Description:    description,
+			DescriptionErr: descriptionErr,
+			VideoErr:       errors.Join(contentTypeErr, fileSizeErr),
+		}))
+	}
+
+	pendingVideoIdStr := c.FormValue("pendingVideoId")
+	pendingVideoId, err := uuid.Parse(pendingVideoIdStr)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid pending video id")
+	}
+
+	currentUser := c.Locals("user_id").(uuid.UUID)
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	videoId, err := videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
+		OwnerId:     currentUser,
+		Title:       title,
+		Description: description,
+	})
+	if err != nil {
+		return err
+	}
+
+	objectKey := fmt.Sprintf("%s/%s", currentUser, videoId)
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	presignedUpload, err := mediaService.GeneratePresignedPutUrls(
+		c.RequestCtx(),
+		*videoId,
+		objectKey,
+		contentType,
+		fileSize,
+	)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.PostVideoForm(templates.PostVideoFormParams{CloseDialogModal: true}),
+
+		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
+			templates.VideoUploader(templates.VideoUploaderParams{
+				PendingVideoId: pendingVideoId,
+				VideoId:        *videoId,
+				UploadId:       presignedUpload.UploadId,
+				PartSize:       presignedUpload.PartSize,
+				UploadUrls:     presignedUpload.Urls,
+				VideoTitle:     title,
+			}),
+		),
+	))
+}
+
+func HandleCompleteVideoUpload(c fiber.Ctx) error {
+	var request struct {
+		VideoId  uuid.UUID `json:"videoId"`
+		UploadId string    `json:"uploadId"`
+		Parts    []struct {
+			ETag       string `json:"etag"`
+			PartNumber int    `json:"partNumber"`
+		} `json:"parts"`
+	}
+
+	if err := c.Bind().Body(&request); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+	}
+
+	parts := make([]media_service.CompleteUploadPart, 0, len(request.Parts))
+	for _, p := range request.Parts {
+		parts = append(parts, media_service.CompleteUploadPart{
+			ETag:       p.ETag,
+			PartNumber: p.PartNumber,
+		})
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	if err := mediaService.CompleteUpload(c.RequestCtx(), request.VideoId, request.UploadId, parts); err != nil {
+		switch {
+		case errors.Is(err, media_service.ErrObjectNotFound):
+			return fiber.NewError(fiber.StatusNotFound, "object not found")
+		case errors.Is(err, media_service.ErrUploadExpired):
+			return fiber.NewError(fiber.StatusForbidden, "upload expired")
+		case errors.Is(err, media_service.ErrUploadAlreadyCompleted):
+			return fiber.NewError(fiber.StatusForbidden, "upload already completed")
+		case errors.Is(err, media_service.ErrInvalidCompleteUploadData):
+			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func HandleVideoPage(c fiber.Ctx) error {
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+
+	return render(c, templates.VideoPage(currentUser.Username, videoId))
+}
+
+func HandleVideoPageContent(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+
+	videoService := fiber.MustGetState[*video_service.Service](c.App().State(), video_service.Name)
+	video, err := videoService.GetVideoById(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	userService := fiber.MustGetState[*user_service.Service](c.App().State(), user_service.Name)
+	owner, err := userService.GetUserById(c.RequestCtx(), video.OwnerId)
+	if err != nil {
+		if errors.Is(err, user_service.ErrUserNotFound) {
+			return fiber.ErrNotFound
+		}
+		return err
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	sourceUrl, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), video.Id)
+	if err != nil {
+		return err
+	}
+
+	currentUser, err := getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	reactionService := fiber.MustGetState[*reaction_service.Service](c.App().State(), reaction_service.Name)
+	viewsCount, err := reactionService.GetVideoViewsCount(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+	reactionCounts, err := reactionService.GetVideoReactionCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+	currentUserReaction, err := reactionService.GetVideoReactionForUser(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	isInWatchLater, err := videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	playlists, err := videoService.GetAllPlaylistsWithVideoStatus(c.RequestCtx(), currentUser.Id, videoId)
+	if err != nil {
+		return err
+	}
+
+	templatePlaylists := make([]templates.PlaylistCheckboxParams, 0, len(playlists))
+	for _, p := range playlists {
+		templatePlaylists = append(templatePlaylists, templates.PlaylistCheckboxParams{
+			VideoId:    videoId,
+			PlaylistId: p.Id,
+			Name:       p.Name,
+			Checked:    p.HasVideo,
+		})
+	}
+
+	socialService := fiber.MustGetState[*social_service.Service](c.App().State(), social_service.Name)
+	isFollowed, err := socialService.IsFollower(c.RequestCtx(), currentUser.Id, video.OwnerId)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.VideoPageContent(templates.VideoPageContentParams{
+			Id:            video.Id,
+			OwnerId:       video.OwnerId,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			SourceUrl:     sourceUrl,
+			Title:         video.Title,
+			Description:   video.Description,
+			Timestamp:     video.Timestamp,
+			ViewsCount:    viewsCount,
+			CurrentUserId: currentUser.Id,
+			IsFollowed:    isFollowed,
+			ReactionsParams: templates.ReactionsWidgetParams{
+				VideoId:       videoId,
+				LikesCount:    reactionCounts.Likes,
+				DislikesCount: reactionCounts.Dislikes,
+				IsLiked:       currentUserReaction.IsLike,
+				IsDisliked:    currentUserReaction.IsDislike,
+			},
+			WatchLaterButtonParams: templates.WatchLaterButtonParams{
+				VideoId:  videoId,
+				IsActive: isInWatchLater,
+			},
+			AddToPlaylistModalParams: templates.AddToPlaylistModalParams{
+				VideoId:   videoId,
+				Playlists: templatePlaylists,
+			},
+		}),
+
+		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+			templates.Navbar(templates.NavbarParams{
+				Username: currentUser.Username,
+			}),
+		),
+	))
+}
+
+func HandleGetVideoStreamUrl(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.ErrNotFound
+	}
+
+	mediaService := fiber.MustGetState[*media_service.Service](c.App().State(), media_service.Name)
+	url, err := mediaService.GeneratePresignedGetUrl(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, media_service.ErrObjectNotFound) {
+			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"url": url})
+}

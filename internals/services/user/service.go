@@ -440,6 +440,8 @@ func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, user
 	return nil
 }
 
+// FIX: move lcoks to handler
+// - also add locks to vidoes
 func (me *Service) AquireUserLock(userId uuid.UUID) {
 	mu, _ := me.userMutexes.LoadOrStore(userId, new(sync.Mutex))
 	mu.(*sync.Mutex).Lock()
