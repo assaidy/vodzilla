@@ -126,9 +126,12 @@ func registerRoutes(app *fiber.App, h *handlers.Handler) {
 			return nil
 		},
 	}))
-	app.Get("/health", h.HandleCheckHealth)
 
+	app.Get("/health", h.HandleCheckHealth)
 	app.Get("/ws/:client_id", h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
+
+	app.Get("/", h.HandleHomePage)
+
 	app.Get("/register", h.HandleRegisterPage)
 	app.Post("/register", h.HandleRegister)
 	app.Get("/login", h.HandleLoginPage)
@@ -137,22 +140,18 @@ func registerRoutes(app *fiber.App, h *handlers.Handler) {
 	app.Get("/verification_email/sent", h.HandleVerificationEmailSentPage)
 	app.Get("/verification_email/verify", h.HandleVerifyEmailPage)
 
-	app.Get("/", h.HandleHomePage)
-	app.Get("/feed", h.WithSession, h.HandleFeedPage)
-	app.Get("/feed/content", h.WithSession, h.HandleFeedPageContent)
-	app.Get("/discover", h.WithSession, h.HandleDiscoverPage)
-	app.Get("/discover/content", h.WithSession, h.HandleDiscoverPageContent)
-	app.Get("/watch_later", h.WithSession, h.HandleWatchLaterPage)
-	app.Get("/watch_later/content", h.WithSession, h.HandleWatchLaterPageContent)
-	app.Get("/playlists", h.WithSession, h.HandlePlaylistsPage)
-	app.Get("/playlists/content", h.WithSession, h.HandlePlaylistsPageContent)
-	app.Get("/notifications", h.WithSession, h.HandleNotificationsPage)
-	app.Get("/notifications/content", h.WithSession, h.HandleNotificationsPageContent)
 	app.Get("/@:username", h.WithSession, h.HandleProfilePage)
 	app.Get("/@:username/content", h.WithSession, h.HandleProfilePageContent)
 	app.Put("/profiles", h.WithSession, h.WithCsrfToken, h.HandleEditProfile)
 	// TODO: edit account: email, password, delete account
 
+	app.Get("/discover", h.WithSession, h.HandleDiscoverPage)
+	app.Get("/discover/content", h.WithSession, h.HandleDiscoverPageContent)
+	app.Get("/notifications", h.WithSession, h.HandleNotificationsPage)
+	app.Get("/notifications/content", h.WithSession, h.HandleNotificationsPageContent)
+
+	app.Get("/feed", h.WithSession, h.HandleFeedPage)
+	app.Get("/feed/content", h.WithSession, h.HandleFeedPageContent)
 	app.Post("/follow/:id", h.WithSession, h.WithCsrfToken, h.HandleFollow)
 	app.Delete("/follow/:id", h.WithSession, h.WithCsrfToken, h.HandleUnfollow)
 
@@ -164,9 +163,14 @@ func registerRoutes(app *fiber.App, h *handlers.Handler) {
 	app.Post("/videos/:video_id/views", h.WithSession, h.WithCsrfToken, h.HandleViewVideo)
 	app.Post("/videos/:video_id/reactions", h.WithSession, h.WithCsrfToken, h.HandleAddVideoReaction)
 	app.Delete("/videos/:video_id/reactions", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoReaction)
-	app.Post("/videos/:video_id/watch_later", h.WithSession, h.WithCsrfToken, h.HandleAddToWatchLater)
-	app.Delete("/videos/:video_id/watch_later", h.WithSession, h.WithCsrfToken, h.HandleDeleteFromWatchLater)
 
+	app.Get("/watchlater", h.WithSession, h.HandleWatchLaterPage)
+	app.Get("/watchlater/content", h.WithSession, h.HandleWatchLaterPageContent)
+	app.Post("/videos/:video_id/watchlater", h.WithSession, h.WithCsrfToken, h.HandleAddToWatchLater)
+	app.Delete("/videos/:video_id/watchlater", h.WithSession, h.WithCsrfToken, h.HandleDeleteFromWatchLater)
+
+	app.Get("/playlists", h.WithSession, h.HandlePlaylistsPage)
+	app.Get("/playlists/content", h.WithSession, h.HandlePlaylistsPageContent)
 	app.Get("/playlists/:playlist_id", h.WithSession, h.HandlePlaylistDetailPage)
 	app.Get("/playlists/:playlist_id/content", h.WithSession, h.HandlePlaylistDetailPageContent)
 	app.Post("/playlists", h.WithSession, h.WithCsrfToken, h.HandleCreatePlaylist)
