@@ -2,6 +2,7 @@ package templates
 
 import (
 	. "github.com/assaidy/hyper/v2"
+	"github.com/assaidy/lucide"
 )
 
 func RegisterPage() HyperNode {
@@ -143,7 +144,9 @@ func VerificationEmailSentPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-warning mb-4"))(
-							RawText(`<svg class="w-16 h-16 mx-auto" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-icon lucide-mail"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>`),
+							RawText(lucide.Mail(lucide.Params{
+								Class: "w-16 h-16 mx-auto",
+							})),
 						),
 						H1(AttrClass("text-2xl font-bold"))("Verification Email Sent"),
 						P(AttrClass("text-base-content/70"))(
@@ -163,7 +166,9 @@ func EmailVerifiedPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-success mb-4"))(
-							RawText(`<svg class="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`),
+							RawText(lucide.MailCheck(lucide.Params{
+								Class: "w-16 h-16 mx-auto",
+							})),
 						),
 						H1(AttrClass("text-2xl font-bold"))("Email Verified"),
 						P(AttrClass("text-base-content/70"))(
@@ -186,7 +191,9 @@ func InvalidVerificationLinkPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-error mb-4"))(
-							RawText(`<svg class="w-16 h-16 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`),
+							RawText(lucide.MailWarning(lucide.Params{
+								Class: "w-16 h-16 mx-auto",
+							})),
 						),
 						H1(AttrClass("text-2xl font-bold"))("Invalid Link"),
 						P(AttrClass("text-base-content/70"))(

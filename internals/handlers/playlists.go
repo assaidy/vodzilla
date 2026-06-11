@@ -79,21 +79,34 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
+
+	var request struct {
+		PlaylistName string `json:"playlistName"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "missing playlistName field in request body")
+	}
+
 	userId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
 		switch {
-		case errors.Is(err, video_service.ErrPlaylistVideoConflict):
-			return fiber.NewError(fiber.StatusConflict, "already in playlist")
 		case errors.Is(err, video_service.ErrVideoNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "video not found")
+		case errors.Is(err, video_service.ErrPlaylistVideoConflict):
+			return fiber.NewError(fiber.StatusConflict, "already in playlist")
 		case errors.Is(err, video_service.ErrPlaylistNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 		}
 		return err
 	}
 
-	return nil
+	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
+		VideoId:    videoId,
+		PlaylistId: playlistId,
+		Name:       request.PlaylistName,
+		Checked:    true,
+	}))
 }
 
 func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
@@ -105,6 +118,14 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 	}
+
+	var request struct {
+		PlaylistName string `json:"playlistName"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "missing playlistName field in request body")
+	}
+
 	userId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.videoService.DeleteVideoFromPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
@@ -117,7 +138,12 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 		return err
 	}
 
-	return nil
+	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
+		VideoId:    videoId,
+		PlaylistId: playlistId,
+		Name:       request.PlaylistName,
+		Checked:    false,
+	}))
 }
 
 func (me *Handler) HandlePlaylistsPage(c fiber.Ctx) error {

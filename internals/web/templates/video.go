@@ -6,6 +6,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/assaidy/lucide"
 	"github.com/google/uuid"
 )
 
@@ -266,7 +267,9 @@ func videoUploadIndicator() HyperNode {
 				AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"),
 				AttrOnClick("UPLOAD_LIST_DIALOG.showModal()"),
 			)(
-				RawText(`<svg class="w-5 h-5 animate-bounce" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-up-from-line-icon lucide-arrow-up-from-line"><path d="m18 9-6-6-6 6"/><path d="M12 3v14"/><path d="M5 21h14"/></svg>`),
+				RawText(lucide.ArrowUpFromLine(lucide.Params{
+					Class: "w-5 h-5 animate-bounce",
+				})),
 			),
 			SPAN(AttrId("UPLOAD_INDICATOR_COUNT"), AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"))("0"),
 		),
@@ -286,7 +289,7 @@ type profileVideosParams struct {
 	videoCards []VideoCardParams
 }
 
-func profileVideosContainer(params profileVideosParams) HyperNode {
+func profileVideos(params profileVideosParams) HyperNode {
 	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"))(
 		Range(params.videoCards, func(p VideoCardParams) any {
 			return VideoCard(p)
@@ -343,7 +346,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 					If(params.AvatarUrl != "",
 						IMG(AttrClass("w-9 h-9 rounded-full"), AttrSrc(params.AvatarUrl)),
 					).Else(
-						videoCardAvatarPlaceholder(),
+						videoCardOwnerAvatarPlaceholder(),
 					),
 				),
 			),
@@ -413,10 +416,10 @@ func normalizeViewsCount(i int) any {
 	}
 }
 
-func videoCardAvatarPlaceholder() HyperNode {
+func videoCardOwnerAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("avatar placeholder"))(
 		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-10 h-10 flex items-center justify-center text-xs"))(
-			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+			RawText(lucide.User()),
 		),
 	)
 }
@@ -435,9 +438,9 @@ func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
 			Attr("hx-target", "#WATCH_LATER_BUTTON"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
-				IfElseZero(params.IsActive, "text-primary"),
-			)),
+			RawText(lucide.Clock(lucide.Params{
+				Class: IfElseZero(params.IsActive, "text-primary"),
+			})),
 		),
 	)
 }
@@ -450,15 +453,16 @@ type PlaylistCheckboxParams struct {
 }
 
 func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
-	return DIV(AttrClass("form-control"))(
+	return DIV(AttrId("PLAYLIST_CHECKBOX"), AttrClass("form-control"))(
 		LABEL(AttrClass("label cursor-pointer flex justify-between"))(
 			SPAN(AttrClass("text-base-content"))(params.Name),
 			INPUT(
 				AttrType(TypeCheckbox),
 				AttrClass("checkbox checkbox-sm checkbox-primary"),
 				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
-				Attr("hx-on::after:request", "if (evt.detail.ctx.response.ok) this.checked = !this.checked"),
-				Attr("hx-swap", "none"),
+				Attr("hx-target", "#PLAYLIST_CHECKBOX"),
+				Attr("hx-swap", "outerHTML"),
+				Attr("hx-vals", Json(Object{"playlistName": params.Name})),
 				AttrChecked(params.Checked),
 			),
 		),
@@ -470,13 +474,13 @@ type AddToPlaylistModalParams struct {
 	Playlists []PlaylistCheckboxParams
 }
 
-func AddToPlaylistButton(videoId uuid.UUID) HyperNode {
+func AddToPlaylistButton() HyperNode {
 	return DIV(AttrClass("tooltip tooltip-top"), Attr("data-tip", "Add to Playlist"))(
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm"),
 			AttrOnClick("ADD_TO_PLAYLIST_MODAL.show()"),
 		)(
-			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`),
+			RawText(lucide.ListVideo()),
 		),
 	)
 }
@@ -548,6 +552,8 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 
 func videoCardThumbnailPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
-		RawText(`<svg class="w-10 h-10 text-base-content/30" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clapperboard-icon lucide-clapperboard"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg>`),
+		RawText(lucide.Clapperboard(lucide.Params{
+			Class: "w-10 h-10 text-base-content/30",
+		})),
 	)
 }

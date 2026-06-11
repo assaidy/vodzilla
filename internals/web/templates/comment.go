@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/assaidy/lucide"
 	"github.com/google/uuid"
 )
 
@@ -60,7 +61,7 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 			Attr("hx-indicator", "find .submit-btn"),
 		)(
 			If(params.ParentId == uuid.Nil,
-				commentAvatarPlaceholder(),
+				commentOwnerAvatarPlaceholder(),
 			),
 			DIV(AttrClass("flex-1 flex gap-2"))(
 				TEXTAREA(
@@ -118,7 +119,7 @@ func Comment(params CommentParams) HyperNode {
 		AttrClass("flex gap-2"),
 	)(
 		DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
-			commentAvatarPlaceholder(),
+			commentOwnerAvatarPlaceholder(),
 		),
 
 		DIV(AttrClass("flex-1 min-w-0"))(
@@ -167,7 +168,7 @@ func Comment(params CommentParams) HyperNode {
 							AttrClass("btn btn-ghost btn-xs btn-circle"),
 							Attr("tabindex", "0"),
 						)(
-							RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>`),
+							RawText(lucide.EllipsisVertical()),
 						),
 						UL(
 							AttrClass("dropdown-content menu p-2 shadow bg-base-100 rounded-box z-[1]"),
@@ -260,10 +261,10 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 	)
 }
 
-func commentAvatarPlaceholder() HyperNode {
+func commentOwnerAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("avatar placeholder shrink-0"))(
 		DIV(AttrClass("bg-neutral text-neutral-content rounded-full w-8 h-8 flex items-center justify-center text-xs"))(
-			RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+			RawText(lucide.User()),
 		),
 	)
 }

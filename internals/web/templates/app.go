@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
+	"github.com/assaidy/lucide"
 	"github.com/google/uuid"
 )
 
@@ -73,7 +74,7 @@ func WatchLaterPageContent(params WatchLaterPageContentParams) HyperNode {
 		If(len(params.Videos) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("No videos in your watch later list."),
 		).Else(
-			profileVideosContainer(profileVideosParams{
+			profileVideos(profileVideosParams{
 				videoCards: params.Videos,
 			}),
 		),
@@ -108,27 +109,25 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 		If(len(params.Playlists) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("No playlists yet."),
 		).Else(
-			Group(
-				Range(params.Playlists, func(p PlaylistCardParams) any {
-					playlistLink := fmt.Sprintf("/playlists/%s", p.Id)
-					return DIV(
-						AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
-						Attr("hx-get", fmt.Sprintf("%s/content", playlistLink)),
-						Attr("hx-push-url", playlistLink),
-						Attr("hx-target", "#APP_PAGE_CONTENT"),
-						Attr("hx-swap", "innerHTML"),
-						Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
-					)(
-						DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
-							RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-base-content/80"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`),
-						),
-						DIV(AttrClass("p-4"))(
-							H2(AttrClass("card-title text-lg font-bold"))(p.Name),
-							P(AttrClass("text-sm text-base-content/60"))(fmt.Sprintf("%d videos", p.VideosCount)),
-						),
-					)
-				}),
-			),
+			Range(params.Playlists, func(p PlaylistCardParams) any {
+				playlistLink := fmt.Sprintf("/playlists/%s", p.Id)
+				return DIV(
+					AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
+					Attr("hx-get", fmt.Sprintf("%s/content", playlistLink)),
+					Attr("hx-push-url", playlistLink),
+					Attr("hx-target", "#APP_PAGE_CONTENT"),
+					Attr("hx-swap", "innerHTML"),
+					Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+				)(
+					DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
+						RawText(lucide.ListVideo(lucide.Params{Class: "text-base-content/80"})),
+					),
+					DIV(AttrClass("p-4"))(
+						H2(AttrClass("card-title text-lg font-bold"))(p.Name),
+						P(AttrClass("text-sm text-base-content/60"))(fmt.Sprintf("%d videos", p.VideosCount)),
+					),
+				)
+			}),
 		),
 	)
 }
@@ -156,7 +155,7 @@ func PlaylistDetailPageContent(params PlaylistDetailPageContentParams) HyperNode
 		If(len(params.Videos) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("This playlist is empty."),
 		).Else(
-			profileVideosContainer(profileVideosParams{
+			profileVideos(profileVideosParams{
 				videoCards: params.Videos,
 			}),
 		),
@@ -238,12 +237,12 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 					AttrClass("btn btn-soft"),
 					AttrOnClick("EDIT_PROFILE_MODAL.show()"),
 				)(
-					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-pen-icon lucide-user-pen"><path d="M11.5 15H7a4 4 0 0 0-4 4v2"/><path d="M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/><circle cx="10" cy="7" r="4"/></svg>`),
+					RawText(lucide.UserPen()),
 					"edit profile",
 				),
 				DIALOG(AttrId("EDIT_PROFILE_MODAL"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
-						EditProfileFrom(EditProfileFromParams{
+						EditProfileForm(EditProfileFormParams{
 							Name:     params.Name,
 							Username: params.Username,
 							Bio:      params.Bio,
@@ -258,7 +257,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 					AttrClass("btn btn-soft"),
 					AttrOnClick("POST_VIDEO_MODAL.show()"),
 				)(
-					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`),
+					RawText(lucide.Plus()),
 					"post a video",
 				),
 				DIALOG(AttrId("POST_VIDEO_MODAL"), AttrClass("modal"))(
@@ -276,7 +275,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 		),
 
 		// profile videos ==================================================
-		profileVideosContainer(profileVideosParams{
+		profileVideos(profileVideosParams{
 			videoCards: params.Videos,
 		}),
 	)
@@ -312,7 +311,7 @@ func FollowButton(params FollowButtonParams) HyperNode {
 	)
 }
 
-type EditProfileFromParams struct {
+type EditProfileFormParams struct {
 	Name        string
 	NameErr     error
 	Username    string
@@ -321,7 +320,7 @@ type EditProfileFromParams struct {
 	BioErr      error
 }
 
-func EditProfileFrom(params EditProfileFromParams) HyperNode {
+func EditProfileForm(params EditProfileFormParams) HyperNode {
 	return FORM(
 		AttrId("EDIT_PROFILE_FORM"),
 		AttrClass("space-y-4"),
@@ -436,42 +435,43 @@ func Navbar(params NavbarParams) HyperNode {
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
 				pageLink: "/feed",
+				// TODO: missing assaidy/lucide timeline
 				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timeline-icon lucide-timeline"><path d="M4 12h.01"/><path d="M4 16h.01"/><path d="M4 20h.01"/><path d="M4 4h.01"/><path d="M4 8h.01"/><path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z"/><path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z"/><path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z"/></svg>`,
 				isActive: params.CurrentPage == PageFeed,
 			}),
 			appPageButton(appPageButtonParams{
 				tab:      PageDiscover,
 				pageLink: "/discover",
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-binoculars-icon lucide-binoculars"><path d="M10 10h4"/><path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/><path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/><path d="M 22 16 L 2 16"/><path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/><path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/></svg>`,
+				icon:     lucide.Binoculars(),
 				isActive: params.CurrentPage == PageDiscover,
 			}),
 			DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", "Search"))(
 				BUTTON(AttrClass("p-2 btn btn-ghost"))(
-					RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`),
+					RawText(lucide.Search()),
 				),
 			),
 			appPageButton(appPageButtonParams{
 				tab:      PageWatchLater,
 				pageLink: "/watch_later",
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clock-icon lucide-clock"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`,
+				icon:     lucide.Clock(),
 				isActive: params.CurrentPage == PageWatchLater,
 			}),
 			appPageButton(appPageButtonParams{
 				tab:      PagePlaylists,
 				pageLink: "/playlists",
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-video-icon lucide-list-video"><path d="M21 5H3"/><path d="M10 12H3"/><path d="M10 19H3"/><path d="M15 12.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997a1 1 0 0 1-1.517-.86z"/></svg>`,
+				icon:     lucide.ListVideo(),
 				isActive: params.CurrentPage == PagePlaylists,
 			}),
 			appPageButton(appPageButtonParams{
 				tab:      PageNotifications,
 				pageLink: "/notifications",
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell-icon lucide-bell"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>`,
+				icon:     lucide.Bell(),
 				isActive: params.CurrentPage == PageNotifications,
 			}),
 			appPageButton(appPageButtonParams{
 				tab:      PageProfile,
 				pageLink: "/@" + params.Username,
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-icon lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+				icon:     lucide.User(),
 				isActive: params.CurrentPage == PageProfile,
 			}),
 		),
@@ -513,7 +513,7 @@ func appPageButton(params appPageButtonParams) HyperNode {
 
 func profileCardAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full aspect-square md:w-48 md:h-48 md:aspect-auto lg:w-64 lg:h-64 rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
-		RawText(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`),
+		RawText(lucide.User()),
 	)
 }
 
@@ -569,7 +569,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			H1(AttrClass("text-2xl font-bold"))(params.Title),
 			DIV(AttrClass("mt-4 flex items-center gap-3"))(
 				DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
-					videoCardAvatarPlaceholder(),
+					videoCardOwnerAvatarPlaceholder(),
 				),
 				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
 					params.OwnerName,
@@ -587,7 +587,8 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				// watch later
 				WatchLaterButton(params.WatchLaterButtonParams),
 				// add to playlist
-				AddToPlaylistButton(params.AddToPlaylistModalParams.VideoId),
+				AddToPlaylistButton(),
+				AddToPlaylistModal(params.AddToPlaylistModalParams),
 			),
 			DIV(AttrClass("mt-4 card bg-base-200 p-4 space-y-2"))(
 				DIV(AttrClass("text-sm text-base-content/60 flex gap-4"))(
@@ -597,8 +598,6 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				P(AttrClass("text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
 			),
 		),
-
-		AddToPlaylistModal(params.AddToPlaylistModalParams),
 
 		CommentSection(params.Id),
 
@@ -644,9 +643,9 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>`,
-				IfElseZero(params.IsLiked, "text-primary"),
-			)),
+			RawText(lucide.ThumbsUp(lucide.Params{
+				Class: IfElseZero(params.IsLiked, "text-primary"),
+			})),
 			SPAN(AttrClass("text-sm"))(params.LikesCount),
 		),
 		BUTTON(
@@ -656,9 +655,9 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(fmt.Sprintf(`<svg class="%s" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>`,
-				IfElseZero(params.IsDisliked, "text-primary"),
-			)),
+			RawText(lucide.ThumbsDown(lucide.Params{
+				Class: IfElseZero(params.IsDisliked, "text-primary"),
+			})),
 			SPAN(AttrClass("text-sm"))(params.DislikesCount),
 		),
 	)

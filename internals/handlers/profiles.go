@@ -130,7 +130,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 	bioErr := validation.Validate(&bio, validation.Length(0, 500))
 
 	if errors.Join(nameErr, usernameErr, bioErr) != nil {
-		return render(c, templates.EditProfileFrom(templates.EditProfileFromParams{
+		return render(c, templates.EditProfileForm(templates.EditProfileFormParams{
 			Name:        name,
 			NameErr:     nameErr,
 			Username:    username,
@@ -147,7 +147,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 		case errors.Is(err, fiber.ErrNotFound):
 			return redirect(c, "/login")
 		case errors.Is(err, user_service.ErrUsernameConflict):
-			return render(c, templates.EditProfileFrom(templates.EditProfileFromParams{
+			return render(c, templates.EditProfileForm(templates.EditProfileFormParams{
 				Name:        name,
 				Username:    username,
 				UsernameErr: fmt.Errorf("username already exists"),
@@ -160,7 +160,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 
 	c.Set("HX-Replace-Url", fmt.Sprintf("/@%s", username))
 	return render(c, hyper.Group(
-		templates.EditProfileFrom(templates.EditProfileFromParams{
+		templates.EditProfileForm(templates.EditProfileFormParams{
 			Name:     name,
 			Username: username,
 			Bio:      bio,
