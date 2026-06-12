@@ -31,7 +31,6 @@ import (
 )
 
 // TODO: add profile avatar upload
-// TODO: use github.com/assaidy/lucide pacakge for lucide icons
 
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 // TODO: rethink all cleanup workers and deletion of data. we might need data.

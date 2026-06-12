@@ -6,7 +6,8 @@ import (
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
-	"github.com/assaidy/lucide"
+	"github.com/assaidy/icons"
+	"github.com/assaidy/icons/lucide"
 	"github.com/google/uuid"
 )
 
@@ -138,8 +139,7 @@ func Navbar(params NavbarParams) HyperNode {
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
 				pageLink: "/feed",
-				// TODO: missing assaidy/lucide timeline
-				icon:     `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timeline-icon lucide-timeline"><path d="M4 12h.01"/><path d="M4 16h.01"/><path d="M4 20h.01"/><path d="M4 4h.01"/><path d="M4 8h.01"/><path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z"/><path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z"/><path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z"/></svg>`,
+				icon:     lucide.Timeline(),
 				isActive: params.CurrentPage == PageFeed,
 			}),
 			appPageButton(appPageButtonParams{
@@ -353,7 +353,7 @@ func VerificationEmailSentPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-warning mb-4"))(
-							RawText(lucide.Mail(lucide.Params{
+							RawText(lucide.Mail(icons.Params{
 								Class: "w-16 h-16 mx-auto",
 							})),
 						),
@@ -375,7 +375,7 @@ func EmailVerifiedPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-success mb-4"))(
-							RawText(lucide.MailCheck(lucide.Params{
+							RawText(lucide.MailCheck(icons.Params{
 								Class: "w-16 h-16 mx-auto",
 							})),
 						),
@@ -400,7 +400,7 @@ func InvalidVerificationLinkPage() HyperNode {
 				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
 					DIV(AttrClass("card-body text-center"))(
 						DIV(AttrClass("text-error mb-4"))(
-							RawText(lucide.MailWarning(lucide.Params{
+							RawText(lucide.MailWarning(icons.Params{
 								Class: "w-16 h-16 mx-auto",
 							})),
 						),
@@ -1099,7 +1099,7 @@ func videoUploadIndicator() HyperNode {
 				AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"),
 				AttrOnClick("UPLOAD_LIST_DIALOG.showModal()"),
 			)(
-				RawText(lucide.ArrowUpFromLine(lucide.Params{
+				RawText(lucide.ArrowUpFromLine(icons.Params{
 					Class: "w-5 h-5 animate-bounce",
 				})),
 			),
@@ -1270,7 +1270,7 @@ func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
 			Attr("hx-target", "#WATCHLATER_BUTTON"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.Clock(lucide.Params{
+			RawText(lucide.Clock(icons.Params{
 				Class: IfElseZero(params.IsActive, "text-primary"),
 			})),
 		),
@@ -1384,7 +1384,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 
 func videoCardThumbnailPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
-		RawText(lucide.Clapperboard(lucide.Params{
+		RawText(lucide.Clapperboard(icons.Params{
 			Class: "w-10 h-10 text-base-content/30",
 		})),
 	)
@@ -1407,7 +1407,7 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.ThumbsUp(lucide.Params{
+			RawText(lucide.ThumbsUp(icons.Params{
 				Class: IfElseZero(params.IsLiked, "text-primary"),
 			})),
 			SPAN(AttrClass("text-sm"))(params.LikesCount),
@@ -1419,7 +1419,7 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.ThumbsDown(lucide.Params{
+			RawText(lucide.ThumbsDown(icons.Params{
 				Class: IfElseZero(params.IsDisliked, "text-primary"),
 			})),
 			SPAN(AttrClass("text-sm"))(params.DislikesCount),
@@ -1466,7 +1466,7 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 					Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
 				)(
 					DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
-						RawText(lucide.ListVideo(lucide.Params{Class: "text-base-content/80"})),
+						RawText(lucide.ListVideo(icons.Params{Class: "text-base-content/80"})),
 					),
 					DIV(AttrClass("p-4"))(
 						H2(AttrClass("card-title text-lg font-bold"))(p.Name),
