@@ -13,8 +13,8 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
-	me.videoLock(videoId)
-	defer me.videoUnlock(videoId)
+	me.videoMutex.RLock(videoId)
+	defer me.videoMutex.RUnlock(videoId)
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
@@ -46,8 +46,8 @@ func (me *Handler) HandleAddVideoReaction(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid reaction kind")
 	}
 
-	me.videoLock(videoId)
-	defer me.videoUnlock(videoId)
+	me.videoMutex.RLock(videoId)
+	defer me.videoMutex.RUnlock(videoId)
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err

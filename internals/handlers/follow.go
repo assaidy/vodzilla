@@ -18,8 +18,8 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "user not found")
 	}
 
-	me.userLock(userId)
-	defer me.userUnlock(userId)
+	me.userMutext.RLock(userId)
+	defer me.userMutext.RUnlock(userId)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
