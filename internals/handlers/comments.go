@@ -145,8 +145,8 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 		}
 	}
 
-	me.videoMutex.RLock(videoId)
-	defer me.videoMutex.RUnlock(videoId)
+	me.videoMutex.RLock(videoId.String())
+	defer me.videoMutex.RUnlock(videoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err

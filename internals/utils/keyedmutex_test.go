@@ -3,14 +3,15 @@ package utils
 import (
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 func TestMultipleRLocksOnSameKey(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	var wg sync.WaitGroup
 	for range 10 {
@@ -23,8 +24,8 @@ func TestMultipleRLocksOnSameKey(t *testing.T) {
 }
 
 func TestLockBlocksOtherLock(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.Lock(key)
 
@@ -51,8 +52,8 @@ func TestLockBlocksOtherLock(t *testing.T) {
 }
 
 func TestLockBlocksRLock(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.Lock(key)
 
@@ -79,8 +80,8 @@ func TestLockBlocksRLock(t *testing.T) {
 }
 
 func TestRLockBlocksLock(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.RLock(key)
 
@@ -107,8 +108,8 @@ func TestRLockBlocksLock(t *testing.T) {
 }
 
 func TestMultipleRLocksConcurrent(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.RLock(key)
 
@@ -133,8 +134,8 @@ func TestMultipleRLocksConcurrent(t *testing.T) {
 }
 
 func TestDifferentKeysDontInterfere(t *testing.T) {
-	var km KeyedRWMutex
-	keyA, keyB := uuid.New(), uuid.New()
+	km := NewKeyedMutex()
+	keyA, keyB := uuid.New().String(), uuid.New().String()
 
 	km.Lock(keyA)
 
@@ -154,16 +155,16 @@ func TestDifferentKeysDontInterfere(t *testing.T) {
 }
 
 func TestUnlockWithoutLockDoesNotPanic(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.Unlock(key)
 	km.RUnlock(key)
 }
 
 func TestConcurrentReadWriteNoDeadlock(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	var wg sync.WaitGroup
 	for range 50 {
@@ -186,12 +187,12 @@ func TestConcurrentReadWriteNoDeadlock(t *testing.T) {
 }
 
 func TestManyKeys(t *testing.T) {
-	var km KeyedRWMutex
+	km := NewKeyedMutex()
 
 	var wg sync.WaitGroup
 	for range 100 {
 		wg.Go(func() {
-			key := uuid.New()
+			key := uuid.New().String()
 			km.Lock(key)
 			km.Unlock(key)
 			km.RLock(key)
@@ -202,8 +203,8 @@ func TestManyKeys(t *testing.T) {
 }
 
 func TestRLockUpgradeNotAllowed(t *testing.T) {
-	var km KeyedRWMutex
-	key := uuid.New()
+	km := NewKeyedMutex()
+	key := uuid.New().String()
 
 	km.RLock(key)
 
@@ -226,4 +227,150 @@ func TestRLockUpgradeNotAllowed(t *testing.T) {
 		t.Fatal("Lock should acquire after RUnlock")
 	}
 	km.Unlock(key)
+}
+
+func TestClearUnusedRemovesOldReleasedEntries(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		key := uuid.New().String()
+
+		km.Lock(key)
+		km.Unlock(key)
+
+		time.Sleep(30 * time.Minute)
+
+		km.ClearUnused(0)
+
+		if _, ok := km.muMap[key]; ok {
+			t.Fatal("ClearUnused should remove old released entry")
+		}
+	})
+}
+
+func TestClearUnusedSkipsRecentlyUsed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		key := uuid.New().String()
+
+		km.Lock(key)
+		km.Unlock(key)
+
+		time.Sleep(30 * time.Minute)
+
+		km.ClearUnused(time.Hour)
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep recently used entry")
+		}
+	})
+}
+
+func TestClearUnusedSkipsCurrentlyLocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		key := uuid.New().String()
+
+		km.Lock(key)
+
+		km.ClearUnused(time.Hour)
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep currently locked entry")
+		}
+
+		km.ClearUnused(0)
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep currently locked entry even with zero threshold")
+		}
+
+		km.Unlock(key)
+	})
+}
+
+func TestClearUnusedSkipsCurrentlyRLocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		key := uuid.New().String()
+
+		km.RLock(key)
+
+		km.ClearUnused(time.Hour)
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep currently read-locked entry")
+		}
+
+		km.ClearUnused(0)
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep currently read-locked entry even with zero threshold")
+		}
+
+		km.RUnlock(key)
+	})
+}
+
+func TestClearUnusedMixedEntries(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		oldKey := uuid.New().String()
+		recentKey := uuid.New().String()
+		lockedKey := uuid.New().String()
+
+		km.Lock(oldKey)
+		km.Unlock(oldKey)
+
+		time.Sleep(30 * time.Minute)
+
+		km.Lock(recentKey)
+		km.Unlock(recentKey)
+
+		km.Lock(lockedKey)
+
+		km.ClearUnused(0)
+
+		_, oldOk := km.muMap[oldKey]
+		_, recentOk := km.muMap[recentKey]
+		_, lockedOk := km.muMap[lockedKey]
+
+		if oldOk {
+			t.Fatal("ClearUnused should remove old released entry")
+		}
+		if recentOk {
+			t.Fatal("ClearUnused should remove recently released entry with zero threshold")
+		}
+		if !lockedOk {
+			t.Fatal("ClearUnused should keep currently locked entry")
+		}
+
+		km.Unlock(lockedKey)
+	})
+}
+
+func TestClearUnusedSkipsEntryLockedByAnotherGoroutine(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		km := NewKeyedMutex()
+		key := uuid.New().String()
+
+		km.Lock(key)
+
+		done := make(chan struct{})
+		go func() {
+			km.ClearUnused(0)
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("ClearUnused should not block on locked entry")
+		}
+
+		if _, ok := km.muMap[key]; !ok {
+			t.Fatal("ClearUnused should keep entry locked by another goroutine")
+		}
+
+		km.Unlock(key)
+	})
 }

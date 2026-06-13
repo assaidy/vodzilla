@@ -274,8 +274,8 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 	}
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.videoMutex.Lock(videoId)
-	defer me.videoMutex.Unlock(videoId)
+	me.videoMutex.Lock(videoId.String())
+	defer me.videoMutex.Unlock(videoId.String())
 
 	if err := me.videoService.DeleteVideo(c.RequestCtx(), videoId, currentUserId); err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {

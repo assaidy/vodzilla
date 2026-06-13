@@ -177,8 +177,8 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.userMutext.Lock(currentUserId)
-	defer me.userMutext.Unlock(currentUserId)
+	me.userMutex.Lock(currentUserId.String())
+	defer me.userMutex.Unlock(currentUserId.String())
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {

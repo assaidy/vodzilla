@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/assaidy/hyper/v2"
 	"github.com/assaidy/vodzilla/internals/services/media"
@@ -22,8 +23,8 @@ type Handler struct {
 	mediaService    *media.Service
 	reactionService *reaction.Service
 	socialService   *social.Service
-	userMutext          utils.KeyedRWMutex
-	videoMutex         utils.KeyedRWMutex
+	userMutex       *utils.KeyedMutex
+	videoMutex      *utils.KeyedMutex
 }
 
 func New(
@@ -43,7 +44,18 @@ func New(
 		mediaService:    mediaService,
 		reactionService: reactionService,
 		socialService:   socialService,
+		userMutex:       utils.NewKeyedMutex(),
+		videoMutex:      utils.NewKeyedMutex(),
 	}
+
+	// TODO: goroutine leak! later, impl a stop mechanims.
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		for range ticker.C {
+			handler.userMutex.ClearUnused(10 * time.Minute)
+			handler.videoMutex.ClearUnused(10 * time.Minute)
+		}
+	}()
 
 	return handler
 }
