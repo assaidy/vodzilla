@@ -126,6 +126,14 @@ func (me *Service) IsFollower(ctx context.Context, followerId, followedId uuid.U
 	return ok, err
 }
 
+func (me *Service) GetFollowedUserIdsForUser(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := me.queries.GetFollowedUserIdsForUsers(ctx, userId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get followed user ids for user: %w", err)
+	}
+	return ids, nil
+}
+
 func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()

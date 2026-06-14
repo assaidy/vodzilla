@@ -10,7 +10,14 @@ set is_published = true
 where id = $1;
 
 -- name: GetAllPublishedVideosForUser :many
-select * from video_service.videos where owner_id = $1 and is_published = true;
+select * from video_service.videos
+where owner_id = $1 and is_published = true
+order by id desc;
+
+-- name: GetAllPublishedVideosForMultipleUsers :many
+select * from video_service.videos
+where owner_id = any (@user_ids::uuid[]) and is_published = true
+order by id desc;
 
 -- name: GetPublishedVideosCountForUser :one
 select count(*) from video_service.videos where owner_id = $1 and is_published = true;

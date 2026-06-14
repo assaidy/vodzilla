@@ -42,16 +42,15 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		}))
 	}
 
-	pendingVideoIdStr := c.FormValue("pendingVideoId")
-	pendingVideoId, err := uuid.Parse(pendingVideoIdStr)
+	pendingVideoId, err := uuid.Parse(c.FormValue("pendingVideoId"))
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid pending video id")
 	}
 
-	currentUser := c.Locals("user_id").(uuid.UUID)
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	videoId, err := me.videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
-		OwnerId:     currentUser,
+		OwnerId:     currentUserId,
 		Title:       title,
 		Description: description,
 	})
@@ -59,7 +58,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		return err
 	}
 
-	objectKey := fmt.Sprintf("%s/%s", currentUser, videoId)
+	objectKey := fmt.Sprintf("%s/%s", currentUserId, videoId)
 
 	presignedUpload, err := me.mediaService.GeneratePresignedPutUrls(
 		c.RequestCtx(),
@@ -120,8 +119,9 @@ func (me *Handler) HandleCompleteVideoUpload(c fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusForbidden, "upload already completed")
 		case errors.Is(err, media_service.ErrInvalidCompleteUploadData):
 			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
+		default:
+			return err
 		}
-		return err
 	}
 
 	return nil
@@ -285,4 +285,40 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 	}
 
 	return redirect(c, "/login")
+}
+
+func (me *Handler) getTemplateVideosFromVideos(c fiber.Ctx, videos []video_service.Video) ([]templates.VideoCardParams, error) {
+	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
+	ownerCache := make(map[uuid.UUID]*user_service.User)
+
+	for _, v := range videos {
+		owner, ok := ownerCache[v.OwnerId]
+		if !ok {
+			var err error
+			owner, err = me.userService.GetUserById(c.RequestCtx(), v.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrUserNotFound) {
+					continue
+				}
+				return nil, err
+			}
+			ownerCache[v.OwnerId] = owner
+		}
+
+		viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		templateVideos = append(templateVideos, templates.VideoCardParams{
+			VideoId:       v.Id,
+			Title:         v.Title,
+			Timestamp:     v.Timestamp,
+			OwnerName:     owner.Name,
+			OwnerUsername: owner.Username,
+			ViewsCount:    viewsCount,
+		})
+	}
+
+	return templateVideos, nil
 }

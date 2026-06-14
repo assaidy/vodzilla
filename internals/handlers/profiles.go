@@ -39,21 +39,9 @@ func (me *Handler) HandleProfilePageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
-	for _, v := range videos {
-		viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
-		if err != nil {
-			return err
-		}
-
-		templateVideos = append(templateVideos, templates.VideoCardParams{
-			VideoId:       v.Id,
-			Title:         v.Title,
-			Timestamp:     v.Timestamp,
-			OwnerName:     profileUser.Name,
-			OwnerUsername: profileUser.Username,
-			ViewsCount:    viewsCount,
-		})
+	templateVideos, err := me.getTemplateVideosFromVideos(c, videos)
+	if err != nil {
+		return err
 	}
 
 	followersCount, err := me.socialService.GetFollowersCount(c.RequestCtx(), profileUser.Id)

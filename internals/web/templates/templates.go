@@ -1,7 +1,6 @@
 package templates
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -608,9 +607,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 		),
 
 		// profile videos ==================================================
-		profileVideos(profileVideosParams{
-			videoCards: params.Videos,
-		}),
+		videosContainer(params.Videos),
 	)
 }
 
@@ -966,8 +963,6 @@ type VideoUploaderParams struct {
 // so all user sessions can see the uploading videos (with the initiating session)
 // and also the processing ones.
 func VideoUploader(params VideoUploaderParams) HyperNode {
-	encodedUrls, _ := json.Marshal(params.UploadUrls)
-
 	return SCRIPT()(RawText(fmt.Sprintf(`
 		(async () => {
 			const script = document.currentScript;
@@ -1001,7 +996,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 		params.VideoId,
 		params.UploadId,
 		params.PartSize,
-		string(encodedUrls),
+		Json(params.UploadUrls),
 	)))
 }
 
@@ -1034,22 +1029,22 @@ func videoUploadersContainer() HyperNode {
 					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0);
 				},
 				_renderUploadList() {
-						const entries = Object.entries(this._uploads);
-						if (entries.length === 0) {
-								UPLOAD_LIST_DIALOG.close();
-								return;
-						}
-						let html = '';
-						for (const [, u] of entries) {
-								html += '<div class="flex flex-col gap-1 py-2">'
-										 +  '<div class="flex justify-between text-sm">'
-										 +  '<span class="truncate">' + u.title + '</span>'
-										 +  '<span class="shrink-0">' + u.completedChunks + '/' + u.totalChunks + '</span>'
-										 +  '</div>'
-										 +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
-										 +  '</div>';
-						}
-						UPLOAD_LIST_BODY.innerHTML = html;
+					const entries = Object.entries(this._uploads);
+					if (entries.length === 0) {
+						UPLOAD_LIST_DIALOG.close();
+						return;
+					}
+					let html = '';
+					for (const [, u] of entries) {
+						html += '<div class="flex flex-col gap-1 py-2">'
+						     +  '<div class="flex justify-between text-sm">'
+						     +  '<span class="truncate">' + u.title + '</span>'
+						     +  '<span class="shrink-0">' + u.completedChunks + '/' + u.totalChunks + '</span>'
+						     +  '</div>'
+						     +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
+						     +  '</div>';
+					}
+					UPLOAD_LIST_BODY.innerHTML = html;
 				},
 			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, videoId, uploadId, completeUploadUrl }) {
 					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
@@ -1059,17 +1054,17 @@ func videoUploadersContainer() HyperNode {
 
 					const completedParts = [];
 					const uploads = uploadUrls.map(async (url, i) => {
-					 	const start = i * partSize;
-					 	const end = i === uploadUrls.length - 1 ? file.size : start + partSize;
-					 	const blob = file.slice(start, end);
+						const start = i * partSize;
+						const end = i === uploadUrls.length - 1 ? file.size : start + partSize;
+						const blob = file.slice(start, end);
 
-					 	const response = await fetch(url, { method: 'PUT', body: blob });
-					 	if (!response.ok) throw new Error("upload failed");
+						const response = await fetch(url, { method: 'PUT', body: blob });
+						if (!response.ok) throw new Error("upload failed");
 
-					 	completedParts.push({
-					 	 	etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
-					 	 	partNumber: i + 1,
-					 	});
+						completedParts.push({
+							etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
+							partNumber: i + 1,
+						});
 
 						this.markChunkComplete(pendingVideoId);
 					});
@@ -1077,9 +1072,9 @@ func videoUploadersContainer() HyperNode {
 					await Promise.all(uploads);
 
 					await fetch(completeUploadUrl, {
-					 	method: 'POST',
-					 	headers: { 'Content-Type': 'application/json' },
-					 	body: JSON.stringify({ videoId, uploadId, parts: completedParts }),
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ videoId, uploadId, parts: completedParts }),
 					});
 
 					delete window._pendingVideos[pendingVideoId];
@@ -1117,13 +1112,9 @@ func videoUploadIndicator() HyperNode {
 	)
 }
 
-type profileVideosParams struct {
-	videoCards []VideoCardParams
-}
-
-func profileVideos(params profileVideosParams) HyperNode {
-	return DIV(AttrId("PROFILE_VIDEOS_CONTAINER"), AttrClass("mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"))(
-		Range(params.videoCards, func(p VideoCardParams) any {
+func videosContainer(videos []VideoCardParams) HyperNode {
+	return DIV(AttrClass("mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"))(
+		Range(videos, func(p VideoCardParams) any {
 			return VideoCard(p)
 		}),
 	)
@@ -1501,19 +1492,17 @@ func PlaylistDetailPageContent(params PlaylistDetailPageContentParams) HyperNode
 		If(len(params.Videos) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("This playlist is empty."),
 		).Else(
-			profileVideos(profileVideosParams{
-				videoCards: params.Videos,
-			}),
+			videosContainer(params.Videos),
 		),
 	)
 }
 
-type WatchLaterPageContentParams struct {
+type WatchlaterPageContentParams struct {
 	Username string
 	Videos   []VideoCardParams
 }
 
-func WatchLaterPage(username string) HyperNode {
+func WatchlaterPage(username string) HyperNode {
 	return appPageLayout(appPageLayoutParams{
 		navbarParams: NavbarParams{
 			CurrentPage: PageWatchLater,
@@ -1524,7 +1513,7 @@ func WatchLaterPage(username string) HyperNode {
 	)
 }
 
-func WatchLaterPageContent(params WatchLaterPageContentParams) HyperNode {
+func WatchlaterPageContent(params WatchlaterPageContentParams) HyperNode {
 	return Group(
 		H1(AttrClass("text-2xl font-bold mb-4"))("Watch Later"),
 		If(len(params.Videos) == 0,
@@ -1532,9 +1521,7 @@ func WatchLaterPageContent(params WatchLaterPageContentParams) HyperNode {
 				"No videos in your watch later list.",
 			),
 		).Else(
-			profileVideos(profileVideosParams{
-				videoCards: params.Videos,
-			}),
+			videosContainer(params.Videos),
 		),
 	)
 }
@@ -1827,9 +1814,17 @@ func FeedPage(username string) HyperNode {
 	)
 }
 
-func FeedPageContent() HyperNode {
+func FeedPageContent(videos []VideoCardParams) HyperNode {
 	return Group(
-		"Feed Page",
+		H1(AttrClass("text-2xl font-bold mb-4"))("Your Feed"),
+		If(len(videos) == 0,
+			DIV(AttrClass("text-center mt-20 space-y-2"))(
+				P(AttrClass("text-base-content/60"))("No videos in your feed yet."),
+				P(AttrClass("text-sm text-base-content/40"))("Follow some users to see their latest videos here."),
+			),
+		).Else(
+			videosContainer(videos),
+		),
 	)
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services/social"
 	"github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/services/video"
-	"github.com/assaidy/vodzilla/internals/utils"
+	"github.com/assaidy/vodzilla/internals/utils/keyed_mutex"
 	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"
 )
@@ -23,8 +23,8 @@ type Handler struct {
 	mediaService    *media.Service
 	reactionService *reaction.Service
 	socialService   *social.Service
-	userMutex       *utils.KeyedMutex
-	videoMutex      *utils.KeyedMutex
+	userMutex       *keyed_mutex.RWMutex
+	videoMutex      *keyed_mutex.RWMutex
 }
 
 func New(
@@ -44,8 +44,8 @@ func New(
 		mediaService:    mediaService,
 		reactionService: reactionService,
 		socialService:   socialService,
-		userMutex:       utils.NewKeyedMutex(),
-		videoMutex:      utils.NewKeyedMutex(),
+		userMutex:       keyed_mutex.New(),
+		videoMutex:      keyed_mutex.New(),
 	}
 
 	// TODO: goroutine leak! later, impl a stop mechanims.

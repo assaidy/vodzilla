@@ -1,4 +1,4 @@
-package utils
+package keyed_mutex
 
 import (
 	"sync"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestMultipleRLocksOnSameKey(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	var wg sync.WaitGroup
@@ -24,7 +24,7 @@ func TestMultipleRLocksOnSameKey(t *testing.T) {
 }
 
 func TestLockBlocksOtherLock(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.Lock(key)
@@ -52,7 +52,7 @@ func TestLockBlocksOtherLock(t *testing.T) {
 }
 
 func TestLockBlocksRLock(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.Lock(key)
@@ -80,7 +80,7 @@ func TestLockBlocksRLock(t *testing.T) {
 }
 
 func TestRLockBlocksLock(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.RLock(key)
@@ -108,7 +108,7 @@ func TestRLockBlocksLock(t *testing.T) {
 }
 
 func TestMultipleRLocksConcurrent(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.RLock(key)
@@ -134,7 +134,7 @@ func TestMultipleRLocksConcurrent(t *testing.T) {
 }
 
 func TestDifferentKeysDontInterfere(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	keyA, keyB := uuid.New().String(), uuid.New().String()
 
 	km.Lock(keyA)
@@ -155,7 +155,7 @@ func TestDifferentKeysDontInterfere(t *testing.T) {
 }
 
 func TestUnlockWithoutLockDoesNotPanic(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.Unlock(key)
@@ -163,7 +163,7 @@ func TestUnlockWithoutLockDoesNotPanic(t *testing.T) {
 }
 
 func TestConcurrentReadWriteNoDeadlock(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	var wg sync.WaitGroup
@@ -187,7 +187,7 @@ func TestConcurrentReadWriteNoDeadlock(t *testing.T) {
 }
 
 func TestManyKeys(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 
 	var wg sync.WaitGroup
 	for range 100 {
@@ -203,7 +203,7 @@ func TestManyKeys(t *testing.T) {
 }
 
 func TestRLockUpgradeNotAllowed(t *testing.T) {
-	km := NewKeyedMutex()
+	km := New()
 	key := uuid.New().String()
 
 	km.RLock(key)
@@ -231,7 +231,7 @@ func TestRLockUpgradeNotAllowed(t *testing.T) {
 
 func TestClearUnusedRemovesOldReleasedEntries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		key := uuid.New().String()
 
 		km.Lock(key)
@@ -249,7 +249,7 @@ func TestClearUnusedRemovesOldReleasedEntries(t *testing.T) {
 
 func TestClearUnusedSkipsRecentlyUsed(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		key := uuid.New().String()
 
 		km.Lock(key)
@@ -267,7 +267,7 @@ func TestClearUnusedSkipsRecentlyUsed(t *testing.T) {
 
 func TestClearUnusedSkipsCurrentlyLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		key := uuid.New().String()
 
 		km.Lock(key)
@@ -290,7 +290,7 @@ func TestClearUnusedSkipsCurrentlyLocked(t *testing.T) {
 
 func TestClearUnusedSkipsCurrentlyRLocked(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		key := uuid.New().String()
 
 		km.RLock(key)
@@ -313,7 +313,7 @@ func TestClearUnusedSkipsCurrentlyRLocked(t *testing.T) {
 
 func TestClearUnusedMixedEntries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		oldKey := uuid.New().String()
 		recentKey := uuid.New().String()
 		lockedKey := uuid.New().String()
@@ -350,7 +350,7 @@ func TestClearUnusedMixedEntries(t *testing.T) {
 
 func TestClearUnusedSkipsEntryLockedByAnotherGoroutine(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		km := NewKeyedMutex()
+		km := New()
 		key := uuid.New().String()
 
 		km.Lock(key)

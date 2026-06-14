@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/assaidy/hyper/v2"
-	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -97,8 +96,9 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusConflict, "already in playlist")
 		case errors.Is(err, video_service.ErrPlaylistNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		default:
+			return err
 		}
-		return err
 	}
 
 	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
@@ -134,8 +134,9 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
 		case errors.Is(err, video_service.ErrVideoNotFound):
 			return fiber.NewError(fiber.StatusNotFound, "video not in playlist")
+		default:
+			return err
 		}
-		return err
 	}
 
 	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
@@ -240,34 +241,9 @@ func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	ownerCache := make(map[uuid.UUID]*user_service.User)
-	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
-	for _, v := range videos {
-		owner, ok := ownerCache[v.OwnerId]
-		if !ok {
-			owner, err = me.userService.GetUserById(c.RequestCtx(), v.OwnerId)
-			if err != nil {
-				if errors.Is(err, user_service.ErrUserNotFound) {
-					continue
-				}
-				return err
-			}
-			ownerCache[v.OwnerId] = owner
-		}
-
-		viewsCount, err := me.reactionService.GetVideoViewsCount(c.RequestCtx(), v.Id)
-		if err != nil {
-			return err
-		}
-
-		templateVideos = append(templateVideos, templates.VideoCardParams{
-			VideoId:       v.Id,
-			Title:         v.Title,
-			Timestamp:     v.Timestamp,
-			OwnerName:     owner.Name,
-			OwnerUsername: owner.Username,
-			ViewsCount:    viewsCount,
-		})
+	templateVideos, err := me.getTemplateVideosFromVideos(c, videos)
+	if err != nil {
+		return err
 	}
 
 	return render(c, hyper.Group(

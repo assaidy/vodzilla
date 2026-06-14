@@ -177,6 +177,26 @@ func (me *Service) GetAllVideosForUser(ctx context.Context, userId uuid.UUID) ([
 	return result, nil
 }
 
+func (me *Service) GetAllVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID) ([]Video, error) {
+	videos, err := me.queries.GetAllPublishedVideosForMultipleUsers(ctx, userIds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all published videos for user: %w", err)
+	}
+
+	result := make([]Video, 0, len(videos))
+	for _, v := range videos {
+		result = append(result, Video{
+			Id:          v.Id,
+			OwnerId:     v.OwnerId,
+			Timestamp:   v.CreatedAt,
+			Title:       v.Title,
+			Description: v.Description.String,
+		})
+	}
+
+	return result, nil
+}
+
 func (me *Service) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckVideo(ctx, queries.CheckVideoParams{
 		Id:          id,

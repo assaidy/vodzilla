@@ -25,8 +25,23 @@ func (me *Handler) HandleFeedPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	followedIds, err := me.socialService.GetFollowedUserIdsForUser(c.RequestCtx(), currentUser.Id)
+	if err != nil {
+		return err
+	}
+
+	videos, err := me.videoService.GetAllVideosForMultipleUsers(c.RequestCtx(), followedIds)
+	if err != nil {
+		return err
+	}
+
+	templateVideos, err := me.getTemplateVideosFromVideos(c, videos)
+	if err != nil {
+		return err
+	}
+
 	return render(c, hyper.Group(
-		templates.FeedPageContent(),
+		templates.FeedPageContent(templateVideos),
 
 		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
