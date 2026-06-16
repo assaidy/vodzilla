@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
+var strf = fmt.Sprintf
+
 func basicPageLayout(title string) ChildrenInserter {
 	clientId := uuid.New()
 
@@ -31,7 +33,7 @@ func basicPageLayout(title string) ChildrenInserter {
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
 					Attr("hx-status:5xx:inherited", "swap:none"),
-					Attr("_", fmt.Sprintf(`
+					Attr("_", strf(`
 						init
 							set $clientId to %q
 						on htmx:config:request
@@ -79,8 +81,8 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 	return DIV(AttrId("ALERT_TOAST"), Attr("hx-swap-oob", "prepend"))(
 		DIV(
 			AttrRole("alert"),
-			AttrClass(fmt.Sprintf("alert alert-%s", level)),
-			Attr("hx-on::after:process", fmt.Sprintf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
+			AttrClass(strf("alert alert-%s", level)),
+			Attr("hx-on::after:process", strf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
 		)(
 			RawText(icon), SPAN()(message),
 		),
@@ -198,7 +200,7 @@ func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
 		BUTTON(
 			AttrClass(Classes("btn btn-ghost p-2", IfElseZero(params.isActive, "btn-primary"))),
-			Attr("hx-get", fmt.Sprintf("%s/content", params.pageLink)),
+			Attr("hx-get", strf("%s/content", params.pageLink)),
 			Attr("hx-push-url", params.pageLink),
 			Attr("hx-target", "#APP_PAGE_CONTENT"),
 			Attr("hx-swap", "innerHTML"),
@@ -514,7 +516,7 @@ func ProfilePage(username string, profileUsername string) HyperNode {
 			Username:    username,
 		},
 	})(
-		appPageContentLoader(fmt.Sprintf("/@%s/content", profileUsername)),
+		appPageContentLoader(strf("/@%s/content", profileUsername)),
 	)
 }
 
@@ -617,7 +619,7 @@ func FollowButton(params FollowButtonParams) HyperNode {
 		If(params.IsFollowed,
 			BUTTON(
 				AttrClass("btn btn-outline btn-accent hover:btn-error group/follow"),
-				Attr("hx-delete", fmt.Sprintf("/follow/%s", params.ProfileOwnerId)),
+				Attr("hx-delete", strf("/follow/%s", params.ProfileOwnerId)),
 				Attr("hx-target", "#FOLLOW_BUTTON"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-disable", "this"),
@@ -628,7 +630,7 @@ func FollowButton(params FollowButtonParams) HyperNode {
 		).Else(
 			BUTTON(
 				AttrClass("btn btn-accent"),
-				Attr("hx-post", fmt.Sprintf("/follow/%s", params.ProfileOwnerId)),
+				Attr("hx-post", strf("/follow/%s", params.ProfileOwnerId)),
 				Attr("hx-target", "#FOLLOW_BUTTON"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-disable", "this"),
@@ -735,7 +737,7 @@ func VideoPage(username string, videoId uuid.UUID) HyperNode {
 			Username: username,
 		},
 	})(
-		appPageContentLoader(fmt.Sprintf("/videos/%s/content", videoId)),
+		appPageContentLoader(strf("/videos/%s/content", videoId)),
 	)
 }
 
@@ -757,7 +759,7 @@ type VideoPageContentParams struct {
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
-	ownerProfileLink := fmt.Sprintf("/@%s", params.OwnerUsername)
+	ownerProfileLink := strf("/@%s", params.OwnerUsername)
 	visitProfileAttrs := []Attribute{
 		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfileLink)),
 		Attr("hx-push-url", ownerProfileLink),
@@ -774,7 +776,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
 			AttrPlaysInline(true),
-			Attr("hx-post", fmt.Sprintf("/videos/%s/views", params.Id)),
+			Attr("hx-post", strf("/videos/%s/views", params.Id)),
 			Attr("hx-trigger", "load"),
 		)(),
 		DIV(AttrClass("mt-4"))(
@@ -801,7 +803,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			),
 			DIV(AttrClass("mt-4 card bg-base-200 p-4 space-y-2"))(
 				DIV(AttrClass("text-sm text-base-content/60 flex gap-4"))(
-					SPAN()(fmt.Sprintf("%d views", params.ViewsCount)),
+					SPAN()(strf("%d views", params.ViewsCount)),
 					SPAN()(params.Timestamp.Format(time.DateOnly)),
 				),
 				P(AttrClass("text-base-content/80"))(IfElse(params.Description == "", "---", params.Description)),
@@ -810,7 +812,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 
 		commentSection(params.Id),
 
-		SCRIPT()(RawText(fmt.Sprintf(`
+		SCRIPT()(RawText(strf(`
 			(() => {
 				const v = VIDEO_PLAYER;
 				let attempts = 0;
@@ -859,15 +861,15 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "find .submit-button"),
 		Attr("hx-disable", "find .submit-button"),
-		Attr("hx-vals", fmt.Sprintf(`js:{
+		Attr("hx-vals", strf(`js:{
 			contentType:    FORM_VIDEO.files[0].type,
 			fileSize:       FORM_VIDEO.files[0].size,
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
-		Attr("hx-on::before:request", fmt.Sprintf(`
+		Attr("hx-on::before:request", strf(`
 			window._pendingVideos[%q] = FORM_VIDEO.files[0];
 		`, pendingVideoId)),
-		Attr("hx-on::after:request", fmt.Sprintf(`
+		Attr("hx-on::after:request", strf(`
 			if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q];
 		`, pendingVideoId)),
 	)(
@@ -959,7 +961,7 @@ type VideoUploaderParams struct {
 // so all user sessions can see the uploading videos (with the initiating session)
 // and also the processing ones.
 func VideoUploader(params VideoUploaderParams) HyperNode {
-	return SCRIPT()(RawText(fmt.Sprintf(`
+	return SCRIPT()(RawText(strf(`
 		(async () => {
 			const script = document.currentScript;
 			const pendingVideoId = %q;
@@ -1131,10 +1133,10 @@ type VideoCardParams struct {
 }
 
 func VideoCard(params VideoCardParams) HyperNode {
-	ownerProfilePageLink := fmt.Sprintf("/@%s", params.OwnerUsername)
-	videoPageLink := fmt.Sprintf("/videos/%s", params.VideoId)
+	ownerProfilePageLink := strf("/@%s", params.OwnerUsername)
+	videoPageLink := strf("/videos/%s", params.VideoId)
 	visiteProfileAttrs := []Attribute{
-		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
 		Attr("hx-push-url", ownerProfilePageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
@@ -1144,7 +1146,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 
 	return DIV(
 		AttrClass("card bg-base-100 cursor-pointer"),
-		Attr("hx-get", fmt.Sprintf("%s/content", videoPageLink)),
+		Attr("hx-get", strf("%s/content", videoPageLink)),
 		Attr("hx-push-url", videoPageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
@@ -1197,44 +1199,44 @@ func normalizeTimestamp(t time.Time) any {
 		if m == 1 {
 			return "1 minute"
 		}
-		return fmt.Sprintf("%d minutes", m)
+		return strf("%d minutes", m)
 	case d < 24*time.Hour:
 		h := int(d.Hours())
 		if h == 1 {
 			return "1 hour"
 		}
-		return fmt.Sprintf("%d hours", h)
+		return strf("%d hours", h)
 	case d < 30*24*time.Hour:
 		days := int(d.Hours() / 24)
 		if days == 1 {
 			return "1 day"
 		}
-		return fmt.Sprintf("%d days", days)
+		return strf("%d days", days)
 	case d < 365*24*time.Hour:
 		months := int(d.Hours() / (24 * 30))
 		if months == 1 {
 			return "1 month"
 		}
-		return fmt.Sprintf("%d months", months)
+		return strf("%d months", months)
 	default:
 		years := int(d.Hours() / (24 * 365))
 		if years == 1 {
 			return "1 year"
 		}
-		return fmt.Sprintf("%d years", years)
+		return strf("%d years", years)
 	}
 }
 
 func normalizeViewsCount(i int) any {
 	switch {
 	case i >= 1_000_000_000:
-		return fmt.Sprintf("%.1fB", float64(i)/1_000_000_000)
+		return strf("%.1fB", float64(i)/1_000_000_000)
 	case i >= 1_000_000:
-		return fmt.Sprintf("%.1fM", float64(i)/1_000_000)
+		return strf("%.1fM", float64(i)/1_000_000)
 	case i >= 1_000:
-		return fmt.Sprintf("%.1fK", float64(i)/1_000)
+		return strf("%.1fK", float64(i)/1_000)
 	default:
-		return fmt.Sprintf("%d", i)
+		return strf("%d", i)
 	}
 }
 
@@ -1256,7 +1258,7 @@ func WatchlaterButton(params WatchlaterButtonParams) HyperNode {
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", IfElse(params.IsActive, "Remove from Watch Later", "Add to Watch Later")),
-			Attr(IfElse(params.IsActive, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/watchlater", params.VideoId)),
+			Attr(IfElse(params.IsActive, "hx-delete", "hx-post"), strf("/videos/%s/watchlater", params.VideoId)),
 			Attr("hx-target", "#WATCHLATER_BUTTON"),
 			Attr("hx-swap", "outerHTML"),
 		)(
@@ -1281,7 +1283,7 @@ func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
 			INPUT(
 				AttrType(TypeCheckbox),
 				AttrClass("checkbox checkbox-sm checkbox-primary"),
-				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
+				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), strf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
 				Attr("hx-target", "#PLAYLIST_CHECKBOX"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-vals", Json(Object{"playlistName": params.Name})),
@@ -1393,7 +1395,7 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Like"),
-			Attr(IfElse(params.IsLiked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/reactions?kind=like", params.VideoId)),
+			Attr(IfElse(params.IsLiked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=like", params.VideoId)),
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
@@ -1405,7 +1407,7 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Dislike"),
-			Attr(IfElse(params.IsDisliked, "hx-delete", "hx-post"), fmt.Sprintf("/videos/%s/reactions?kind=dislike", params.VideoId)),
+			Attr(IfElse(params.IsDisliked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=dislike", params.VideoId)),
 			Attr("hx-target", "#REACTIONS_WIDGET"),
 			Attr("hx-swap", "outerHTML"),
 		)(
@@ -1446,10 +1448,10 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 			P(AttrClass("text-center text-base-content/60 mt-20"))("No playlists yet."),
 		).Else(
 			Range(params.Playlists, func(p PlaylistCardParams) any {
-				playlistLink := fmt.Sprintf("/playlists/%s", p.Id)
+				playlistLink := strf("/playlists/%s", p.Id)
 				return DIV(
 					AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
-					Attr("hx-get", fmt.Sprintf("%s/content", playlistLink)),
+					Attr("hx-get", strf("%s/content", playlistLink)),
 					Attr("hx-push-url", playlistLink),
 					Attr("hx-target", "#APP_PAGE_CONTENT"),
 					Attr("hx-swap", "innerHTML"),
@@ -1460,7 +1462,7 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 					),
 					DIV(AttrClass("p-4"))(
 						H2(AttrClass("card-title text-lg font-bold"))(p.Name),
-						P(AttrClass("text-sm text-base-content/60"))(fmt.Sprintf("%d videos", p.VideosCount)),
+						P(AttrClass("text-sm text-base-content/60"))(strf("%d videos", p.VideosCount)),
 					),
 				)
 			}),
@@ -1481,7 +1483,7 @@ func PlaylistDetailPage(username string, playlistId uuid.UUID) HyperNode {
 			Username:    username,
 		},
 	})(
-		appPageContentLoader(fmt.Sprintf("/playlists/%s/content", playlistId)),
+		appPageContentLoader(strf("/playlists/%s/content", playlistId)),
 	)
 }
 
@@ -1534,7 +1536,7 @@ func commentSection(videoId uuid.UUID) HyperNode {
 		DIV(
 			AttrId("COMMENTS_LIST"),
 			AttrClass("space-y-4 mt-6"),
-			Attr("hx-get", fmt.Sprintf("/videos/%s/comments", videoId)),
+			Attr("hx-get", strf("/videos/%s/comments", videoId)),
 			Attr("hx-trigger", "load"),
 			Attr("hx-swap", "innerHTML"),
 		)(),
@@ -1562,8 +1564,8 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	submitText := "Comment"
 
 	if params.ParentId != uuid.Nil {
-		formId = fmt.Sprintf("REPLY_FORM_INNER_%s", params.ParentId)
-		textareaId = fmt.Sprintf("REPLY_TEXTAREA_%s", params.ParentId)
+		formId = strf("REPLY_FORM_INNER_%s", params.ParentId)
+		textareaId = strf("REPLY_TEXTAREA_%s", params.ParentId)
 		placeholder = "Write a reply..."
 		submitText = "Reply"
 	}
@@ -1572,7 +1574,7 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 		FORM(
 			AttrId(formId),
 			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != uuid.Nil, "hidden"))),
-			Attr("hx-post", fmt.Sprintf("/videos/%s/comments", params.VideoId)),
+			Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
 			Attr("hx-swap", "outerHTML"),
 			Attr("hx-indicator", "find .submit-btn"),
 		)(
@@ -1620,9 +1622,9 @@ func Comment(params CommentParams) HyperNode {
 	commentId := params.CommentId
 	videoId := params.VideoId
 
-	ownerProfilePageLink := fmt.Sprintf("/@%s", params.OwnerUsername)
+	ownerProfilePageLink := strf("/@%s", params.OwnerUsername)
 	visitProfileAttrs := []Attribute{
-		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfilePageLink)),
+		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
 		Attr("hx-push-url", ownerProfilePageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
@@ -1631,7 +1633,7 @@ func Comment(params CommentParams) HyperNode {
 	}
 
 	return DIV(
-		AttrId(fmt.Sprintf("COMMENT_%s", commentId)),
+		AttrId(strf("COMMENT_%s", commentId)),
 		AttrClass("flex gap-2"),
 	)(
 		DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
@@ -1646,8 +1648,8 @@ func Comment(params CommentParams) HyperNode {
 				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
 			),
 
-			DIV(AttrId(fmt.Sprintf("COMMENT_BODY_%s", commentId)))(
-				DIV(AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId)))(
+			DIV(AttrId(strf("COMMENT_BODY_%s", commentId)))(
+				DIV(AttrId(strf("COMMENT_CONTENT_%s", commentId)))(
 					P(AttrClass("text-sm"))(params.Content),
 				),
 				If(params.IsOwner,
@@ -1663,18 +1665,18 @@ func Comment(params CommentParams) HyperNode {
 			DIV(AttrClass("flex items-center gap-1 mt-1"))(
 				BUTTON(
 					AttrClass("btn btn-ghost btn-xs"),
-					AttrOnClick(fmt.Sprintf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
+					AttrOnClick(strf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
 				)("Reply"),
 
 				If(params.RepliesCount > 0,
 					BUTTON(
 						AttrClass("btn btn-soft btn-xs"),
-						Attr("hx-get", fmt.Sprintf("/videos/%s/comments/%s/replies", videoId, commentId)),
-						Attr("hx-target", fmt.Sprintf("#REPLIES_%s", commentId)),
+						Attr("hx-get", strf("/videos/%s/comments/%s/replies", videoId, commentId)),
+						Attr("hx-target", strf("#REPLIES_%s", commentId)),
 						Attr("hx-swap", "append"),
 						Attr("hx-on::after:request", "this.remove()"),
 					)(
-						fmt.Sprintf("Show replies (%d)", params.RepliesCount),
+						strf("Show replies (%d)", params.RepliesCount),
 					),
 				),
 
@@ -1692,7 +1694,7 @@ func Comment(params CommentParams) HyperNode {
 						)(
 							LI()(
 								A(
-									AttrOnClick(fmt.Sprintf(`
+									AttrOnClick(strf(`
 										COMMENT_CONTENT_%[1]s.classList.add('hidden');
 										EDIT_FORM_%[1]s.classList.remove('hidden');
 									`,
@@ -1704,8 +1706,8 @@ func Comment(params CommentParams) HyperNode {
 							),
 							LI()(
 								A(
-									Attr("hx-delete", fmt.Sprintf("/videos/%s/comments/%s", videoId, commentId)),
-									Attr("hx-target", fmt.Sprintf("#COMMENT_%s", commentId)),
+									Attr("hx-delete", strf("/videos/%s/comments/%s", videoId, commentId)),
+									Attr("hx-target", strf("#COMMENT_%s", commentId)),
 									Attr("hx-swap", "delete"),
 									Attr("hx-confirm", "Are you sure?"),
 								)(
@@ -1718,14 +1720,14 @@ func Comment(params CommentParams) HyperNode {
 			),
 
 			DIV(
-				AttrId(fmt.Sprintf("REPLY_FORM_%s", commentId)),
+				AttrId(strf("REPLY_FORM_%s", commentId)),
 				AttrClass("hidden mt-2"),
 			)(
 				CreateCommentForm(CreateCommentFormParams{VideoId: videoId, ParentId: commentId}),
 			),
 
 			DIV(
-				AttrId(fmt.Sprintf("REPLIES_%s", commentId)),
+				AttrId(strf("REPLIES_%s", commentId)),
 				AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3"),
 			)(),
 		),
@@ -1742,9 +1744,9 @@ type EditCommentFormParams struct {
 
 func EditCommentForm(params EditCommentFormParams) HyperNode {
 	return FORM(
-		AttrId(fmt.Sprintf("EDIT_FORM_%s", params.CommentId)),
+		AttrId(strf("EDIT_FORM_%s", params.CommentId)),
 		AttrClass(IfElseZero(params.Hide, "hidden")),
-		Attr("hx-put", fmt.Sprintf("/videos/%s/comments/%s", params.VideoId, params.CommentId)),
+		Attr("hx-put", strf("/videos/%s/comments/%s", params.VideoId, params.CommentId)),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "find .submit-btn"),
 	)(
@@ -1766,7 +1768,7 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 			BUTTON(
 				AttrClass("btn btn-ghost btn-sm"),
 				AttrType(TypeButton),
-				AttrOnClick(fmt.Sprintf(`
+				AttrOnClick(strf(`
 					COMMENT_CONTENT_%[1]s.classList.remove('hidden');
 					EDIT_FORM_%[1]s.classList.add('hidden');
 				`, params.CommentId)),
