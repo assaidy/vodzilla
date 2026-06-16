@@ -27,8 +27,8 @@ func basicPageLayout(title string) ChildrenInserter {
 					LINK(AttrRel("preconnect"), AttrHref("https://fonts.gstatic.com"), AttrCrossOrigin(CrossOriginAnonymous)),
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
-					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
-					SCRIPT(AttrSrc("/assets/js/lib/hyperscript.org@0.9.91.js"))(),
+					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js")),
+					SCRIPT(AttrSrc("/assets/js/lib/hyperscript.org@0.9.91.js")),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
@@ -43,7 +43,7 @@ func basicPageLayout(title string) ChildrenInserter {
 						clientId,
 					)),
 				)(
-					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]"))(),
+					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]")),
 					Group(children...),
 				),
 			),
@@ -95,7 +95,7 @@ func appPageContentLoader(contentPath string) HyperNode {
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-trigger", "load"),
 		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
-	)()
+	)
 }
 
 type appPageLayoutParams struct {
@@ -115,7 +115,7 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 						Group(children...),
 					),
 					DIV(AttrClass("hidden group-[.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
-						SPAN(AttrClass("loading loading-spinner loading-lg"))(),
+						SPAN(AttrClass("loading loading-spinner loading-lg")),
 					),
 				),
 				videoUploadersContainer(),
@@ -337,7 +337,7 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Register"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
 		),
 	)
@@ -493,7 +493,7 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Login"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
 		),
 
@@ -719,7 +719,7 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Submit"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
 		),
 	)
@@ -778,7 +778,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			AttrPlaysInline(true),
 			Attr("hx-post", strf("/videos/%s/views", params.Id)),
 			Attr("hx-trigger", "load"),
-		)(),
+		),
 		DIV(AttrClass("mt-4"))(
 			H1(AttrClass("text-2xl font-bold"))(params.Title),
 			DIV(AttrClass("mt-4 flex items-center gap-3"))(
@@ -832,7 +832,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 					}
 				});
 				v.addEventListener('playing', () => { attempts = 0; });
-			})();
+			});
 		`, params.Id))),
 	)
 }
@@ -935,7 +935,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 				AttrType(TypeSubmit),
 			)(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Post"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block"))(),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
 		),
 
@@ -987,7 +987,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 			} finally {
 				script.remove();
 			}
-		})();
+		});
 	`,
 		params.PendingVideoId,
 		params.VideoTitle,
@@ -1104,7 +1104,7 @@ func videoUploadIndicator() HyperNode {
 		DIALOG(AttrId("UPLOAD_LIST_DIALOG"), AttrClass("modal"))(
 			DIV(AttrClass("modal-box"))(
 				H3(AttrClass("text-lg font-bold"))("Uploading Videos"),
-				DIV(AttrId("UPLOAD_LIST_BODY"), AttrClass("mt-4 space-y-2"))(),
+				DIV(AttrId("UPLOAD_LIST_BODY"), AttrClass("mt-4 space-y-2")),
 			),
 			FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
 				BUTTON()("close"),
@@ -1324,7 +1324,7 @@ func addToPlaylistModal(params AddToPlaylistModalParams) HyperNode {
 					),
 				),
 			),
-			DIV(AttrClass("divider my-4"))(),
+			DIV(AttrClass("divider my-4")),
 			CreatePlaylistForm(CreatePlaylistFormParams{VideoId: params.VideoId}),
 		),
 		FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
@@ -1539,7 +1539,7 @@ func commentSection(videoId uuid.UUID) HyperNode {
 			Attr("hx-get", strf("/videos/%s/comments", videoId)),
 			Attr("hx-trigger", "load"),
 			Attr("hx-swap", "innerHTML"),
-		)(),
+		),
 	)
 }
 
@@ -1729,7 +1729,7 @@ func Comment(params CommentParams) HyperNode {
 			DIV(
 				AttrId(strf("REPLIES_%s", commentId)),
 				AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3"),
-			)(),
+			),
 		),
 	)
 }
