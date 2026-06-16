@@ -761,7 +761,7 @@ type VideoPageContentParams struct {
 func VideoPageContent(params VideoPageContentParams) HyperNode {
 	ownerProfileLink := strf("/@%s", params.OwnerUsername)
 	visitProfileAttrs := []Attribute{
-		Attr("hx-get", fmt.Sprintf("%s/content", ownerProfileLink)),
+		Attr("hx-get", strf("%s/content", ownerProfileLink)),
 		Attr("hx-push-url", ownerProfileLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
