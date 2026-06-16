@@ -28,7 +28,7 @@ func (me *Handler) HandleAddToWatchLater(c fiber.Ctx) error {
 		}
 	}
 
-	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+	return render(c, templates.WatchlaterButton(templates.WatchlaterButtonParams{
 		VideoId:  videoId,
 		IsActive: true,
 	}))
@@ -48,7 +48,7 @@ func (me *Handler) HandleDeleteFromWatchLater(c fiber.Ctx) error {
 		return err
 	}
 
-	return render(c, templates.WatchLaterButton(templates.WatchLaterButtonParams{
+	return render(c, templates.WatchlaterButton(templates.WatchlaterButtonParams{
 		VideoId:  videoId,
 		IsActive: false,
 	}))

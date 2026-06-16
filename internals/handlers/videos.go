@@ -231,7 +231,7 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 				IsLiked:       currentUserReaction.IsLike,
 				IsDisliked:    currentUserReaction.IsDislike,
 			},
-			WatchLaterButtonParams: templates.WatchLaterButtonParams{
+			WatchLaterButtonParams: templates.WatchlaterButtonParams{
 				VideoId:  videoId,
 				IsActive: isInWatchLater,
 			},

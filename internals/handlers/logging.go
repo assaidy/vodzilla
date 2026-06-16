@@ -23,7 +23,7 @@ func (me *Handler) WithLogging(c fiber.Ctx) error {
 	)
 
 	// Handler error is intentionally not returned.
-	// All errors are handled and the request is finalized in [WithErrorResolver].
+	// All errors are handled and the request (body & status code)  is finalizedin [WithErrorResolver].
 	return nil
 }
 

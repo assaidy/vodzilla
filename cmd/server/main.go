@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/etag"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	_ "github.com/joho/godotenv/autoload"
 )
@@ -34,12 +35,6 @@ import (
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 // TODO: rethink all cleanup workers and deletion of data. we might need data.
 func main() {
-	router := fiber.New(fiber.Config{
-		AppName: "Vodzilla",
-		// We handler errors with [handlers.Handler.WithErrorResolver].
-		ErrorHandler: nil,
-	})
-
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
 		Formatter:       log.TextFormatter,
 		ReportTimestamp: true,
@@ -86,6 +81,9 @@ func main() {
 		reactionService,
 		socialService,
 	)
+	router := fiber.New(fiber.Config{
+		AppName: "Vodzilla",
+	})
 	registerRoutes(router, handler)
 
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -114,16 +112,19 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Use(h.WithLogging)
 	router.Use(h.WithErrorResolver)
 	router.Use(h.WithPassClientIdToLocals)
+	router.Use(etag.New())
 
-	router.Use(static.New("assets/", static.Config{
+	router.Get("/health", h.HandleCheckHealth)
+	router.Get("/assets/*", static.New("assets", static.Config{
 		FS:       web.AssetsFS,
 		Compress: true,
 		ModifyResponse: func(c fiber.Ctx) error {
-			c.Set(fiber.HeaderCacheControl, "no-cache, no-store")
+			// necessary for etag to work with assets
+			c.Response().Header.Del(fiber.HeaderLastModified)
 			return nil
 		},
 	}))
-	router.Get("/health", h.HandleCheckHealth)
+	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 
 	router.Get("/", h.HandleHomePage)
 
@@ -177,6 +178,4 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Post("/videos/:video_id/comments", h.WithSession, h.WithCsrfToken, h.HandleCreateComment)
 	router.Put("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment)
 	router.Delete("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteComment)
-
-	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 }

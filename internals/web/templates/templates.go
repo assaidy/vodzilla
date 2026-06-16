@@ -26,24 +26,20 @@ func basicPageLayout(title string) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js"))(),
-					SCRIPT(AttrDefer(true))(RawText(fmt.Sprintf(`
-						window._clientId = %q;
-
-						htmx.on('htmx:config:request', (event) => {
-							event.detail.ctx.request.headers['X-CSRF-Token'] = document.cookie
-								.split("; ")
-								.map((cookie) => cookie.split("="))
-								.find(([key]) => key === 'csrf_token')
-								?.map(decodeURIComponent)[1] || null;
-							event.detail.ctx.request.headers['X-Client-ID']  = window._clientId;
-						});
-					`,
-						clientId,
-					))),
+					SCRIPT(AttrSrc("/assets/js/lib/hyperscript.org@0.9.91.js"))(),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
 					Attr("hx-status:5xx:inherited", "swap:none"),
+					Attr("_", fmt.Sprintf(`
+						init
+							set $clientId to %q
+						on htmx:config:request
+							set event.detail.ctx.request.headers['X-CSRF-Token'] to cookies['csrf_token']
+							set event.detail.ctx.request.headers['X-Client-ID'] to $clientId
+					`,
+						clientId,
+					)),
 				)(
 					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]"))(),
 					Group(children...),
@@ -96,7 +92,7 @@ func appPageContentLoader(contentPath string) HyperNode {
 		Attr("hx-get", contentPath),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-trigger", "load"),
-		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 	)()
 }
 
@@ -106,11 +102,11 @@ type appPageLayoutParams struct {
 
 func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 	return func(children ...any) Element {
-		return basicPageLayout("Vidzilla")(
+		return basicPageLayout("Vodzilla")(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
 				DIV(
-					AttrId("PAGE_CONTENT_CONTAINER"),
+					AttrId("PAGE_CONTENT_INDICATOR"),
 					AttrClass("flex-1 relative group pt-20"),
 				)(
 					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full p-6"))(
@@ -206,7 +202,7 @@ func appPageButton(params appPageButtonParams) HyperNode {
 			Attr("hx-push-url", params.pageLink),
 			Attr("hx-target", "#APP_PAGE_CONTENT"),
 			Attr("hx-swap", "innerHTML"),
-			Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+			Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 		)(
 			RawText(params.icon),
 		),
@@ -756,7 +752,7 @@ type VideoPageContentParams struct {
 	CurrentUserId            uuid.UUID
 	IsFollowed               bool
 	ReactionsParams          ReactionsWidgetParams
-	WatchLaterButtonParams   WatchLaterButtonParams
+	WatchLaterButtonParams   WatchlaterButtonParams
 	AddToPlaylistModalParams AddToPlaylistModalParams
 }
 
@@ -768,7 +764,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 	}
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(
@@ -799,7 +795,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				),
 
 				ReactionsWidget(params.ReactionsParams),
-				WatchLaterButton(params.WatchLaterButtonParams),
+				WatchlaterButton(params.WatchLaterButtonParams),
 				addToPlaylistButton(),
 				addToPlaylistModal(params.AddToPlaylistModalParams),
 			),
@@ -1098,7 +1094,10 @@ func videoUploadIndicator() HyperNode {
 					Class: "w-5 h-5 animate-bounce",
 				})),
 			),
-			SPAN(AttrId("UPLOAD_INDICATOR_COUNT"), AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"))("0"),
+			SPAN(
+				AttrId("UPLOAD_INDICATOR_COUNT"),
+				AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"),
+			)("0"),
 		),
 		DIALOG(AttrId("UPLOAD_LIST_DIALOG"), AttrClass("modal"))(
 			DIV(AttrClass("modal-box"))(
@@ -1140,7 +1139,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 	}
 
 	return DIV(
@@ -1149,7 +1148,7 @@ func VideoCard(params VideoCardParams) HyperNode {
 		Attr("hx-push-url", videoPageLink),
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
-		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 	)(
 		FIGURE(AttrClass("relative aspect-video overflow-hidden"))(
 			DIV(AttrClass("w-full h-full"))(
@@ -1247,12 +1246,12 @@ func videoCardOwnerAvatarPlaceholder() HyperNode {
 	)
 }
 
-type WatchLaterButtonParams struct {
+type WatchlaterButtonParams struct {
 	VideoId  uuid.UUID
 	IsActive bool
 }
 
-func WatchLaterButton(params WatchLaterButtonParams) HyperNode {
+func WatchlaterButton(params WatchlaterButtonParams) HyperNode {
 	return DIV(AttrId("WATCHLATER_BUTTON"))(
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
@@ -1454,7 +1453,7 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 					Attr("hx-push-url", playlistLink),
 					Attr("hx-target", "#APP_PAGE_CONTENT"),
 					Attr("hx-swap", "innerHTML"),
-					Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+					Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 				)(
 					DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
 						RawText(lucide.ListVideo(icons.Params{Class: "text-base-content/80"})),
@@ -1628,7 +1627,7 @@ func Comment(params CommentParams) HyperNode {
 		Attr("hx-target", "#APP_PAGE_CONTENT"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_CONTAINER"),
+		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
 	}
 
 	return DIV(
