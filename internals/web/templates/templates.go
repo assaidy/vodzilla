@@ -107,14 +107,11 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 		return basicPageLayout("Vodzilla")(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
-				DIV(
-					AttrId("PAGE_CONTENT_INDICATOR"),
-					AttrClass("flex-1 relative group pt-20"),
-				)(
+				DIV(AttrClass("flex-1 relative pt-20"))(
 					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full p-6"))(
 						Group(children...),
 					),
-					DIV(AttrClass("hidden group-[.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
+					DIV(AttrId("PAGE_CONTENT_INDICATOR"), AttrClass("hidden [.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
 						SPAN(AttrClass("loading loading-spinner loading-lg")),
 					),
 				),
