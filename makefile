@@ -12,17 +12,15 @@ run: build
 clean:
 	rm -rf ./bin/
 
-WATCH_CMD = watchexec --ignore-nothing
+WATCH_CMD = watchexec --ignore-nothing --restart --stop-timeout=0
 watch:
-	@$(WATCH_CMD) -r --stop-timeout=0 \
-								-w ./internals/web/tailwind/tailwind_input.css \
+	@$(WATCH_CMD) -w ./internals/web/tailwind/tailwind_input.css \
 								-w ./internals/web/assets/js/   -e js \
 								-w ./internals/web/templates/   -e go \
 								-w ./internals/handlers/        -e go \
 								-- tailwindcss --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css &
 	@$(WATCH_CMD) -w ./internals/services/ -e sql -- sqlc generate &
-	@$(WATCH_CMD) -r --stop-timeout=0        \
-								-w ./internals/      -e go \
+	@$(WATCH_CMD) -w ./internals/      -e go \
 								-w ./cmd/server/     -e go \
 								-w ./internals/web/assets/ \
 								-- "go build -o ./bin/server ./cmd/server/ && ./bin/server"
