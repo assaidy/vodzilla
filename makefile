@@ -14,7 +14,8 @@ clean:
 
 WATCH_CMD = watchexec --ignore-nothing
 watch:
-	@$(WATCH_CMD) -w ./internals/web/tailwind/tailwind_input.css \
+	@$(WATCH_CMD) -r --stop-timeout=0 \
+								-w ./internals/web/tailwind/tailwind_input.css \
 								-w ./internals/web/assets/js/   -e js \
 								-w ./internals/web/templates/   -e go \
 								-w ./internals/handlers/        -e go \
@@ -53,4 +54,4 @@ pg-cli:
 	@pgcli "$(POSTGRES_URL)"
 
 redis-cli:
-	@valkey-cli -p "$(REDIS_PORT)"
+	@redis-cli -p "$(REDIS_PORT)"
