@@ -87,6 +87,18 @@ func (me *Service) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (i
 	return int(count), nil
 }
 
+func (me *Service) IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
+	ok, err := me.queries.CheckVideoViewer(ctx, queries.CheckVideoViewerParams{
+		VideoId: videoId,
+		UserId:  userId,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to check video viewer: %w", err)
+	}
+
+	return ok, nil
+}
+
 func (me *Service) AddVidoeReaction(ctx context.Context, videoId, userId uuid.UUID, kind string) error {
 	if err := me.queries.InsertReaction(ctx, queries.InsertReactionParams{
 		VideoId: videoId,

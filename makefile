@@ -3,6 +3,7 @@ include .env
 build:
 	tailwindcss --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css
 	sqlc generate
+	go fmt ./...
 	go build -o ./bin/server ./cmd/server/
 
 run: build

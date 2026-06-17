@@ -186,6 +186,11 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 		return err
 	}
 
+	isViewed, err := me.reactionService.IsVideoViewedByUser(c.RequestCtx(), videoId, currentUser.Id)
+	if err != nil {
+		return err
+	}
+
 	isInWatchLater, err := me.videoService.IsInWatchLater(c.RequestCtx(), videoId, currentUser.Id)
 	if err != nil {
 		return err
@@ -222,6 +227,7 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 			Description:   video.Description,
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
+			IsViewed:      isViewed,
 			CurrentUserId: currentUser.Id,
 			IsFollowed:    isFollowed,
 			ReactionsParams: templates.ReactionsWidgetParams{

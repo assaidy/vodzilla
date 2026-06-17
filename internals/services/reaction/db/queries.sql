@@ -5,6 +5,9 @@ on conflict (video_id, user_id) do nothing;
 -- name: GetViewsCount :one
 select count(*) from reaction_service.views where video_id = $1;
 
+-- name: CheckVideoViewer :one
+select exists (select 1 from reaction_service.views where video_id = $1 and user_id = $2 for update);
+
 -- name: InsertReaction :exec
 insert into reaction_service.reactions (video_id, user_id, kind) values ($1, $2, $3)
 on conflict (video_id, user_id) do update set

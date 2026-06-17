@@ -751,6 +751,7 @@ type VideoPageContentParams struct {
 	Description              string
 	Timestamp                time.Time
 	ViewsCount               int
+	IsViewed                 bool
 	CurrentUserId            uuid.UUID
 	IsFollowed               bool
 	ReactionsParams          ReactionsWidgetParams
@@ -770,14 +771,15 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 	}
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(
+		If(!params.IsViewed,
+			DIV(Attr("hx-post", strf("/videos/%s/views", params.Id)), Attr("hx-trigger", "load")),
+		),
 		VIDEO(
 			AttrId("VIDEO_PLAYER"),
 			AttrClass("w-full aspect-video bg-black rounded-box"),
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
 			AttrPlaysInline(true),
-			Attr("hx-post", strf("/videos/%s/views", params.Id)),
-			Attr("hx-trigger", "load"),
 		),
 		DIV(AttrClass("mt-4"))(
 			H1(AttrClass("text-2xl font-bold"))(params.Title),
