@@ -74,7 +74,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.PostVideoForm(templates.PostVideoFormParams{CloseDialogModal: true}),
 
-		hyper.DIV(hyper.AttrId("VIDEO_UPLOADERS_CONTAINER"), hyper.Attr("hx-swap-oob", "append"))(
+		hyper.DIV(hyper.AttrId("video-uploaders-container"), hyper.Attr("hx-swap-oob", "append"))(
 			templates.VideoUploader(templates.VideoUploaderParams{
 				PendingVideoId: pendingVideoId,
 				VideoId:        *videoId,
@@ -247,7 +247,7 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 			},
 		}),
 
-		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
 				Username: currentUser.Username,
 			}),

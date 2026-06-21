@@ -28,14 +28,14 @@ func basicPageLayout(title string) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js")),
-					SCRIPT(AttrSrc("/assets/js/main.js"), AttrDefer(true)),
+					SCRIPT(AttrSrc("/assets/js/main.js")),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
 					Attr("hx-status:5xx:inherited", "swap:none"),
 					Attr("data-client-id", clientId.String()),
 				)(
-					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]")),
+					DIV(AttrId("alert-toast"), AttrClass("toast toast-top w-md z-[1000000]")),
 					Group(children...),
 				),
 			),
@@ -70,7 +70,7 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		t = timeout[0]
 	}
 
-	return DIV(AttrId("ALERT_TOAST"), Attr("hx-swap-oob", "prepend"))(
+	return DIV(AttrId("alert-toast"), Attr("hx-swap-oob", "prepend"))(
 		DIV(
 			AttrRole("alert"),
 			AttrClass(strf("alert alert-%s", level)),
@@ -81,12 +81,290 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 	)
 }
 
+func RegisterPage() HyperNode {
+	return Once(func() HyperNode {
+		return basicPageLayout("Register")(
+			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
+					DIV(AttrClass("card-body"))(
+						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Create Your Account"),
+						RegisterForm(),
+						P(AttrClass("text-center text-sm text-base-content/70 mt-4"))(
+							"Already have an account? ",
+							A(AttrClass("link link-primary"), AttrHref("/login"))("Login"),
+						),
+					),
+				),
+			),
+		)
+	})
+}
+
+type RegisterFormParams struct {
+	Name        string
+	NameErr     error
+	Username    string
+	UsernameErr error
+	Email       string
+	EmailErr    error
+	Password    string
+	PasswordErr error
+}
+
+func RegisterForm(params ...RegisterFormParams) HyperNode {
+	var p RegisterFormParams
+	if len(params) > 0 {
+		p = params[0]
+	}
+
+	return FORM(
+		AttrId("register-form"),
+		AttrClass("space-y-4"),
+		Attr("hx-post", "/register"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .register-button"),
+		Attr("hx-disable", "find button"),
+	)(
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-name"))(
+				SPAN(AttrClass("label-text"))("Name"),
+			),
+			INPUT(
+				AttrId("form-name"),
+				AttrClass(Classes("input w-full", IfElseZero(p.NameErr != nil, "input-error"))),
+				AttrType(TypeText),
+				AttrName("name"),
+				AttrValue(p.Name),
+				AttrRequired(true),
+			),
+			If(p.NameErr != nil,
+				LABEL(AttrClass("label"))(
+					SPAN(AttrClass("label-text-alt text-error"))(p.NameErr),
+				),
+			),
+		),
+
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-username"))(
+				SPAN(AttrClass("label-text"))("Username"),
+			),
+			INPUT(
+				AttrId("form-username"),
+				AttrClass(Classes("input w-full", IfElseZero(p.UsernameErr != nil, "input-error"))),
+				AttrType(TypeText),
+				AttrName("username"),
+				AttrValue(p.Username),
+				AttrRequired(true),
+			),
+			If(p.UsernameErr != nil,
+				LABEL(AttrClass("label"))(
+					SPAN(AttrClass("label-text-alt text-error"))(p.UsernameErr),
+				),
+			),
+		),
+
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-email"))(
+				SPAN(AttrClass("label-text"))("Email"),
+			),
+			INPUT(
+				AttrId("form-email"),
+				AttrClass(Classes("input w-full", IfElseZero(p.EmailErr != nil, "input-error"))),
+				AttrType(TypeEmail),
+				AttrName("email"),
+				AttrValue(p.Email),
+				AttrRequired(true),
+			),
+			If(p.EmailErr != nil,
+				LABEL(AttrClass("label"))(
+					SPAN(AttrClass("label-text-alt text-error"))(p.EmailErr),
+				),
+			),
+		),
+
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-password"))(
+				SPAN(AttrClass("label-text"))("Password"),
+			),
+			INPUT(
+				AttrId("form-password"),
+				AttrClass(Classes("input w-full", IfElseZero(p.PasswordErr != nil, "input-error"))),
+				AttrType(TypePassword),
+				AttrName("password"),
+				AttrValue(p.Password),
+				AttrRequired(true),
+			),
+			If(p.PasswordErr != nil,
+				LABEL(AttrClass("label"))(
+					SPAN(AttrClass("label-text-alt text-error"))(p.PasswordErr),
+				),
+			),
+		),
+
+		DIV(AttrClass("pt-2"))(
+			BUTTON(
+				AttrClass("btn btn-primary w-full register-button group"),
+				AttrType(TypeSubmit),
+			)(
+				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Register"),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
+			),
+		),
+	)
+}
+
+func VerificationEmailSentPage() HyperNode {
+	return Once(func() HyperNode {
+		return basicPageLayout("Verification Email Sent")(
+			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
+					DIV(AttrClass("card-body text-center"))(
+						DIV(AttrClass("text-warning mb-4"))(
+							RawText(lucide.Mail(icons.Params{Class: "w-16 h-16 mx-auto"})),
+						),
+						H1(AttrClass("text-2xl font-bold"))("Verification Email Sent"),
+						P(AttrClass("text-base-content/70"))("We have sent you a verification email. Please check your inbox."),
+					),
+				),
+			),
+		)
+	})
+}
+
+func EmailVerifiedPage() HyperNode {
+	return Once(func() HyperNode {
+		return basicPageLayout("Email Verified")(
+			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
+					DIV(AttrClass("card-body text-center"))(
+						DIV(AttrClass("text-success mb-4"))(
+							RawText(lucide.MailCheck(icons.Params{Class: "w-16 h-16 mx-auto"})),
+						),
+						H1(AttrClass("text-2xl font-bold"))("Email Verified"),
+						P(AttrClass("text-base-content/70"))("Your email has been verified successfully. You can now log in to your account."),
+						DIV(AttrClass("card-actions justify-center mt-4"))(
+							A(AttrClass("btn btn-primary"), AttrHref("/login"))("Go to Login"),
+						),
+					),
+				),
+			),
+		)
+	})
+}
+
+func InvalidVerificationLinkPage() HyperNode {
+	return Once(func() HyperNode {
+		return basicPageLayout("Invalid Verification Link")(
+			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
+					DIV(AttrClass("card-body text-center"))(
+						DIV(AttrClass("text-error mb-4"))(
+							RawText(lucide.MailWarning(icons.Params{Class: "w-16 h-16 mx-auto"})),
+						),
+						H1(AttrClass("text-2xl font-bold"))("Invalid Link"),
+						P(AttrClass("text-base-content/70"))("This verification link is invalid or has expired."),
+					),
+				),
+			),
+		)
+	})
+}
+
+func LoginPage() HyperNode {
+	return Once(func() HyperNode {
+		return basicPageLayout("Login")(
+			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
+				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
+					DIV(AttrClass("card-body"))(
+						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Login"),
+						LoginForm(),
+						P(AttrClass("text-center text-sm text-base-content/70 mt-4"))(
+							"Don't have an account? ", A(AttrClass("link link-primary"), AttrHref("/register"))("Register"),
+						),
+					),
+				),
+			),
+		)
+	})
+}
+
+type LoginFormParams struct {
+	Email    string
+	Password string
+	Err      LoginError
+}
+
+type LoginError int
+
+const (
+	_ LoginError = iota
+	ErrInvalidCredentials
+	ErrEmailNotVerified
+)
+
+func LoginForm(params ...LoginFormParams) HyperNode {
+	var p LoginFormParams
+	if len(params) > 0 {
+		p = params[0]
+	}
+
+	return FORM(
+		AttrId("login-form"),
+		AttrClass("space-y-4"),
+		Attr("hx-post", "/login"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .login-button"),
+		Attr("hx-disable", "find button"),
+	)(
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-email"))(
+				SPAN(AttrClass("label-text"))("Email"),
+			),
+			INPUT(
+				AttrId("form-email"),
+				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
+				AttrType(TypeEmail),
+				AttrName("email"),
+				AttrValue(p.Email),
+				AttrRequired(true),
+			),
+		),
+
+		DIV(AttrClass("fieldset"))(
+			LABEL(AttrClass("label"), AttrFor("form-password"))(
+				SPAN(AttrClass("label-text"))("Password"),
+			),
+			INPUT(
+				AttrId("form-password"),
+				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
+				AttrType(TypePassword),
+				AttrName("password"),
+				AttrValue(p.Password),
+				AttrRequired(true),
+			),
+		),
+
+		DIV(AttrClass("pt-2"))(
+			BUTTON(AttrClass("btn btn-primary w-full login-button group"), AttrType(TypeSubmit))(
+				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Login"),
+				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
+			),
+		),
+
+		If(p.Err == ErrInvalidCredentials,
+			DIV(AttrClass("text-center text-error mt-2"))("Invalid email or password."),
+		).ElseIf(p.Err == ErrEmailNotVerified,
+			DIV(AttrClass("text-center text-error mt-2"))("Email not verified. Please check your inbox for verification email."),
+		),
+	)
+}
+
 func appPageContentLoader(contentPath string) HyperNode {
 	return DIV(
 		Attr("hx-get", contentPath),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-trigger", "load"),
-		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+		Attr("hx-indicator", "#page-content-indicator"),
 	)
 }
 
@@ -100,11 +378,11 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
 				DIV(AttrClass("flex-1 relative pt-20"))(
-					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full p-6"))(
+					MAIN(AttrId("app-page-content"), AttrClass("w-full p-6"))(
 						Group(children...),
 					),
 					DIV(
-						AttrId("PAGE_CONTENT_INDICATOR"),
+						AttrId("page-content-indicator"),
 						AttrClass("hidden [.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"),
 					)(
 						SPAN(AttrClass("loading loading-spinner loading-lg")),
@@ -123,7 +401,7 @@ type NavbarParams struct {
 }
 
 func Navbar(params NavbarParams) HyperNode {
-	return NAV(AttrId("NAVBAR"), AttrClass("w-full fixed top-0 z-10 py-2 flex justify-center"))(
+	return NAV(AttrId("navbar"), AttrClass("w-full fixed top-0 z-10 py-2 flex justify-center"))(
 		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
 			appPageButton(appPageButtonParams{
 				tab:      PageFeed,
@@ -194,309 +472,11 @@ func appPageButton(params appPageButtonParams) HyperNode {
 			AttrClass(Classes("btn btn-ghost p-2", IfElseZero(params.isActive, "btn-primary"))),
 			Attr("hx-get", strf("%s/content", params.pageLink)),
 			Attr("hx-push-url", params.pageLink),
-			Attr("hx-target", "#APP_PAGE_CONTENT"),
+			Attr("hx-target", "#app-page-content"),
 			Attr("hx-swap", "innerHTML"),
-			Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+			Attr("hx-indicator", "#page-content-indicator"),
 		)(
 			RawText(params.icon),
-		),
-	)
-}
-
-func RegisterPage() HyperNode {
-	return Once(func() HyperNode {
-		return basicPageLayout("Register")(
-			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
-					DIV(AttrClass("card-body"))(
-						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Create Your Account"),
-						RegisterForm(),
-						P(AttrClass("text-center text-sm text-base-content/70 mt-4"))(
-							"Already have an account? ",
-							A(AttrClass("link link-primary"), AttrHref("/login"))("Login"),
-						),
-					),
-				),
-			),
-		)
-	})
-}
-
-type RegisterFormParams struct {
-	Name        string
-	NameErr     error
-	Username    string
-	UsernameErr error
-	Email       string
-	EmailErr    error
-	Password    string
-	PasswordErr error
-}
-
-func RegisterForm(params ...RegisterFormParams) HyperNode {
-	var p RegisterFormParams
-	if len(params) > 0 {
-		p = params[0]
-	}
-
-	return FORM(
-		AttrId("REGISTER_FORM"),
-		AttrClass("space-y-4"),
-		Attr("hx-post", "/register"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .register-button"),
-		Attr("hx-disable", "find button"),
-	)(
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_NAME"))(
-				SPAN(AttrClass("label-text"))("Name"),
-			),
-			INPUT(
-				AttrId("FORM_NAME"),
-				AttrClass(Classes("input w-full", IfElseZero(p.NameErr != nil, "input-error"))),
-				AttrType(TypeText),
-				AttrName("name"),
-				AttrValue(p.Name),
-				AttrRequired(true),
-			),
-			If(p.NameErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.NameErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_USERNAME"))(
-				SPAN(AttrClass("label-text"))("Username"),
-			),
-			INPUT(
-				AttrId("FORM_USERNAME"),
-				AttrClass(Classes("input w-full", IfElseZero(p.UsernameErr != nil, "input-error"))),
-				AttrType(TypeText),
-				AttrName("username"),
-				AttrValue(p.Username),
-				AttrRequired(true),
-			),
-			If(p.UsernameErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.UsernameErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_EMAIL"))(
-				SPAN(AttrClass("label-text"))("Email"),
-			),
-			INPUT(
-				AttrId("FORM_EMAIL"),
-				AttrClass(Classes("input w-full", IfElseZero(p.EmailErr != nil, "input-error"))),
-				AttrType(TypeEmail),
-				AttrName("email"),
-				AttrValue(p.Email),
-				AttrRequired(true),
-			),
-			If(p.EmailErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.EmailErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_PASSWORD"))(
-				SPAN(AttrClass("label-text"))("Password"),
-			),
-			INPUT(
-				AttrId("FORM_PASSWORD"),
-				AttrClass(Classes("input w-full", IfElseZero(p.PasswordErr != nil, "input-error"))),
-				AttrType(TypePassword),
-				AttrName("password"),
-				AttrValue(p.Password),
-				AttrRequired(true),
-			),
-			If(p.PasswordErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(p.PasswordErr),
-				),
-			),
-		),
-
-		DIV(AttrClass("pt-2"))(
-			BUTTON(
-				AttrClass("btn btn-primary w-full register-button group"),
-				AttrType(TypeSubmit),
-			)(
-				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Register"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
-			),
-		),
-	)
-}
-
-func VerificationEmailSentPage() HyperNode {
-	return Once(func() HyperNode {
-		return basicPageLayout("Verification Email Sent")(
-			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
-					DIV(AttrClass("card-body text-center"))(
-						DIV(AttrClass("text-warning mb-4"))(
-							RawText(lucide.Mail(icons.Params{
-								Class: "w-16 h-16 mx-auto",
-							})),
-						),
-						H1(AttrClass("text-2xl font-bold"))("Verification Email Sent"),
-						P(AttrClass("text-base-content/70"))(
-							"We have sent you a verification email. Please check your inbox.",
-						),
-					),
-				),
-			),
-		)
-	})
-}
-
-func EmailVerifiedPage() HyperNode {
-	return Once(func() HyperNode {
-		return basicPageLayout("Email Verified")(
-			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
-					DIV(AttrClass("card-body text-center"))(
-						DIV(AttrClass("text-success mb-4"))(
-							RawText(lucide.MailCheck(icons.Params{
-								Class: "w-16 h-16 mx-auto",
-							})),
-						),
-						H1(AttrClass("text-2xl font-bold"))("Email Verified"),
-						P(AttrClass("text-base-content/70"))(
-							"Your email has been verified successfully. You can now log in to your account.",
-						),
-						DIV(AttrClass("card-actions justify-center mt-4"))(
-							A(AttrClass("btn btn-primary"), AttrHref("/login"))("Go to Login"),
-						),
-					),
-				),
-			),
-		)
-	})
-}
-
-func InvalidVerificationLinkPage() HyperNode {
-	return Once(func() HyperNode {
-		return basicPageLayout("Invalid Verification Link")(
-			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
-					DIV(AttrClass("card-body text-center"))(
-						DIV(AttrClass("text-error mb-4"))(
-							RawText(lucide.MailWarning(icons.Params{
-								Class: "w-16 h-16 mx-auto",
-							})),
-						),
-						H1(AttrClass("text-2xl font-bold"))("Invalid Link"),
-						P(AttrClass("text-base-content/70"))(
-							"This verification link is invalid or has expired.",
-						),
-					),
-				),
-			),
-		)
-	})
-}
-
-func LoginPage() HyperNode {
-	return Once(func() HyperNode {
-		return basicPageLayout("Login")(
-			DIV(AttrClass("min-h-screen flex items-center justify-center"))(
-				DIV(AttrClass("card w-full max-w-md bg-base-100 border-base-300 shadow-lg"))(
-					DIV(AttrClass("card-body"))(
-						H1(AttrClass("card-title text-3xl justify-center mb-4"))("Login"),
-						LoginForm(),
-						P(AttrClass("text-center text-sm text-base-content/70 mt-4"))(
-							"Don't have an account? ",
-							A(AttrClass("link link-primary"), AttrHref("/register"))("Register"),
-						),
-					),
-				),
-			),
-		)
-	})
-}
-
-type LoginFormParams struct {
-	Email    string
-	Password string
-	Err      LoginError
-}
-
-type LoginError int
-
-const (
-	_ LoginError = iota
-	ErrInvalidCredentials
-	ErrEmailNotVerified
-)
-
-func LoginForm(params ...LoginFormParams) HyperNode {
-	var p LoginFormParams
-	if len(params) > 0 {
-		p = params[0]
-	}
-
-	return FORM(
-		AttrId("LOGIN_FORM"),
-		AttrClass("space-y-4"),
-		Attr("hx-post", "/login"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .login-button"),
-		Attr("hx-disable", "find button"),
-	)(
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_EMAIL"))(
-				SPAN(AttrClass("label-text"))("Email"),
-			),
-			INPUT(
-				AttrId("FORM_EMAIL"),
-				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
-				AttrType(TypeEmail),
-				AttrName("email"),
-				AttrValue(p.Email),
-				AttrRequired(true),
-			),
-		),
-
-		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_PASSWORD"))(
-				SPAN(AttrClass("label-text"))("Password"),
-			),
-			INPUT(
-				AttrId("FORM_PASSWORD"),
-				AttrClass(Classes("input w-full", IfElseZero(p.Err == ErrInvalidCredentials, "input-error"))),
-				AttrType(TypePassword),
-				AttrName("password"),
-				AttrValue(p.Password),
-				AttrRequired(true),
-			),
-		),
-
-		DIV(AttrClass("pt-2"))(
-			BUTTON(
-				AttrClass("btn btn-primary w-full login-button group"),
-				AttrType(TypeSubmit),
-			)(
-				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Login"),
-				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
-			),
-		),
-
-		If(p.Err == ErrInvalidCredentials,
-			DIV(AttrClass("text-center text-error mt-2"))(
-				SPAN()("Invalid email or password."),
-			),
-		).ElseIf(p.Err == ErrEmailNotVerified,
-			DIV(AttrClass("text-center text-error mt-2"))(
-				SPAN()("Email not verified. Please check your inbox for verification email."),
-			),
 		),
 	)
 }
@@ -526,43 +506,32 @@ type ProfilePageContentParams struct {
 
 func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 	return Group(
-		// profile card ==================================================
 		DIV(AttrClass("card bg-base-100 p-2 flex flex-col md:flex-row overflow-hidden"))(
 			profileCardAvatarPlaceholder(),
 			DIV(AttrClass("p-4 min-w-0"))(
 				DIV(AttrClass("flex items-start justify-between gap-2"))(
 					DIV(AttrClass("min-w-0 flex-1"))(
-						H1(AttrId("PROFILE_CARD_NAME"), AttrClass("text-2xl font-bold truncate"))(params.Name),
-						P(AttrId("PROFILE_CARD_USERNAME"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
+						H1(AttrId("profile-card-name"), AttrClass("text-2xl font-bold truncate"))(params.Name),
+						P(AttrId("profile-card-username"), AttrClass("text-sm text-base-content/60"))("@"+params.Username),
 					),
 					If(!params.IsOwner,
-						FollowButton(FollowButtonParams{
-							ProfileOwnerId: params.OwnerId,
-							IsFollowed:     params.IsFollowed,
-						}),
+						FollowButton(FollowButtonParams{ProfileOwnerId: params.OwnerId, IsFollowed: params.IsFollowed}),
 					),
 				),
 				DIV(AttrClass("mt-2 flex gap-6"))(
 					P()(SPAN(AttrClass("font-bold"))(params.FollowersCount), SPAN(AttrClass("text-base-content/60"))(" followers")),
 					P()(SPAN(AttrClass("font-bold"))(params.PostsCount), SPAN(AttrClass("text-base-content/60"))(" posts")),
 				),
-				P(AttrId("PROFILE_CARD_BIO"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
+				P(AttrId("profile-card-bio"), AttrClass("mt-2"))(IfElse(params.Bio == "", "---", params.Bio)),
 			),
 		),
 
-		// actions ==================================================
 		If(params.IsOwner,
-			// profile owner actions ==================================================
 			DIV(AttrClass("mt-4 flex justify-center lg:justify-start gap-2"))(
-				// edit profile ==================================================
-				BUTTON(
-					AttrClass("btn btn-soft"),
-					AttrOnClick("EDIT_PROFILE_MODAL.show()"),
-				)(
-					RawText(lucide.UserPen()),
-					"edit profile",
+				BUTTON(AttrClass("btn btn-soft"), AttrOnClick("$('#edit-profile-modal').show()"))(
+					RawText(lucide.UserPen()), "edit profile",
 				),
-				DIALOG(AttrId("EDIT_PROFILE_MODAL"), AttrClass("modal"))(
+				DIALOG(AttrId("edit-profile-modal"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						EditProfileForm(EditProfileFormParams{
 							Name:     params.Name,
@@ -574,15 +543,10 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 						BUTTON()("close"),
 					),
 				),
-				// post video ==================================================
-				BUTTON(
-					AttrClass("btn btn-soft"),
-					AttrOnClick("POST_VIDEO_MODAL.show()"),
-				)(
-					RawText(lucide.Plus()),
-					"post a video",
+				BUTTON(AttrClass("btn btn-soft"), AttrOnClick("$('#post-video-modal').show()"))(
+					RawText(lucide.Plus()), "post a video",
 				),
-				DIALOG(AttrId("POST_VIDEO_MODAL"), AttrClass("modal"))(
+				DIALOG(AttrId("post-video-modal"), AttrClass("modal"))(
 					DIV(AttrClass("modal-box"))(
 						PostVideoForm(),
 					),
@@ -591,12 +555,8 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 					),
 				),
 			),
-		).Else(
-			// profile viewer actions ==================================================
-			Group(),
 		),
 
-		// profile videos ==================================================
 		videosContainer(params.Videos),
 	)
 }
@@ -607,12 +567,12 @@ type FollowButtonParams struct {
 }
 
 func FollowButton(params FollowButtonParams) HyperNode {
-	return DIV(AttrId("FOLLOW_BUTTON"))(
+	return DIV(AttrId("follow-button"))(
 		If(params.IsFollowed,
 			BUTTON(
 				AttrClass("btn btn-outline btn-accent hover:btn-error group/follow"),
 				Attr("hx-delete", strf("/follow/%s", params.ProfileOwnerId)),
-				Attr("hx-target", "#FOLLOW_BUTTON"),
+				Attr("hx-target", "#follow-button"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-disable", "this"),
 			)(
@@ -623,7 +583,7 @@ func FollowButton(params FollowButtonParams) HyperNode {
 			BUTTON(
 				AttrClass("btn btn-accent"),
 				Attr("hx-post", strf("/follow/%s", params.ProfileOwnerId)),
-				Attr("hx-target", "#FOLLOW_BUTTON"),
+				Attr("hx-target", "#follow-button"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-disable", "this"),
 			)("Follow"),
@@ -642,7 +602,7 @@ type EditProfileFormParams struct {
 
 func EditProfileForm(params EditProfileFormParams) HyperNode {
 	return FORM(
-		AttrId("EDIT_PROFILE_FORM"),
+		AttrId("edit-profile-form"),
 		AttrClass("space-y-4"),
 		Attr("hx-put", "/profiles"),
 		Attr("hx-swap", "outerHTML"),
@@ -650,11 +610,11 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 		Attr("hx-disable", "find .submit-button"),
 	)(
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_NAME"))(
+			LABEL(AttrClass("label"), AttrFor("form-name"))(
 				SPAN(AttrClass("label-text"))("Name"),
 			),
 			INPUT(
-				AttrId("FORM_NAME"),
+				AttrId("form-name"),
 				AttrClass(Classes("input w-full", IfElseZero(params.NameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("name"),
@@ -669,11 +629,11 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_USERNAME"))(
+			LABEL(AttrClass("label"), AttrFor("form-username"))(
 				SPAN(AttrClass("label-text"))("Username"),
 			),
 			INPUT(
-				AttrId("FORM_USERNAME"),
+				AttrId("form-username"),
 				AttrClass(Classes("input w-full", IfElseZero(params.UsernameErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("username"),
@@ -688,11 +648,11 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_BIO"))(
+			LABEL(AttrClass("label"), AttrFor("form-bio"))(
 				SPAN(AttrClass("label-text"))("Bio"),
 			),
 			TEXTAREA(
-				AttrId("FORM_BIO"),
+				AttrId("form-bio"),
 				AttrClass(Classes("textarea block w-full", IfElseZero(params.BioErr != nil, "textarea-error"))),
 				AttrName("bio"),
 			)(
@@ -706,10 +666,7 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("pt-2"))(
-			BUTTON(
-				AttrClass("btn btn-primary w-full submit-button group"),
-				AttrType(TypeSubmit),
-			)(
+			BUTTON(AttrClass("btn btn-primary w-full submit-button group"), AttrType(TypeSubmit))(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Submit"),
 				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
@@ -752,14 +709,14 @@ type VideoPageContentParams struct {
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
-	ownerProfileLink := strf("/@%s", params.OwnerUsername)
+	ownerProfileLink := "/@" + params.OwnerUsername
 	visitProfileAttrs := []Attribute{
 		Attr("hx-get", strf("%s/content", ownerProfileLink)),
 		Attr("hx-push-url", ownerProfileLink),
-		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-target", "#app-page-content"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+		Attr("hx-indicator", "#page-content-indicator"),
 	}
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(
@@ -767,7 +724,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			DIV(Attr("hx-post", strf("/videos/%s/views", params.Id)), Attr("hx-trigger", "load")),
 		),
 		VIDEO(
-			AttrId("VIDEO_PLAYER"),
+			AttrId("video-player"),
 			AttrClass("w-full aspect-video bg-black rounded-box"),
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
@@ -808,7 +765,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 
 		SCRIPT()(RawText(strf(`
 			(() => {
-				const v = VIDEO_PLAYER
+				const v = $('#video-player')
 				let attempts = 0
 				v.addEventListener('error', async () => {
 					if (v.error && v.error.code !== v.error.MEDIA_ERR_NETWORK) return
@@ -827,7 +784,9 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				})
 				v.addEventListener('playing', () => { attempts = 0 })
 			})
-		`, params.Id))),
+		`,
+			params.Id,
+		))),
 	)
 }
 
@@ -849,34 +808,27 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 	pendingVideoId := uuid.New()
 
 	return FORM(
-		AttrId("POST_VIDEO_FORM"),
+		AttrId("post-video-form"),
 		AttrClass("space-y-4"),
 		Attr("hx-post", "/videos"),
 		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "find .submit-button"),
 		Attr("hx-disable", "find .submit-button"),
 		Attr("hx-vals", strf(`js:{
-			contentType:    FORM_VIDEO.files[0].type,
-			fileSize:       FORM_VIDEO.files[0].size,
+			contentType:    $('#form-video').files[0].type,
+			fileSize:       $('#form-video').files[0].size,
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
-		Attr("hx-on::before:request", strf(`
-			window._pendingVideos[%q] = FORM_VIDEO.files[0]
-		`, pendingVideoId)),
-		Attr("hx-on::after:request", strf(`
-			if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]
-		`, pendingVideoId)),
+		Attr("hx-on::before:request", strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
+		Attr("hx-on::after:request", strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
+		IfElseZero(p.CloseDialogModal, Attr("hx-on::after:process", `$('#post-video-modal').close()`)),
 	)(
-		If(p.CloseDialogModal,
-			SCRIPT()(RawText(`POST_VIDEO_MODAL.close()`)),
-		),
-
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_TITLE"))(
+			LABEL(AttrClass("label"), AttrFor("form-title"))(
 				SPAN(AttrClass("label-text"))("Title"),
 			),
 			INPUT(
-				AttrId("FORM_TITLE"),
+				AttrId("form-title"),
 				AttrClass(Classes("input w-full", IfElseZero(p.TitleErr != nil, "input-error"))),
 				AttrType(TypeText),
 				AttrName("title"),
@@ -891,11 +843,11 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_DESCRIPTION"))(
+			LABEL(AttrClass("label"), AttrFor("form-description"))(
 				SPAN(AttrClass("label-text"))("Description"),
 			),
 			TEXTAREA(
-				AttrId("FORM_DESCRIPTION"),
+				AttrId("form-description"),
 				AttrClass(Classes("textarea block w-full", IfElseZero(p.DescriptionErr != nil, "textarea-error"))),
 				AttrName("description"),
 			)(
@@ -909,12 +861,12 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("fieldset"))(
-			LABEL(AttrClass("label"), AttrFor("FORM_VIDEO"))(
+			LABEL(AttrClass("label"), AttrFor("form-video"))(
 				SPAN(AttrClass("label-text"))("Video"),
 			),
 			INPUT(
 				// doesn't have a name, so htmx will not send it with the form
-				AttrId("FORM_VIDEO"),
+				AttrId("form-video"),
 				AttrClass(Classes("file-input w-full", IfElseZero(p.VideoErr != nil, "file-input-error"))),
 				AttrType(TypeFile),
 				AttrAccept("video/*"),
@@ -928,10 +880,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		),
 
 		DIV(AttrClass("pt-2"))(
-			BUTTON(
-				AttrClass("btn btn-primary w-full submit-button group"),
-				AttrType(TypeSubmit),
-			)(
+			BUTTON(AttrClass("btn btn-primary w-full submit-button group"), AttrType(TypeSubmit))(
 				SPAN(AttrClass("group-[.htmx-request]:hidden"))("Post"),
 				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
@@ -987,7 +936,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 }
 
 func videoUploadersContainer() HyperNode {
-	return DIV(AttrId("VIDEO_UPLOADERS_CONTAINER"))(
+	return DIV(AttrId("video-uploaders-container"))(
 		SCRIPT()(RawText(`
 			window._pendingVideos = {}
 
@@ -1010,14 +959,14 @@ func videoUploadersContainer() HyperNode {
 				},
 				_updateIndicator() {
 					const count = Object.keys(this._uploads).length
-					UPLOAD_INDICATOR_COUNT.textContent = count
+					$('#upload-indicator-count').textContent = count
 					this._renderUploadList()
-					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0)
+					$('#upload-indicator').classList.toggle('hidden', count === 0)
 				},
 				_renderUploadList() {
 					const entries = Object.entries(this._uploads)
 					if (entries.length === 0) {
-						UPLOAD_LIST_DIALOG.close()
+						$('#upload-list-dialog').close()
 						return
 					}
 					let html = ''
@@ -1030,7 +979,7 @@ func videoUploadersContainer() HyperNode {
 						     +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
 						     +  '</div>'
 					}
-					UPLOAD_LIST_BODY.innerHTML = html
+					$('#upload-list-body').innerHTML = html
 				},
 			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, videoId, uploadId, completeUploadUrl }) {
 					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length)
@@ -1072,27 +1021,25 @@ func videoUploadersContainer() HyperNode {
 
 func videoUploadIndicator() HyperNode {
 	return DIV(
-		AttrId("UPLOAD_INDICATOR"),
+		AttrId("upload-indicator"),
 		AttrClass("hidden fixed bottom-6 right-6 z-50"),
 	)(
 		DIV(AttrClass("indicator"))(
 			BUTTON(
 				AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"),
-				AttrOnClick("UPLOAD_LIST_DIALOG.showModal()"),
+				AttrOnClick("$('#upload-list-dialog').showModal()"),
 			)(
-				RawText(lucide.ArrowUpFromLine(icons.Params{
-					Class: "w-5 h-5 animate-bounce",
-				})),
+				RawText(lucide.ArrowUpFromLine(icons.Params{Class: "w-5 h-5 animate-bounce"})),
 			),
 			SPAN(
-				AttrId("UPLOAD_INDICATOR_COUNT"),
+				AttrId("upload-indicator-count"),
 				AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"),
 			)("0"),
 		),
-		DIALOG(AttrId("UPLOAD_LIST_DIALOG"), AttrClass("modal"))(
+		DIALOG(AttrId("upload-list-dialog"), AttrClass("modal"))(
 			DIV(AttrClass("modal-box"))(
 				H3(AttrClass("text-lg font-bold"))("Uploading Videos"),
-				DIV(AttrId("UPLOAD_LIST_BODY"), AttrClass("mt-4 space-y-2")),
+				DIV(AttrId("upload-list-body"), AttrClass("mt-4 space-y-2")),
 			),
 			FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
 				BUTTON()("close"),
@@ -1121,32 +1068,29 @@ type VideoCardParams struct {
 }
 
 func VideoCard(params VideoCardParams) HyperNode {
-	ownerProfilePageLink := strf("/@%s", params.OwnerUsername)
+	ownerProfilePageLink := "/@" + params.OwnerUsername
 	videoPageLink := strf("/videos/%s", params.VideoId)
 	visiteProfileAttrs := []Attribute{
 		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
 		Attr("hx-push-url", ownerProfilePageLink),
-		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-target", "#app-page-content"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+		Attr("hx-indicator", "#page-content-indicator"),
 	}
 
 	return DIV(
 		AttrClass("card bg-base-100 cursor-pointer"),
 		Attr("hx-get", strf("%s/content", videoPageLink)),
 		Attr("hx-push-url", videoPageLink),
-		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-target", "#app-page-content"),
 		Attr("hx-swap", "innerHTML"),
-		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+		Attr("hx-indicator", "#page-content-indicator"),
 	)(
 		FIGURE(AttrClass("relative aspect-video overflow-hidden"))(
 			DIV(AttrClass("w-full h-full"))(
 				If(params.ThumbnailUrl != "",
-					IMG(
-						AttrClass("w-full h-full object-cover"),
-						AttrSrc(params.ThumbnailUrl),
-					),
+					IMG(AttrClass("w-full h-full object-cover"), AttrSrc(params.ThumbnailUrl)),
 				).Else(
 					videoCardThumbnailPlaceholder(),
 				),
@@ -1164,13 +1108,9 @@ func VideoCard(params VideoCardParams) HyperNode {
 			),
 			DIV(AttrClass("min-w-0 flex-1"))(
 				H2(AttrClass("card-title text-base font-bold leading-tight line-clamp-2"))(params.Title),
-				A(append(visiteProfileAttrs, AttrClass("link link-hover text-xs text-base-content/60"))...)(
-					params.OwnerName,
-				),
+				A(append(visiteProfileAttrs, AttrClass("link link-hover text-xs text-base-content/60"))...)(params.OwnerName),
 				DIV(AttrClass("text-xs text-base-content/60"))(
-					normalizeViewsCount(params.ViewsCount), " views",
-					" . ",
-					normalizeTimestamp(params.Timestamp), " ago",
+					normalizeViewsCount(params.ViewsCount), " views", " . ", normalizeTimestamp(params.Timestamp), " ago",
 				),
 			),
 		),
@@ -1242,17 +1182,15 @@ type WatchlaterButtonParams struct {
 }
 
 func WatchlaterButton(params WatchlaterButtonParams) HyperNode {
-	return DIV(AttrId("WATCHLATER_BUTTON"))(
+	return DIV(AttrId("watchlater-button"))(
 		BUTTON(
 			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", IfElse(params.IsActive, "Remove from Watch Later", "Add to Watch Later")),
 			Attr(IfElse(params.IsActive, "hx-delete", "hx-post"), strf("/videos/%s/watchlater", params.VideoId)),
-			Attr("hx-target", "#WATCHLATER_BUTTON"),
+			Attr("hx-target", "#watchlater-button"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.Clock(icons.Params{
-				Class: IfElseZero(params.IsActive, "text-primary"),
-			})),
+			RawText(lucide.Clock(icons.Params{Class: IfElseZero(params.IsActive, "text-primary")})),
 		),
 	)
 }
@@ -1265,14 +1203,14 @@ type PlaylistCheckboxParams struct {
 }
 
 func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
-	return DIV(AttrId("PLAYLIST_CHECKBOX"), AttrClass("form-control"))(
+	return DIV(AttrId("playlist-checkbox"), AttrClass("form-control"))(
 		LABEL(AttrClass("label cursor-pointer flex justify-between"))(
 			SPAN(AttrClass("text-base-content"))(params.Name),
 			INPUT(
 				AttrType(TypeCheckbox),
 				AttrClass("checkbox checkbox-sm checkbox-primary"),
 				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), strf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
-				Attr("hx-target", "#PLAYLIST_CHECKBOX"),
+				Attr("hx-target", "#playlist-checkbox"),
 				Attr("hx-swap", "outerHTML"),
 				Attr("hx-vals", Json(Object{"playlistName": params.Name})),
 				AttrChecked(params.Checked),
@@ -1288,28 +1226,23 @@ type AddToPlaylistModalParams struct {
 
 func addToPlaylistButton() HyperNode {
 	return DIV(AttrClass("tooltip tooltip-top"), Attr("data-tip", "Add to Playlist"))(
-		BUTTON(
-			AttrClass("btn btn-soft btn-sm"),
-			AttrOnClick("ADD_TO_PLAYLIST_MODAL.show()"),
-		)(
+		BUTTON(AttrClass("btn btn-soft btn-sm"), AttrOnClick("$('#add-to-playlist-modal').show()"))(
 			RawText(lucide.ListVideo()),
 		),
 	)
 }
 
 func addToPlaylistModal(params AddToPlaylistModalParams) HyperNode {
-	return DIALOG(AttrId("ADD_TO_PLAYLIST_MODAL"), AttrClass("modal"))(
+	return DIALOG(AttrId("add-to-playlist-modal"), AttrClass("modal"))(
 		DIV(AttrClass("modal-box"))(
 			H3(AttrClass("text-lg font-bold mb-4"))("Add to Playlist"),
-			DIV(AttrId("PLAYLIST_CHECKBOX_LIST"), AttrClass("space-y-2"))(
+			DIV(AttrId("playlist-checkbox-list"), AttrClass("space-y-2"))(
 				If(len(params.Playlists) == 0,
 					P(AttrClass("text-sm text-base-content/60"))("No playlists yet. Create one below."),
 				).Else(
-					Group(
-						Range(params.Playlists, func(p PlaylistCheckboxParams) any {
-							return PlaylistCheckbox(p)
-						}),
-					),
+					Range(params.Playlists, func(p PlaylistCheckboxParams) any {
+						return PlaylistCheckbox(p)
+					}),
 				),
 			),
 			DIV(AttrClass("divider my-4")),
@@ -1334,7 +1267,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 	}
 
 	return FORM(
-		AttrId("CREATE_PLAYLIST_FORM"),
+		AttrId("create-playlist-form"),
 		AttrClass("flex gap-2"),
 		Attr("hx-post", "/playlists"),
 		Attr("hx-swap", "outerHTML"),
@@ -1342,7 +1275,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 		Attr("hx-vals", Json(Object{"videoId": p.VideoId})),
 	)(
 		INPUT(
-			AttrId("FORM_PLAYLIST_NAME"),
+			AttrId("form-playlist-name"),
 			AttrType(TypeText),
 			AttrName("name"),
 			AttrValue(p.Name),
@@ -1350,12 +1283,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 			AttrClass(Classes("input w-full", IfElseZero(p.NameErr != nil, "input-error"))),
 			AttrRequired(true),
 		),
-		BUTTON(
-			AttrClass("btn btn-primary"),
-			AttrType(TypeSubmit),
-		)(
-			"Create",
-		),
+		BUTTON(AttrClass("btn btn-primary"), AttrType(TypeSubmit))("Create"),
 		If(p.NameErr != nil,
 			P(AttrClass("text-xs text-error"))(p.NameErr),
 		),
@@ -1364,9 +1292,7 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 
 func videoCardThumbnailPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full h-full flex items-center justify-center bg-base-200"))(
-		RawText(lucide.Clapperboard(icons.Params{
-			Class: "w-10 h-10 text-base-content/30",
-		})),
+		RawText(lucide.Clapperboard(icons.Params{Class: "w-10 h-10 text-base-content/30"})),
 	)
 }
 
@@ -1379,29 +1305,25 @@ type ReactionsWidgetParams struct {
 }
 
 func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
-	return DIV(AttrId("REACTIONS_WIDGET"), AttrClass("join ml-auto"))(
+	return DIV(AttrId("reactions-widget"), AttrClass("join ml-auto"))(
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Like"),
 			Attr(IfElse(params.IsLiked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=like", params.VideoId)),
-			Attr("hx-target", "#REACTIONS_WIDGET"),
+			Attr("hx-target", "#reactions-widget"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.ThumbsUp(icons.Params{
-				Class: IfElseZero(params.IsLiked, "text-primary"),
-			})),
+			RawText(lucide.ThumbsUp(icons.Params{Class: IfElseZero(params.IsLiked, "text-primary")})),
 			SPAN(AttrClass("text-sm"))(params.LikesCount),
 		),
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Dislike"),
 			Attr(IfElse(params.IsDisliked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=dislike", params.VideoId)),
-			Attr("hx-target", "#REACTIONS_WIDGET"),
+			Attr("hx-target", "#reactions-widget"),
 			Attr("hx-swap", "outerHTML"),
 		)(
-			RawText(lucide.ThumbsDown(icons.Params{
-				Class: IfElseZero(params.IsDisliked, "text-primary"),
-			})),
+			RawText(lucide.ThumbsDown(icons.Params{Class: IfElseZero(params.IsDisliked, "text-primary")})),
 			SPAN(AttrClass("text-sm"))(params.DislikesCount),
 		),
 	)
@@ -1430,7 +1352,7 @@ func PlaylistsPage(username string) HyperNode {
 }
 
 func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
-	return DIV(AttrId("PLAYLISTS_CONTAINER"), AttrClass("space-y-4"))(
+	return DIV(AttrId("playlists-container"), AttrClass("space-y-4"))(
 		H1(AttrClass("text-2xl font-bold mb-4"))("Playlists"),
 		If(len(params.Playlists) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("No playlists yet."),
@@ -1441,9 +1363,9 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 					AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
 					Attr("hx-get", strf("%s/content", playlistLink)),
 					Attr("hx-push-url", playlistLink),
-					Attr("hx-target", "#APP_PAGE_CONTENT"),
+					Attr("hx-target", "#app-page-content"),
 					Attr("hx-swap", "innerHTML"),
-					Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+					Attr("hx-indicator", "#page-content-indicator"),
 				)(
 					DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
 						RawText(lucide.ListVideo(icons.Params{Class: "text-base-content/80"})),
@@ -1476,7 +1398,7 @@ func PlaylistDetailPage(username string, playlistId uuid.UUID) HyperNode {
 }
 
 func PlaylistDetailPageContent(params PlaylistDetailPageContentParams) HyperNode {
-	return DIV(AttrId("PLAYLIST_DETAIL_CONTAINER"))(
+	return DIV(AttrId("playlist-detail-container"))(
 		H1(AttrClass("text-2xl font-bold mb-6"))(params.Playlist.Name),
 		If(len(params.Videos) == 0,
 			P(AttrClass("text-center text-base-content/60 mt-20"))("This playlist is empty."),
@@ -1506,9 +1428,7 @@ func WatchlaterPageContent(params WatchlaterPageContentParams) HyperNode {
 	return Group(
 		H1(AttrClass("text-2xl font-bold mb-4"))("Watch Later"),
 		If(len(params.Videos) == 0,
-			P(AttrClass("text-center text-base-content/60 mt-20"))(
-				"No videos in your watch later list.",
-			),
+			P(AttrClass("text-center text-base-content/60 mt-20"))("No videos in your watch later list."),
 		).Else(
 			videosContainer(params.Videos),
 		),
@@ -1518,11 +1438,11 @@ func WatchlaterPageContent(params WatchlaterPageContentParams) HyperNode {
 // TODO: the indentation for replies is too big. use the menu
 // component from daisy ui; it comes with indentation styles.
 func commentSection(videoId uuid.UUID) HyperNode {
-	return DIV(AttrId("COMMENT_SECTION"), AttrClass("mt-8"))(
+	return DIV(AttrId("comment-section"), AttrClass("mt-8"))(
 		H2(AttrClass("text-xl font-bold mb-4"))("Comments"),
 		CreateCommentForm(CreateCommentFormParams{VideoId: videoId}),
 		DIV(
-			AttrId("COMMENTS_LIST"),
+			AttrId("comments-list"),
 			AttrClass("space-y-4 mt-6"),
 			Attr("hx-get", strf("/videos/%s/comments", videoId)),
 			Attr("hx-trigger", "load"),
@@ -1546,51 +1466,46 @@ type CreateCommentFormParams struct {
 // replies after a new reply inserted. also the number of replies (in the button) will be updated dynamically when new replies inserted.
 // TODO: make dropdown menu not to appear in the bottom
 func CreateCommentForm(params CreateCommentFormParams) HyperNode {
-	formId := "CREATE_COMMENT_FORM"
-	textareaId := "CREATE_COMMENT_TEXTAREA"
+	formId := "create-comment-form"
+	textareaId := "create-comment-textarea"
 	placeholder := "Add a comment..."
 	submitText := "Comment"
 
 	if params.ParentId != uuid.Nil {
-		formId = strf("REPLY_FORM_INNER_%s", params.ParentId)
-		textareaId = strf("REPLY_TEXTAREA_%s", params.ParentId)
+		formId = strf("reply-form-inner-%s", params.ParentId)
+		textareaId = strf("reply-textarea-%s", params.ParentId)
 		placeholder = "Write a reply..."
 		submitText = "Reply"
 	}
 
-	return Group(
-		FORM(
-			AttrId(formId),
-			AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != uuid.Nil, "hidden"))),
-			Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
-			Attr("hx-swap", "outerHTML"),
-			Attr("hx-indicator", "find .submit-btn"),
-		)(
-			If(params.ParentId == uuid.Nil,
-				commentOwnerAvatarPlaceholder(),
-			),
-			DIV(AttrClass("flex-1 flex gap-2"))(
-				TEXTAREA(
-					AttrId(textareaId),
-					AttrClass("textarea textarea-bordered w-full resize-none"),
-					AttrName("content"),
-					AttrPlaceholder(placeholder),
-					AttrRequired(true),
-					AttrMaxLength("500"),
-				)(params.Content),
-				If(params.ContentErr != nil,
-					LABEL(AttrClass("label"))(
-						SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
-					),
+	return FORM(
+		AttrId(formId),
+		AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != uuid.Nil, "hidden"))),
+		Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .submit-btn"),
+	)(
+		If(params.ParentId == uuid.Nil,
+			commentOwnerAvatarPlaceholder(),
+		),
+		DIV(AttrClass("flex-1 flex gap-2"))(
+			TEXTAREA(
+				AttrId(textareaId),
+				AttrClass("textarea textarea-bordered w-full resize-none"),
+				AttrName("content"),
+				AttrPlaceholder(placeholder),
+				AttrRequired(true),
+				AttrMaxLength("500"),
+			)(params.Content),
+			If(params.ContentErr != nil,
+				LABEL(AttrClass("label"))(
+					SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
 				),
-				If(params.ParentId != uuid.Nil,
-					INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId.String())),
-				),
-				BUTTON(
-					AttrClass("btn btn-primary btn-sm submit-btn"),
-					AttrType(TypeSubmit),
-				)(submitText),
 			),
+			If(params.ParentId != uuid.Nil,
+				INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId.String())),
+			),
+			BUTTON(AttrClass("btn btn-primary btn-sm submit-btn"), AttrType(TypeSubmit))(submitText),
 		),
 	)
 }
@@ -1610,34 +1525,29 @@ func Comment(params CommentParams) HyperNode {
 	commentId := params.CommentId
 	videoId := params.VideoId
 
-	ownerProfilePageLink := strf("/@%s", params.OwnerUsername)
+	ownerProfilePageLink := "/@" + params.OwnerUsername
 	visitProfileAttrs := []Attribute{
 		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
 		Attr("hx-push-url", ownerProfilePageLink),
-		Attr("hx-target", "#APP_PAGE_CONTENT"),
+		Attr("hx-target", "#app-page-content"),
 		Attr("hx-swap", "innerHTML"),
 		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#PAGE_CONTENT_INDICATOR"),
+		Attr("hx-indicator", "#page-content-indicator"),
 	}
 
-	return DIV(
-		AttrId(strf("COMMENT_%s", commentId)),
-		AttrClass("flex gap-2"),
-	)(
+	return DIV(AttrId(strf("comment-%s", commentId)), AttrClass("flex gap-2"))(
 		DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
 			commentOwnerAvatarPlaceholder(),
 		),
 
 		DIV(AttrClass("flex-1 min-w-0"))(
 			DIV(AttrClass("flex items-center gap-2 text-sm"))(
-				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(
-					params.OwnerName,
-				),
+				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(params.OwnerName),
 				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
 			),
 
-			DIV(AttrId(strf("COMMENT_BODY_%s", commentId)))(
-				DIV(AttrId(strf("COMMENT_CONTENT_%s", commentId)))(
+			DIV(AttrId(strf("comment-body-%s", commentId)))(
+				DIV(AttrId(strf("comment-content-%s", commentId)))(
 					P(AttrClass("text-sm"))(params.Content),
 				),
 				If(params.IsOwner,
@@ -1653,14 +1563,14 @@ func Comment(params CommentParams) HyperNode {
 			DIV(AttrClass("flex items-center gap-1 mt-1"))(
 				BUTTON(
 					AttrClass("btn btn-ghost btn-xs"),
-					AttrOnClick(strf("REPLY_FORM_%s.classList.toggle('hidden')", commentId)),
+					AttrOnClick(strf("$('#reply-form-%s').classList.toggle('hidden')", commentId)),
 				)("Reply"),
 
 				If(params.RepliesCount > 0,
 					BUTTON(
 						AttrClass("btn btn-soft btn-xs"),
 						Attr("hx-get", strf("/videos/%s/comments/%s/replies", videoId, commentId)),
-						Attr("hx-target", strf("#REPLIES_%s", commentId)),
+						Attr("hx-target", strf("#replies-%s", commentId)),
 						Attr("hx-swap", "append"),
 						Attr("hx-on::after:request", "this.remove()"),
 					)(
@@ -1670,21 +1580,15 @@ func Comment(params CommentParams) HyperNode {
 
 				If(params.IsOwner,
 					DIV(AttrClass("dropdown dropdown-end"))(
-						BUTTON(
-							AttrClass("btn btn-ghost btn-xs btn-circle"),
-							Attr("tabindex", "0"),
-						)(
+						BUTTON(AttrClass("btn btn-ghost btn-xs btn-circle"), Attr("tabindex", "0"))(
 							RawText(lucide.EllipsisVertical()),
 						),
-						UL(
-							AttrClass("dropdown-content menu p-2 shadow bg-base-100 rounded-box z-[1]"),
-							Attr("tabindex", "0"),
-						)(
+						UL(AttrClass("dropdown-content menu p-2 shadow bg-base-100 rounded-box z-[1]"), Attr("tabindex", "0"))(
 							LI()(
 								A(
 									AttrOnClick(strf(`
-										COMMENT_CONTENT_%[1]s.classList.add('hidden')
-										EDIT_FORM_%[1]s.classList.remove('hidden')
+										$('#comment-content-%[1]s').classList.add('hidden')
+										$('#edit-comment-form-%[1]s').classList.remove('hidden')
 									`,
 										commentId,
 									)),
@@ -1695,7 +1599,7 @@ func Comment(params CommentParams) HyperNode {
 							LI()(
 								A(
 									Attr("hx-delete", strf("/videos/%s/comments/%s", videoId, commentId)),
-									Attr("hx-target", strf("#COMMENT_%s", commentId)),
+									Attr("hx-target", strf("#comment-%s", commentId)),
 									Attr("hx-swap", "delete"),
 									Attr("hx-confirm", "Are you sure?"),
 								)(
@@ -1707,17 +1611,11 @@ func Comment(params CommentParams) HyperNode {
 				),
 			),
 
-			DIV(
-				AttrId(strf("REPLY_FORM_%s", commentId)),
-				AttrClass("hidden mt-2"),
-			)(
+			DIV(AttrId(strf("reply-form-%s", commentId)), AttrClass("hidden mt-2"))(
 				CreateCommentForm(CreateCommentFormParams{VideoId: videoId, ParentId: commentId}),
 			),
 
-			DIV(
-				AttrId(strf("REPLIES_%s", commentId)),
-				AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3"),
-			),
+			DIV(AttrId(strf("replies-%s", commentId)), AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3")),
 		),
 	)
 }
@@ -1732,7 +1630,7 @@ type EditCommentFormParams struct {
 
 func EditCommentForm(params EditCommentFormParams) HyperNode {
 	return FORM(
-		AttrId(strf("EDIT_FORM_%s", params.CommentId)),
+		AttrId(strf("edit-comment-form-%s", params.CommentId)),
 		AttrClass(IfElseZero(params.Hide, "hidden")),
 		Attr("hx-put", strf("/videos/%s/comments/%s", params.VideoId, params.CommentId)),
 		Attr("hx-swap", "outerHTML"),
@@ -1757,8 +1655,8 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 				AttrClass("btn btn-ghost btn-sm"),
 				AttrType(TypeButton),
 				AttrOnClick(strf(`
-					COMMENT_CONTENT_%[1]s.classList.remove('hidden')
-					EDIT_FORM_%[1]s.classList.add('hidden')
+					$('#comment-content-%[1]s').classList.remove('hidden')
+					$('#edit-comment-form-%[1]s').classList.add('hidden')
 				`, params.CommentId)),
 			)(
 				"Cancel",
@@ -1787,9 +1685,7 @@ func DiscoverPage(username string) HyperNode {
 }
 
 func DiscoverPageContent() HyperNode {
-	return Group(
-		"Discover Page",
-	)
+	return Text("Discover Page")
 }
 
 func FeedPage(username string) HyperNode {
@@ -1829,7 +1725,5 @@ func NotificationsPage(username string) HyperNode {
 }
 
 func NotificationsPageContent() HyperNode {
-	return Group(
-		"Notifications Page",
-	)
+	return Text("Notifications Page")
 }

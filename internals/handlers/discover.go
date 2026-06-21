@@ -24,7 +24,7 @@ func (me *Handler) HandleDiscoverPageContent(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.DiscoverPageContent(),
 
-		hyper.DIV(hyper.AttrId("NAVBAR"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PageDiscover,

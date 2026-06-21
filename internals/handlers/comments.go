@@ -167,10 +167,10 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 		return err
 	}
 
-	oobTargetId := "COMMENTS_LIST"
+	oobTargetId := "comments-list"
 	oobSwap := "prepend"
 	if parentId != uuid.Nil {
-		oobTargetId = fmt.Sprintf("REPLIES_%s", parentId)
+		oobTargetId = fmt.Sprintf("replies-%s", parentId)
 		oobSwap = "append"
 	}
 
@@ -232,7 +232,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 			Hide:      true,
 		}),
 		hyper.DIV(
-			hyper.AttrId(fmt.Sprintf("COMMENT_CONTENT_%s", commentId)),
+			hyper.AttrId(fmt.Sprintf("comment-content-%s", commentId)),
 			hyper.Attr("hx-swap-oob", "outerHTML"),
 		)(
 			hyper.P(hyper.AttrClass("text-sm"))(content),

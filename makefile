@@ -20,9 +20,9 @@ watch:
 								-w ./internals/handlers/        -e go \
 								-- tailwindcss --minify -i ./internals/web/tailwind/tailwind_input.css -o ./internals/web/assets/css/style.css &
 	@$(WATCH_CMD) -w ./internals/services/ -e sql -- sqlc generate &
-	@$(WATCH_CMD) -w ./internals/      -e go \
-								-w ./cmd/server/     -e go \
-								-w ./internals/web/assets/ \
+	@$(WATCH_CMD) -w ./internals/            -e go     \
+								-w ./cmd/server/           -e go     \
+								-w ./internals/web/assets/ -e css,js \
 								-- "go build -o ./bin/server ./cmd/server/ && ./bin/server"
 
 validate-goose-service:
