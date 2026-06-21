@@ -13,7 +13,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
-	moderation_service "github.com/assaidy/vodzilla/internals/services/moderation"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	search_service "github.com/assaidy/vodzilla/internals/services/search"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
@@ -67,8 +66,6 @@ func main() {
 	serviceManager.Add("social service", socialService)
 	_ = search_service.New()
 	_ = history_service.New()
-	_ = moderation_service.New()
-
 	serviceManager.StartAll(context.Background())
 	defer serviceManager.StopAll(context.Background())
 

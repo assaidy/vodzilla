@@ -1,4 +1,4 @@
-package tests
+package services
 
 import (
 	"context"
@@ -87,9 +87,8 @@ func resetTable(b *testing.B) {
 
 func BenchmarkInsertUuidV4(b *testing.B) {
 	resetTable(b)
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := testDB.Exec(`INSERT INTO id_test (uuid_col) VALUES ($1)`, uuid.New()); err != nil {
 			b.Fatal(err)
 		}
@@ -98,9 +97,8 @@ func BenchmarkInsertUuidV4(b *testing.B) {
 
 func BenchmarkInsertUuidV7(b *testing.B) {
 	resetTable(b)
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := testDB.Exec(`INSERT INTO id_test (uuid_col) VALUES ($1)`, uuid.Must(uuid.NewV7())); err != nil {
 			b.Fatal(err)
 		}
@@ -109,9 +107,8 @@ func BenchmarkInsertUuidV7(b *testing.B) {
 
 func BenchmarkInsertUlidInVarcharColumn(b *testing.B) {
 	resetTable(b)
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := testDB.Exec(`INSERT INTO id_test (varchar_col) VALUES ($1)`, ulid.Make().String()); err != nil {
 			b.Fatal(err)
 		}
@@ -139,9 +136,8 @@ func BenchmarkReadUuidV4(b *testing.B) {
 			b.Fatal(err)
 		}
 	})
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		var uid uuid.UUID
 		if err := testDB.QueryRow(`SELECT uuid_col FROM id_test WHERE id = $1`, (i%1000)+1).Scan(&uid); err != nil {
 			b.Fatal(err)
@@ -155,9 +151,8 @@ func BenchmarkReadUuidV7(b *testing.B) {
 			b.Fatal(err)
 		}
 	})
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		var uid uuid.UUID
 		if err := testDB.QueryRow(`SELECT uuid_col FROM id_test WHERE id = $1`, (i%1000)+1).Scan(&uid); err != nil {
 			b.Fatal(err)
@@ -171,9 +166,8 @@ func BenchmarkReadUlidFromVarcharColumn(b *testing.B) {
 			b.Fatal(err)
 		}
 	})
-	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
+	for i := 0; b.Loop(); i++ {
 		var s string
 		if err := testDB.QueryRow(`SELECT varchar_col FROM id_test WHERE id = $1`, (i%1000)+1).Scan(&s); err != nil {
 			b.Fatal(err)
