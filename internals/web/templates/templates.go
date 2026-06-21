@@ -28,20 +28,12 @@ func basicPageLayout(title string) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js")),
-					SCRIPT(AttrSrc("/assets/js/lib/hyperscript.org@0.9.91.js")),
+					SCRIPT(AttrSrc("/assets/js/main.js"), AttrDefer(true)),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
 					Attr("hx-status:5xx:inherited", "swap:none"),
-					Attr("_", strf(`
-						init
-							set $clientId to %q
-						on htmx:config:request
-							set event.detail.ctx.request.headers['X-CSRF-Token'] to cookies['csrf_token']
-							set event.detail.ctx.request.headers['X-Client-ID'] to $clientId
-					`,
-						clientId,
-					)),
+					Attr("data-client-id", clientId.String()),
 				)(
 					DIV(AttrId("ALERT_TOAST"), AttrClass("toast toast-top w-md z-[1000000]")),
 					Group(children...),
@@ -111,7 +103,10 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 					MAIN(AttrId("APP_PAGE_CONTENT"), AttrClass("w-full p-6"))(
 						Group(children...),
 					),
-					DIV(AttrId("PAGE_CONTENT_INDICATOR"), AttrClass("hidden [.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"))(
+					DIV(
+						AttrId("PAGE_CONTENT_INDICATOR"),
+						AttrClass("hidden [.htmx-request]:flex absolute inset-0 items-center justify-center bg-base-300/70 z-10"),
+					)(
 						SPAN(AttrClass("loading loading-spinner loading-lg")),
 					),
 				),
@@ -813,25 +808,25 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 
 		SCRIPT()(RawText(strf(`
 			(() => {
-				const v = VIDEO_PLAYER;
-				let attempts = 0;
+				const v = VIDEO_PLAYER
+				let attempts = 0
 				v.addEventListener('error', async () => {
-					if (v.error && v.error.code !== v.error.MEDIA_ERR_NETWORK) return;
-					if (++attempts > 3) return;
+					if (v.error && v.error.code !== v.error.MEDIA_ERR_NETWORK) return
+					if (++attempts > 3) return
 					try {
-						const r = await fetch('/videos/%s/stream_url');
-						const d = await r.json();
-						const t = v.currentTime;
-						const p = !v.paused;
-						v.src = d.url;
-						v.currentTime = t;
-						if (p) await v.play();
+						const r = await fetch('/videos/%s/stream_url')
+						const d = await r.json()
+						const t = v.currentTime
+						const p = !v.paused
+						v.src = d.url
+						v.currentTime = t
+						if (p) await v.play()
 					} catch(e) {
-						console.error(e);
+						console.error(e)
 					}
-				});
-				v.addEventListener('playing', () => { attempts = 0; });
-			});
+				})
+				v.addEventListener('playing', () => { attempts = 0 })
+			})
 		`, params.Id))),
 	)
 }
@@ -866,12 +861,16 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
 		Attr("hx-on::before:request", strf(`
-			window._pendingVideos[%q] = FORM_VIDEO.files[0];
+			window._pendingVideos[%q] = FORM_VIDEO.files[0]
 		`, pendingVideoId)),
 		Attr("hx-on::after:request", strf(`
-			if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q];
+			if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]
 		`, pendingVideoId)),
 	)(
+		If(p.CloseDialogModal,
+			SCRIPT()(RawText(`POST_VIDEO_MODAL.close()`)),
+		),
+
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("FORM_TITLE"))(
 				SPAN(AttrClass("label-text"))("Title"),
@@ -937,13 +936,6 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 				SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 			),
 		),
-
-		If(p.CloseDialogModal,
-			SCRIPT()(RawText(`
-				POST_VIDEO_MODAL.close();
-				document.currentScript.remove();
-			`)),
-		),
 	)
 }
 
@@ -962,13 +954,12 @@ type VideoUploaderParams struct {
 func VideoUploader(params VideoUploaderParams) HyperNode {
 	return SCRIPT()(RawText(strf(`
 		(async () => {
-			const script = document.currentScript;
-			const pendingVideoId = %q;
-			const videoTitle     = %q;
-			const videoId        = %q;
-			const uploadId       = %q;
-			const partSize       = %d;
-			const uploadUrls     = %s;
+			const pendingVideoId = %q
+			const videoTitle     = %q
+			const videoId        = %q
+			const uploadId       = %q
+			const partSize       = %d
+			const uploadUrls     = %s
 
 			try {
 				await window._videoUploadManager.upload({
@@ -979,14 +970,12 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 					partSize,
 					uploadUrls,
 					completeUploadUrl: "/videos/complete_upload",
-				});
+				})
 			} catch (err) {
-				console.error(err);
-				window._videoUploadManager.removeUpload(pendingVideoId);
-			} finally {
-				script.remove();
+				console.error(err)
+				window._videoUploadManager.removeUpload(pendingVideoId)
 			}
-		});
+		})
 	`,
 		params.PendingVideoId,
 		params.VideoTitle,
@@ -1000,38 +989,38 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 func videoUploadersContainer() HyperNode {
 	return DIV(AttrId("VIDEO_UPLOADERS_CONTAINER"))(
 		SCRIPT()(RawText(`
-			window._pendingVideos = {};
+			window._pendingVideos = {}
 
 			window._videoUploadManager = {
 				_uploads: {},
 				addUpload(id, title, totalChunks) {
-					this._uploads[id] = { title, totalChunks, completedChunks: 0 };
-					this._updateIndicator();
+					this._uploads[id] = { title, totalChunks, completedChunks: 0 }
+					this._updateIndicator()
 				},
 				markChunkComplete(id) {
-					const u = this._uploads[id];
-					if (!u) return;
-					u.completedChunks++;
-					if (u.completedChunks >= u.totalChunks) delete this._uploads[id];
-					this._updateIndicator();
+					const u = this._uploads[id]
+					if (!u) return
+					u.completedChunks++
+					if (u.completedChunks >= u.totalChunks) delete this._uploads[id]
+					this._updateIndicator()
 				},
 				removeUpload(id) {
-					delete this._uploads[id];
-					this._updateIndicator();
+					delete this._uploads[id]
+					this._updateIndicator()
 				},
 				_updateIndicator() {
-					const count = Object.keys(this._uploads).length;
-					UPLOAD_INDICATOR_COUNT.textContent = count;
-					this._renderUploadList();
-					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0);
+					const count = Object.keys(this._uploads).length
+					UPLOAD_INDICATOR_COUNT.textContent = count
+					this._renderUploadList()
+					UPLOAD_INDICATOR.classList.toggle('hidden', count === 0)
 				},
 				_renderUploadList() {
-					const entries = Object.entries(this._uploads);
+					const entries = Object.entries(this._uploads)
 					if (entries.length === 0) {
-						UPLOAD_LIST_DIALOG.close();
-						return;
+						UPLOAD_LIST_DIALOG.close()
+						return
 					}
-					let html = '';
+					let html = ''
 					for (const [, u] of entries) {
 						html += '<div class="flex flex-col gap-1 py-2">'
 						     +  '<div class="flex justify-between text-sm">'
@@ -1039,44 +1028,44 @@ func videoUploadersContainer() HyperNode {
 						     +  '<span class="shrink-0">' + u.completedChunks + '/' + u.totalChunks + '</span>'
 						     +  '</div>'
 						     +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
-						     +  '</div>';
+						     +  '</div>'
 					}
-					UPLOAD_LIST_BODY.innerHTML = html;
+					UPLOAD_LIST_BODY.innerHTML = html
 				},
 			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, videoId, uploadId, completeUploadUrl }) {
-					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length);
+					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length)
 
-					const file = window._pendingVideos[pendingVideoId];
-					if (!file) throw new Error("pending video not found");
+					const file = window._pendingVideos[pendingVideoId]
+					if (!file) throw new Error("pending video not found")
 
-					const completedParts = [];
+					const completedParts = []
 					const uploads = uploadUrls.map(async (url, i) => {
-						const start = i * partSize;
-						const end = i === uploadUrls.length - 1 ? file.size : start + partSize;
-						const blob = file.slice(start, end);
+						const start = i * partSize
+						const end = i === uploadUrls.length - 1 ? file.size : start + partSize
+						const blob = file.slice(start, end)
 
-						const response = await fetch(url, { method: 'PUT', body: blob });
-						if (!response.ok) throw new Error("upload failed");
+						const response = await fetch(url, { method: 'PUT', body: blob })
+						if (!response.ok) throw new Error("upload failed")
 
 						completedParts.push({
 							etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
 							partNumber: i + 1,
-						});
+						})
 
-						this.markChunkComplete(pendingVideoId);
-					});
+						this.markChunkComplete(pendingVideoId)
+					})
 
-					await Promise.all(uploads);
+					await Promise.all(uploads)
 
 					await fetch(completeUploadUrl, {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
 						body: JSON.stringify({ videoId, uploadId, parts: completedParts }),
-					});
+					})
 
-					delete window._pendingVideos[pendingVideoId];
+					delete window._pendingVideos[pendingVideoId]
 			 	}
-			};
+			}
 	`)),
 	)
 }
@@ -1694,8 +1683,8 @@ func Comment(params CommentParams) HyperNode {
 							LI()(
 								A(
 									AttrOnClick(strf(`
-										COMMENT_CONTENT_%[1]s.classList.add('hidden');
-										EDIT_FORM_%[1]s.classList.remove('hidden');
+										COMMENT_CONTENT_%[1]s.classList.add('hidden')
+										EDIT_FORM_%[1]s.classList.remove('hidden')
 									`,
 										commentId,
 									)),
@@ -1768,8 +1757,8 @@ func EditCommentForm(params EditCommentFormParams) HyperNode {
 				AttrClass("btn btn-ghost btn-sm"),
 				AttrType(TypeButton),
 				AttrOnClick(strf(`
-					COMMENT_CONTENT_%[1]s.classList.remove('hidden');
-					EDIT_FORM_%[1]s.classList.add('hidden');
+					COMMENT_CONTENT_%[1]s.classList.remove('hidden')
+					EDIT_FORM_%[1]s.classList.add('hidden')
 				`, params.CommentId)),
 			)(
 				"Cancel",
