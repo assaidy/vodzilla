@@ -246,8 +246,12 @@ type Comment struct {
 	RepliesCount int
 }
 
-func (me *Service) GetAllVideoComments(ctx context.Context, videoId uuid.UUID) ([]Comment, error) {
-	dbComments, err := me.queries.GetAllVideoComments(ctx, videoId)
+func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, maxTimestamp time.Time) ([]Comment, error) {
+	dbComments, err := me.queries.GetVideoComments(ctx, queries.GetVideoCommentsParams{
+		VideoId:       videoId,
+		LastCommentId: lastCommentId,
+		MaxTimestamp:  maxTimestamp,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get comments on video: %w", err)
 	}

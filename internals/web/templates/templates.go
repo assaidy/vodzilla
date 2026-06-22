@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	. "github.com/assaidy/hyper/v2"
@@ -701,11 +702,12 @@ type VideoPageContentParams struct {
 	Timestamp                time.Time
 	ViewsCount               int
 	IsViewed                 bool
-	CurrentUserId            uuid.UUID
 	IsFollowed               bool
 	ReactionsParams          ReactionsWidgetParams
 	WatchLaterButtonParams   WatchlaterButtonParams
 	AddToPlaylistModalParams AddToPlaylistModalParams
+	CurrentUserId            uuid.UUID
+	CurrentUsername          string
 }
 
 func VideoPageContent(params VideoPageContentParams) HyperNode {
@@ -761,7 +763,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			),
 		),
 
-		commentSection(params.Id),
+		commentSection(CommentSectionParams{VideoId: params.Id, CurrentUsername: params.CurrentUsername}),
 
 		SCRIPT()(RawText(strf(`
 			(() => {
@@ -1435,85 +1437,85 @@ func WatchlaterPageContent(params WatchlaterPageContentParams) HyperNode {
 	)
 }
 
-// TODO: the indentation for replies is too big. use the menu
-// component from daisy ui; it comes with indentation styles.
-func commentSection(videoId uuid.UUID) HyperNode {
+type CommentSectionParams struct {
+	VideoId         uuid.UUID
+	CurrentUsername string
+}
+
+func commentSection(params CommentSectionParams) HyperNode {
 	return DIV(AttrId("comment-section"), AttrClass("mt-8"))(
-		H2(AttrClass("text-xl font-bold mb-4"))("Comments"),
-		CreateCommentForm(CreateCommentFormParams{VideoId: videoId}),
-		DIV(
-			AttrId("comments-list"),
-			AttrClass("space-y-4 mt-6"),
-			Attr("hx-get", strf("/videos/%s/comments", videoId)),
-			Attr("hx-trigger", "load"),
-			Attr("hx-swap", "innerHTML"),
+		CreateCommentForm(params.VideoId, params.CurrentUsername),
+		DIV(AttrId("comments-list"), AttrClass("mt-8 space-y-4"))(
+			CommentsLoader(CommentsLoaderParams{VideoId: params.VideoId}),
 		),
 	)
 }
 
-type CreateCommentFormParams struct {
-	VideoId    uuid.UUID
-	ParentId   uuid.UUID
-	Content    string
-	ContentErr error
-}
-
-// TODO: split comment form into two forms: create comment, create reply
-// TODO: the loading of replies is not correct.
-// there should be a button show/hide replies whose text changes according to the replies status (showed/hidden).
-// the replies list is lazy loaded when first show. that way we can hide/show comments any time and also it fixes
-// that the new reply is inserted event if replies is hidden, and that create two duplicate replies if we opened(loaded)
-// replies after a new reply inserted. also the number of replies (in the button) will be updated dynamically when new replies inserted.
-// TODO: make dropdown menu not to appear in the bottom
-func CreateCommentForm(params CreateCommentFormParams) HyperNode {
-	formId := "create-comment-form"
-	textareaId := "create-comment-textarea"
-	placeholder := "Add a comment..."
-	submitText := "Comment"
-
-	if params.ParentId != uuid.Nil {
-		formId = strf("reply-form-inner-%s", params.ParentId)
-		textareaId = strf("reply-textarea-%s", params.ParentId)
-		placeholder = "Write a reply..."
-		submitText = "Reply"
-	}
-
+func CreateCommentForm(videoId uuid.UUID, currentUsername string) HyperNode {
 	return FORM(
-		AttrId(formId),
-		AttrClass(Classes("flex gap-2 items-start", IfElseZero(params.ParentId != uuid.Nil, "hidden"))),
-		Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .submit-btn"),
+		AttrId("create-comment-form"),
+		AttrClass("w-full flex flex-col gap-2 bg-base-100 p-2 rounded-xl border border-base-300 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all"),
+		Attr("hx-post", strf("/videos/%s/comments", videoId)),
+		Attr("hx-target", "#comments-list"),
+		Attr("hx-swap", "prepend"),
+		Attr("hx-indicator", "#comment-post-btn"),
+		Attr("hx-disable", "#comment-buttons button"),
+		Attr("hx-on::after:swap", "this.reset()"),
 	)(
-		If(params.ParentId == uuid.Nil,
-			commentOwnerAvatarPlaceholder(),
+		TEXTAREA(
+			AttrId("comment-input"),
+			AttrClass("textarea textarea-ghost outline-none w-full resize-none field-sizing-content overflow-hidden min-h-[1lh]"),
+			AttrRows("1"),
+			AttrMaxLength("500"),
+			AttrPlaceholder("Write a cool comment..."),
+			AttrName("comment"),
+			AttrRequired(true),
 		),
-		DIV(AttrClass("flex-1 flex gap-2"))(
-			TEXTAREA(
-				AttrId(textareaId),
-				AttrClass("textarea textarea-bordered w-full resize-none"),
-				AttrName("content"),
-				AttrPlaceholder(placeholder),
-				AttrRequired(true),
-				AttrMaxLength("500"),
-			)(params.Content),
-			If(params.ContentErr != nil,
-				LABEL(AttrClass("label"))(
-					SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
+
+		DIV(AttrClass("flex justify-between items-center border-t border-base-300 pt-2"))(
+			DIV(AttrClass("flex items-center gap-2"))(
+				commentOwnerAvatarPlaceholder(),
+				SPAN(AttrClass("text-sm font-medium"))("@"+currentUsername),
+			),
+			DIV(AttrId("comment-buttons"), AttrClass("flex gap-2"))(
+				BUTTON(AttrClass("btn btn-soft btn-error btn-sm"), AttrType(TypeButton), AttrOnClick(`$('#comment-input').value = ''`))("Clear"),
+				BUTTON(AttrId("comment-post-btn"), AttrClass("btn btn-primary btn-sm group"), AttrType(TypeSubmit))(
+					"Post Comment", SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 				),
 			),
-			If(params.ParentId != uuid.Nil,
-				INPUT(AttrType(TypeHidden), AttrName("parent_id"), AttrValue(params.ParentId.String())),
-			),
-			BUTTON(AttrClass("btn btn-primary btn-sm submit-btn"), AttrType(TypeSubmit))(submitText),
+		),
+	)
+}
+
+type CommentsLoaderParams struct {
+	VideoId       uuid.UUID
+	LastCommentId uuid.UUID
+}
+
+func CommentsLoader(params CommentsLoaderParams) HyperNode {
+	var urlQuery string
+	if params.LastCommentId != uuid.Nil {
+		urlQuery = strf("last_comment_id=%s", params.LastCommentId)
+	} else {
+		// This is to avoid duplication when posting a comment before initail comments load.
+		urlQuery = strf("max_timestamp=%s", url.QueryEscape(time.Now().Format(time.RFC3339)))
+	}
+
+	return DIV(
+		Attr("hx-get", strf("/videos/%s/comments?%s", params.VideoId, urlQuery)),
+		Attr("hx-trigger", "intersect"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .htmx-indicator"),
+	)(
+		DIV(AttrClass("htmx-indicator hidden [.htmx-request]:flex justify-center pt-4"))(
+			SPAN(AttrClass("loading loading-spinner loading-sm")),
 		),
 	)
 }
 
 type CommentParams struct {
+	Id            uuid.UUID
 	VideoId       uuid.UUID
-	CommentId     uuid.UUID
-	OwnerName     string
 	OwnerUsername string
 	Content       string
 	CreatedAt     time.Time
@@ -1522,144 +1524,17 @@ type CommentParams struct {
 }
 
 func Comment(params CommentParams) HyperNode {
-	commentId := params.CommentId
-	videoId := params.VideoId
-
-	ownerProfilePageLink := "/@" + params.OwnerUsername
-	visitProfileAttrs := []Attribute{
-		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
-		Attr("hx-push-url", ownerProfilePageLink),
-		Attr("hx-target", "#app-page-content"),
-		Attr("hx-swap", "innerHTML"),
-		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#page-content-indicator"),
-	}
-
-	return DIV(AttrId(strf("comment-%s", commentId)), AttrClass("flex gap-2"))(
-		DIV(append(visitProfileAttrs, AttrClass("shrink-0 cursor-pointer"))...)(
-			commentOwnerAvatarPlaceholder(),
-		),
-
-		DIV(AttrClass("flex-1 min-w-0"))(
+	return DIV(AttrClass("flex gap-2"))(
+		commentOwnerAvatarPlaceholder(),
+		DIV(AttrClass("flex-1"))(
 			DIV(AttrClass("flex items-center gap-2 text-sm"))(
-				A(append(visitProfileAttrs, AttrClass("link link-hover font-semibold"))...)(params.OwnerName),
+				SPAN()("@"+params.OwnerUsername),
 				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
 			),
-
-			DIV(AttrId(strf("comment-body-%s", commentId)))(
-				DIV(AttrId(strf("comment-content-%s", commentId)))(
-					P(AttrClass("text-sm"))(params.Content),
-				),
-				If(params.IsOwner,
-					EditCommentForm(EditCommentFormParams{
-						VideoId:   videoId,
-						CommentId: commentId,
-						Content:   params.Content,
-						Hide:      true,
-					}),
-				),
-			),
-
-			DIV(AttrClass("flex items-center gap-1 mt-1"))(
-				BUTTON(
-					AttrClass("btn btn-ghost btn-xs"),
-					AttrOnClick(strf("$('#reply-form-%s').classList.toggle('hidden')", commentId)),
-				)("Reply"),
-
-				If(params.RepliesCount > 0,
-					BUTTON(
-						AttrClass("btn btn-soft btn-xs"),
-						Attr("hx-get", strf("/videos/%s/comments/%s/replies", videoId, commentId)),
-						Attr("hx-target", strf("#replies-%s", commentId)),
-						Attr("hx-swap", "append"),
-						Attr("hx-on::after:request", "this.remove()"),
-					)(
-						strf("Show replies (%d)", params.RepliesCount),
-					),
-				),
-
-				If(params.IsOwner,
-					DIV(AttrClass("dropdown dropdown-end"))(
-						BUTTON(AttrClass("btn btn-ghost btn-xs btn-circle"), Attr("tabindex", "0"))(
-							RawText(lucide.EllipsisVertical()),
-						),
-						UL(AttrClass("dropdown-content menu p-2 shadow bg-base-100 rounded-box z-[1]"), Attr("tabindex", "0"))(
-							LI()(
-								A(
-									AttrOnClick(strf(`
-										$('#comment-content-%[1]s').classList.add('hidden')
-										$('#edit-comment-form-%[1]s').classList.remove('hidden')
-									`,
-										commentId,
-									)),
-								)(
-									"Edit",
-								),
-							),
-							LI()(
-								A(
-									Attr("hx-delete", strf("/videos/%s/comments/%s", videoId, commentId)),
-									Attr("hx-target", strf("#comment-%s", commentId)),
-									Attr("hx-swap", "delete"),
-									Attr("hx-confirm", "Are you sure?"),
-								)(
-									"Delete",
-								),
-							),
-						),
-					),
-				),
-			),
-
-			DIV(AttrId(strf("reply-form-%s", commentId)), AttrClass("hidden mt-2"))(
-				CreateCommentForm(CreateCommentFormParams{VideoId: videoId, ParentId: commentId}),
-			),
-
-			DIV(AttrId(strf("replies-%s", commentId)), AttrClass("ml-8 border-l-2 border-base-300 pl-4 mt-2 space-y-3")),
-		),
-	)
-}
-
-type EditCommentFormParams struct {
-	VideoId    uuid.UUID
-	CommentId  uuid.UUID
-	Content    string
-	ContentErr error
-	Hide       bool
-}
-
-func EditCommentForm(params EditCommentFormParams) HyperNode {
-	return FORM(
-		AttrId(strf("edit-comment-form-%s", params.CommentId)),
-		AttrClass(IfElseZero(params.Hide, "hidden")),
-		Attr("hx-put", strf("/videos/%s/comments/%s", params.VideoId, params.CommentId)),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .submit-btn"),
-	)(
-		TEXTAREA(
-			AttrClass("textarea textarea-bordered w-full resize-none"),
-			AttrName("content"),
-			AttrRequired(true),
-			AttrMaxLength("500"),
-		)(
-			params.Content,
-		),
-		If(params.ContentErr != nil,
-			LABEL(AttrClass("label"))(
-				SPAN(AttrClass("label-text-alt text-error"))(params.ContentErr),
-			),
-		),
-		DIV(AttrClass("flex gap-2 mt-1"))(
-			BUTTON(AttrClass("btn btn-primary btn-sm submit-btn"), AttrType(TypeSubmit))("Save"),
-			BUTTON(
-				AttrClass("btn btn-ghost btn-sm"),
-				AttrType(TypeButton),
-				AttrOnClick(strf(`
-					$('#comment-content-%[1]s').classList.remove('hidden')
-					$('#edit-comment-form-%[1]s').classList.add('hidden')
-				`, params.CommentId)),
-			)(
-				"Cancel",
+			P(AttrClass("text-sm mt-1"))(params.Content),
+			DIV(AttrClass("flex items-center gap-1 mt-1 text-base-content/40"))(
+				BUTTON(AttrClass("btn btn-ghost btn-xs"))(RawText(lucide.Reply()), " Reply"),
+				BUTTON(AttrClass("btn btn-ghost btn-xs btn-circle"))(RawText(lucide.Ellipsis())),
 			),
 		),
 	)

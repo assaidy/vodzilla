@@ -48,7 +48,7 @@ where id = $2;
 -- name: DeleteComment :execrows
 delete from reaction_service.comments where id = $1 and owner_id = $2;
 
--- name: GetAllVideoComments :many
+-- name: GetVideoComments :many
 select 
   c.id,
   c.owner_id,
@@ -57,9 +57,13 @@ select
   count(r.id) as replies_count
 from reaction_service.comments c
 left join reaction_service.comments r on c.id = r.parent_id
-where c.video_id = $1 and c.parent_id is null
+where c.video_id = $1 and c.parent_id is null and (
+  @last_comment_id::uuid != '00000000-0000-0000-0000-000000000000' and c.id < @last_comment_id
+  or c.created_at <= @max_timestamp
+)
 group by c.id, c.owner_id, c.content, c.created_at
-order by c.created_at desc;
+order by c.created_at desc, c.id desc
+limit 15;
 
 -- name: GetAllCommentReplies :many
 select 

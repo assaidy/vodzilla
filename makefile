@@ -22,6 +22,7 @@ watch:
 	@$(WATCH_CMD) -w ./internals/services/ -e sql -- sqlc generate &
 	@$(WATCH_CMD) -w ./internals/            -e go     \
 								-w ./cmd/server/           -e go     \
+								-w ./                      -e mod    \
 								-w ./internals/web/assets/ -e css,js \
 								-- "go build -o ./bin/server ./cmd/server/ && ./bin/server"
 

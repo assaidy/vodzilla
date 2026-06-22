@@ -228,7 +228,6 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 			Timestamp:     video.Timestamp,
 			ViewsCount:    viewsCount,
 			IsViewed:      isViewed,
-			CurrentUserId: currentUser.Id,
 			IsFollowed:    isFollowed,
 			ReactionsParams: templates.ReactionsWidgetParams{
 				VideoId:       videoId,
@@ -245,6 +244,8 @@ func (me *Handler) HandleVideoPageContent(c fiber.Ctx) error {
 				VideoId:   videoId,
 				Playlists: templatePlaylists,
 			},
+			CurrentUserId:   currentUser.Id,
+			CurrentUsername: currentUser.Username,
 		}),
 
 		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
