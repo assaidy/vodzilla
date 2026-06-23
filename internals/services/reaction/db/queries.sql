@@ -65,7 +65,7 @@ group by c.id, c.owner_id, c.content, c.created_at
 order by c.created_at desc, c.id desc
 limit 15;
 
--- name: GetAllCommentReplies :many
+-- name: GetCommentReplies :many
 select 
   c.id,
   c.owner_id,
@@ -74,9 +74,13 @@ select
   count(r.id) as replies_count
 from reaction_service.comments c
 left join reaction_service.comments r on c.id = r.parent_id
-where c.parent_id = @comment_id::uuid
+where c.parent_id = @comment_id::uuid and (
+  @last_comment_id::uuid != '00000000-0000-0000-0000-000000000000' and c.id < @last_comment_id
+  or c.created_at <= @max_timestamp
+)
 group by c.id, c.owner_id, c.content, c.created_at
-order by c.created_at asc;
+order by c.created_at desc, c.id desc
+limit 15;
 
 -- name: DeleteAllViewsForUser :exec
 delete from reaction_service.views where user_id = $1;
@@ -93,5 +97,20 @@ delete from reaction_service.views where video_id = $1;
 -- name: DeleteAllReactionsForVideo :exec
 delete from reaction_service.reactions where video_id = $1;
 
+-- name: GetVideoCommentsCount :one
+select count(*) from reaction_service.comments where video_id = $1 and parent_id is null;
+
 -- name: DeleteAllCommentsForVideo :exec
 delete from reaction_service.comments where video_id = $1;
+
+-- name: GetCommentById :one
+select 
+  c.id,
+  c.owner_id,
+  c.content,
+  c.created_at,
+  count(r.id) as replies_count
+from reaction_service.comments c
+left join reaction_service.comments r on c.id = r.parent_id
+where c.id = $1
+group by c.id, c.owner_id, c.content, c.created_at;

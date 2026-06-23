@@ -763,7 +763,10 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			),
 		),
 
-		commentSection(CommentSectionParams{VideoId: params.Id, CurrentUsername: params.CurrentUsername}),
+		commentSection(CommentSectionParams{
+			VideoId:         params.Id,
+			CurrentUsername: params.CurrentUsername,
+		}),
 
 		SCRIPT()(RawText(strf(`
 			(() => {
@@ -1444,27 +1447,37 @@ type CommentSectionParams struct {
 
 func commentSection(params CommentSectionParams) HyperNode {
 	return DIV(AttrId("comment-section"), AttrClass("mt-8"))(
-		CreateCommentForm(params.VideoId, params.CurrentUsername),
-		DIV(AttrId("comments-list"), AttrClass("mt-8 space-y-4"))(
+		SCRIPT(AttrSrc("/assets/js/comment_section.js"), AttrDefer(true)),
+		H2(AttrClass("text-xl font-bold mb-4"))("Comments"),
+		CreateCommentForm(CreateCommentFormParams{VideoId: params.VideoId, CurrentUsername: params.CurrentUsername}),
+		DIV(AttrId("comments-list"), AttrClass("mt-4 space-y-4"))(
 			CommentsLoader(CommentsLoaderParams{VideoId: params.VideoId}),
 		),
 	)
 }
 
-func CreateCommentForm(videoId uuid.UUID, currentUsername string) HyperNode {
+type CreateCommentFormParams struct {
+	VideoId         uuid.UUID
+	CurrentUsername string
+	ContentErr      error
+}
+
+func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	return FORM(
 		AttrId("create-comment-form"),
 		AttrClass("w-full flex flex-col gap-2 bg-base-100 p-2 rounded-xl border border-base-300 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all"),
-		Attr("hx-post", strf("/videos/%s/comments", videoId)),
-		Attr("hx-target", "#comments-list"),
-		Attr("hx-swap", "prepend"),
+		Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
+		Attr("hx-target", "this"),
+		Attr("hx-swap", "outerHTML"),
 		Attr("hx-indicator", "#comment-post-btn"),
 		Attr("hx-disable", "#comment-buttons button"),
-		Attr("hx-on::after:swap", "this.reset()"),
 	)(
 		TEXTAREA(
 			AttrId("comment-input"),
-			AttrClass("textarea textarea-ghost outline-none w-full resize-none field-sizing-content overflow-hidden min-h-[1lh]"),
+			AttrClass(Classes(
+				"textarea textarea-ghost outline-none w-full resize-none field-sizing-content overflow-hidden min-h-[1lh]",
+				IfElseZero(params.ContentErr != nil, "textarea-error"),
+			)),
 			AttrRows("1"),
 			AttrMaxLength("500"),
 			AttrPlaceholder("Write a cool comment..."),
@@ -1475,12 +1488,65 @@ func CreateCommentForm(videoId uuid.UUID, currentUsername string) HyperNode {
 		DIV(AttrClass("flex justify-between items-center border-t border-base-300 pt-2"))(
 			DIV(AttrClass("flex items-center gap-2"))(
 				commentOwnerAvatarPlaceholder(),
-				SPAN(AttrClass("text-sm font-medium"))("@"+currentUsername),
+				SPAN(AttrClass("text-sm font-medium"))("@"+params.CurrentUsername),
+				If(params.ContentErr != nil,
+					SPAN(AttrClass("text-xs text-error"))(params.ContentErr),
+				),
 			),
 			DIV(AttrId("comment-buttons"), AttrClass("flex gap-2"))(
-				BUTTON(AttrClass("btn btn-soft btn-error btn-sm"), AttrType(TypeButton), AttrOnClick(`$('#comment-input').value = ''`))("Clear"),
+				BUTTON(AttrId("comment-clear-btn"), AttrClass("btn btn-soft btn-error btn-sm"), AttrType(TypeButton))("Clear"),
 				BUTTON(AttrId("comment-post-btn"), AttrClass("btn btn-primary btn-sm group"), AttrType(TypeSubmit))(
 					"Post Comment", SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
+				),
+			),
+		),
+	)
+}
+
+type CreateReplyFormParams struct {
+	VideoId    uuid.UUID
+	CommentId  uuid.UUID
+	ContentErr error
+}
+
+func CreateReplyForm(params CreateReplyFormParams) HyperNode {
+	return FORM(
+		AttrId(strf("create-reply-form-%s", params.CommentId)),
+		AttrClass("w-full flex flex-col gap-2 bg-base-100 p-2 rounded-xl border border-base-300 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all"),
+		Attr("hx-post", strf("/videos/%s/comments/%s/replies", params.VideoId, params.CommentId)),
+		Attr("hx-target", "this"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", strf("#reply-post-btn-%s", params.CommentId)),
+		Attr("hx-disable", strf("#reply-buttons-%s button", params.CommentId)),
+	)(
+		TEXTAREA(
+			AttrId(strf("reply-input-%s", params.CommentId)),
+			AttrClass(Classes(
+				"textarea textarea-ghost outline-none w-full resize-none field-sizing-content overflow-hidden min-h-[1lh]",
+				IfElseZero(params.ContentErr != nil, "textarea-error"),
+			)),
+			AttrRows("1"),
+			AttrMaxLength("500"),
+			AttrPlaceholder(strf("Write a cool reply...")),
+			AttrName("comment"),
+			AttrRequired(true),
+		),
+
+		DIV(AttrClass("flex items-center border-t border-base-300 pt-2"))(
+			If(params.ContentErr != nil,
+				SPAN(AttrClass("text-xs text-error"))(params.ContentErr),
+			),
+			DIV(AttrClass("flex gap-2 ml-auto"), AttrId(strf("reply-buttons-%s", params.CommentId)))(
+				BUTTON(
+					AttrClass("btn btn-soft btn-error btn-sm"),
+					AttrType(TypeButton),
+					Attr("data-reply-cancel", ""),
+					Attr("data-comment-id", params.CommentId.String()),
+				)(
+					"Cancel",
+				),
+				BUTTON(AttrId(strf("reply-post-btn-%s", params.CommentId)), AttrClass("btn btn-primary btn-sm group"), AttrType(TypeSubmit))(
+					"Reply", SPAN(AttrClass("loading loading-spinner loading-sm htmx-indicator hidden group-[.htmx-request]:inline-block")),
 				),
 			),
 		),
@@ -1497,7 +1563,7 @@ func CommentsLoader(params CommentsLoaderParams) HyperNode {
 	if params.LastCommentId != uuid.Nil {
 		urlQuery = strf("last_comment_id=%s", params.LastCommentId)
 	} else {
-		// This is to avoid duplication when posting a comment before initail comments load.
+		// This is to avoid duplication when posting a comment before initail load.
 		urlQuery = strf("max_timestamp=%s", url.QueryEscape(time.Now().Format(time.RFC3339)))
 	}
 
@@ -1519,23 +1585,102 @@ type CommentParams struct {
 	OwnerUsername string
 	Content       string
 	CreatedAt     time.Time
-	RepliesCount  int
 	IsOwner       bool
 }
 
 func Comment(params CommentParams) HyperNode {
-	return DIV(AttrClass("flex gap-2"))(
+	const commentCharLimit = 100
+	isLong := len(params.Content) > commentCharLimit
+	var displayContent string
+	if isLong {
+		displayContent = params.Content[:commentCharLimit] + "..."
+	} else {
+		displayContent = params.Content
+	}
+
+	return DIV(AttrId(strf("comment-%s", params.Id)), AttrClass("flex gap-2"))(
 		commentOwnerAvatarPlaceholder(),
 		DIV(AttrClass("flex-1"))(
 			DIV(AttrClass("flex items-center gap-2 text-sm"))(
-				SPAN()("@"+params.OwnerUsername),
+				A(AttrClass("link link-hover font-bold"), AttrHref("/@"+params.OwnerUsername))("@"+params.OwnerUsername),
 				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
 			),
-			P(AttrClass("text-sm mt-1"))(params.Content),
-			DIV(AttrClass("flex items-center gap-1 mt-1 text-base-content/40"))(
-				BUTTON(AttrClass("btn btn-ghost btn-xs"))(RawText(lucide.Reply()), " Reply"),
-				BUTTON(AttrClass("btn btn-ghost btn-xs btn-circle"))(RawText(lucide.Ellipsis())),
+			DIV(AttrClass("comment-text-container"))(
+				P(AttrClass("text-sm mt-1"))(displayContent),
+				If(isLong,
+					BUTTON(AttrClass("comment-read-more text-xs link link-primary mt-1"), Attr("data-full-text", params.Content))("Read more"),
+				),
 			),
+			DIV(AttrClass("flex items-center gap-1 mt-1 text-base-content/40"))(
+				BUTTON(
+					AttrClass("btn btn-ghost btn-xs"),
+					Attr("data-reply-toggle", ""),
+					Attr("data-comment-id", params.Id.String()),
+				)(
+					RawText(lucide.Reply()), " Reply",
+				),
+				If(params.IsOwner,
+					BUTTON(
+						AttrClass("btn btn-ghost btn-xs"),
+						Attr("hx-delete", strf("/videos/%s/comments/%s", params.VideoId, params.Id)),
+						Attr("hx-target", strf("#comment-%s", params.Id)),
+						Attr("hx-swap", "delete"),
+						Attr("hx-disable", "this"),
+					)(
+						RawText(lucide.Trash2(icons.Params{Class: "w-4 h-4"})), " Delete",
+					),
+				),
+				SPAN(AttrId(strf("show-replies-btn-%s", params.Id)))(
+					ShowRepliesButton(params.Id),
+				),
+			),
+			DIV(AttrId(strf("reply-form-%s", params.Id)), AttrClass("hidden mt-2"))(
+				CreateReplyForm(CreateReplyFormParams{VideoId: params.VideoId, CommentId: params.Id}),
+			),
+			DIV(AttrId(strf("replies-%s", params.Id)), AttrClass("hidden mt-2 border-l-2 border-base-300 space-y-2"))(
+				RepliesLoader(RepliesLoaderParams{VideoId: params.VideoId, CommentId: params.Id}),
+			),
+		),
+	)
+}
+
+// TODO : this is always visible event if the comment doesn't have any replies.
+// it's confusing to the user.
+// handle state for comments/replies count.
+func ShowRepliesButton(commentId uuid.UUID) HyperNode {
+	return BUTTON(
+		AttrClass("btn btn-ghost btn-xs"),
+		Attr("data-replies-toggle", ""),
+		Attr("data-comment-id", commentId.String()),
+		Attr("data-view-text", "View replies"),
+	)(
+		"View replies",
+	)
+}
+
+type RepliesLoaderParams struct {
+	VideoId       uuid.UUID
+	LastCommentId uuid.UUID
+	CommentId     uuid.UUID
+}
+
+func RepliesLoader(params RepliesLoaderParams) HyperNode {
+	var urlQuery string
+	if params.LastCommentId != uuid.Nil {
+		urlQuery = strf("last_comment_id=%s", params.LastCommentId)
+	} else {
+		// This is to avoid duplication when posting a reply before initail load.
+		urlQuery = strf("max_timestamp=%s", url.QueryEscape(time.Now().Format(time.RFC3339)))
+	}
+
+	return DIV(
+		Attr("hx-get", strf("/videos/%s/comments/%s/replies?%s", params.VideoId, params.CommentId, urlQuery)),
+		Attr("hx-trigger", "intersect"),
+		Attr("hx-swap", "outerHTML"),
+		Attr("hx-indicator", "find .htmx-indicator"),
+	)(
+		DIV(AttrClass("htmx-indicator hidden [.htmx-request]:flex justify-center pt-4"))(
+			SPAN(AttrClass("loading loading-spinner loading-sm")),
 		),
 	)
 }

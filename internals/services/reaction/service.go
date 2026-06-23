@@ -160,6 +160,24 @@ func (me *Service) GetVideoReactionForUser(ctx context.Context, videoId, userId 
 	}, nil
 }
 
+func (me *Service) GetCommentById(ctx context.Context, commentId uuid.UUID) (*Comment, error) {
+	dbComment, err := me.queries.GetCommentById(ctx, commentId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrCommentNotFound
+		}
+		return nil, fmt.Errorf("failed to get comment by id: %w", err)
+	}
+
+	return &Comment{
+		Id:           commentId,
+		OwnerId:      dbComment.OwnerId,
+		Content:      dbComment.Content,
+		CreatedAt:    dbComment.CreatedAt,
+		RepliesCount: int(dbComment.RepliesCount),
+	}, nil
+}
+
 func (me *Service) CreateComment(ctx context.Context, videoId, userId uuid.UUID, content string, parentId uuid.UUID) (*uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -246,6 +264,14 @@ type Comment struct {
 	RepliesCount int
 }
 
+func (me *Service) GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
+	count, err := me.queries.GetVideoCommentsCount(ctx, videoId)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get comments count: %w", err)
+	}
+	return int(count), nil
+}
+
 func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, maxTimestamp time.Time) ([]Comment, error) {
 	dbComments, err := me.queries.GetVideoComments(ctx, queries.GetVideoCommentsParams{
 		VideoId:       videoId,
@@ -270,7 +296,7 @@ func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId 
 	return result, nil
 }
 
-func (me *Service) GetAllCommentReplies(ctx context.Context, commentId uuid.UUID) ([]Comment, error) {
+func (me *Service) GetCommentReplies(ctx context.Context, commentId, lastCommentId uuid.UUID, maxTimestamp time.Time) ([]Comment, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -284,7 +310,11 @@ func (me *Service) GetAllCommentReplies(ctx context.Context, commentId uuid.UUID
 		return nil, ErrCommentNotFound
 	}
 
-	dbComments, err := qtx.GetAllCommentReplies(ctx, commentId)
+	dbComments, err := qtx.GetCommentReplies(ctx, queries.GetCommentRepliesParams{
+		CommentId:     commentId,
+		LastCommentId: lastCommentId,
+		MaxTimestamp:  maxTimestamp,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get comment replies: %w", err)
 	}

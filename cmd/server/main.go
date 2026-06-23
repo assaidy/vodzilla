@@ -172,7 +172,8 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 
 	router.Get("/videos/:video_id/comments", h.WithSession, h.HandleGetVideoComments)
 	router.Get("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.HandleGetCommentReplies)
+	router.Post("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.WithCsrfToken, h.HandleCreateReply)
 	router.Post("/videos/:video_id/comments", h.WithSession, h.WithCsrfToken, h.HandleCreateComment)
-	// router.Put("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment)
+	// router.Put("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment) // TODO: edit comment
 	router.Delete("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteComment)
 }

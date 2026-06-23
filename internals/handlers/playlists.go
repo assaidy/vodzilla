@@ -241,7 +241,7 @@ func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 		return err
 	}
 
-	templateVideos, err := me.getTemplateVideosFromVideos(c, videos)
+	templateVideos, err := me.toTemplateVideos(c, videos)
 	if err != nil {
 		return err
 	}

@@ -294,7 +294,7 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 	return redirect(c, "/login")
 }
 
-func (me *Handler) getTemplateVideosFromVideos(c fiber.Ctx, videos []video_service.Video) ([]templates.VideoCardParams, error) {
+func (me *Handler) toTemplateVideos(c fiber.Ctx, videos []video_service.Video) ([]templates.VideoCardParams, error) {
 	templateVideos := make([]templates.VideoCardParams, 0, len(videos))
 	ownerCache := make(map[uuid.UUID]*user_service.User)
 

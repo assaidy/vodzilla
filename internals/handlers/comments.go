@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -52,31 +53,14 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 		return nil
 	}
 
-	currentUserId := c.Locals("user_id").(uuid.UUID)
-	ownerCache := make(map[uuid.UUID]*user_service.User)
-	templateComments := make([]any, 0, len(comments))
+	currentUser, err := me.getCurrentUser(c)
+	if err != nil {
+		return err
+	}
 
-	for _, comment := range comments {
-		owner, ok := ownerCache[comment.OwnerId]
-		if !ok {
-			owner, err = me.userService.GetUserById(c.RequestCtx(), comment.OwnerId)
-			if err != nil {
-				if errors.Is(err, user_service.ErrUserNotFound) {
-					continue
-				}
-				return err
-			}
-			ownerCache[comment.OwnerId] = owner
-		}
-		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			Id:            comment.Id,
-			VideoId:       videoId,
-			OwnerUsername: owner.Username,
-			Content:       comment.Content,
-			CreatedAt:     comment.CreatedAt,
-			RepliesCount:  comment.RepliesCount,
-			IsOwner:       currentUserId == comment.OwnerId,
-		}))
+	templateComments, err := me.toTemplateComments(c, comments, videoId, currentUser)
+	if err != nil {
+		return err
 	}
 
 	return render(c, hyper.Group(
@@ -88,6 +72,36 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 	))
 }
 
+func (me *Handler) toTemplateComments(c fiber.Ctx, comments []reaction_service.Comment, videoId uuid.UUID, currentUser *user_service.User) ([]any, error) {
+	ownerCache := make(map[uuid.UUID]*user_service.User)
+	templateComments := make([]any, 0, len(comments))
+
+	for _, comment := range comments {
+		owner, ok := ownerCache[comment.OwnerId]
+		if !ok {
+			var err error
+			owner, err = me.userService.GetUserById(c.RequestCtx(), comment.OwnerId)
+			if err != nil {
+				if errors.Is(err, user_service.ErrUserNotFound) {
+					continue
+				}
+				return nil, err
+			}
+			ownerCache[comment.OwnerId] = owner
+		}
+		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
+			Id:            comment.Id,
+			VideoId:       videoId,
+			OwnerUsername: owner.Username,
+			Content:       comment.Content,
+			CreatedAt:     comment.CreatedAt,
+			IsOwner:       currentUser.Id == comment.OwnerId,
+		}))
+	}
+
+	return templateComments, nil
+}
+
 func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
@@ -97,9 +111,24 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "comment not found")
 	}
-	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	replies, err := me.reactionService.GetAllCommentReplies(c.RequestCtx(), commentId)
+	var lastCommentId uuid.UUID
+	var maxTimestamp time.Time
+	if lastCommentIdQuery := c.Query("last_comment_id"); lastCommentIdQuery != "" {
+		id, err := uuid.Parse(lastCommentIdQuery)
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid id format for last_comment_id query param")
+		}
+		lastCommentId = id
+	} else {
+		t, err := time.Parse(time.RFC3339, c.Query("max_timestamp"))
+		if err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "invalid timestamp format for max_timestamp query param")
+		}
+		maxTimestamp = t
+	}
+
+	replies, err := me.reactionService.GetCommentReplies(c.RequestCtx(), commentId, lastCommentId, maxTimestamp)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return fiber.NewError(fiber.StatusNotFound, "comment not found")
@@ -107,33 +136,29 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 		return err
 	}
 
-	// TODO: DRY! getTemplateCommentsFromComments()
-	ownerCache := make(map[uuid.UUID]*user_service.User)
-	templateComments := make([]any, 0, len(replies))
-	for _, reply := range replies {
-		owner, ok := ownerCache[reply.OwnerId]
-		if !ok {
-			owner, err = me.userService.GetUserById(c.RequestCtx(), reply.OwnerId)
-			if err != nil {
-				if errors.Is(err, user_service.ErrUserNotFound) {
-					continue
-				}
-				return err
-			}
-			ownerCache[reply.OwnerId] = owner
-		}
-		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
-			Id:            reply.Id,
-			VideoId:       videoId,
-			OwnerUsername: owner.Username,
-			Content:       reply.Content,
-			CreatedAt:     reply.CreatedAt,
-			RepliesCount:  reply.RepliesCount,
-			IsOwner:       currentUserId == reply.OwnerId,
-		}))
+	if len(replies) == 0 {
+		// swap the loader with empty response (ie. remove it).
+		return nil
 	}
 
-	return render(c, hyper.Group(templateComments...))
+	currentUser, err := me.getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	templateComments, err := me.toTemplateComments(c, replies, videoId, currentUser)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		hyper.Group(templateComments...),
+		templates.RepliesLoader(templates.RepliesLoaderParams{
+			VideoId:       videoId,
+			CommentId:     commentId,
+			LastCommentId: replies[len(replies)-1].Id,
+		}),
+	))
 }
 
 func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
@@ -142,9 +167,18 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
+	currentUser, err := me.getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
 	content := strings.TrimSpace(c.FormValue("comment"))
 	if err := validation.Validate(content, validation.Required, validation.Length(1, 500)); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		return render(c, templates.CreateCommentForm(templates.CreateCommentFormParams{
+			VideoId:         videoId,
+			CurrentUsername: currentUser.Username,
+			ContentErr:      err,
+		}))
 	}
 
 	me.videoMutex.RLock(videoId.String())
@@ -156,76 +190,80 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "video not found")
 	}
 
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
 	commentId, err := me.reactionService.CreateComment(c.RequestCtx(), videoId, currentUser.Id, content, uuid.Nil)
 	if err != nil {
 		return err
 	}
 
 	return render(c, hyper.Group(
-		templates.Comment(templates.CommentParams{
-			Id:            *commentId,
-			VideoId:       videoId,
-			OwnerUsername: currentUser.Username,
-			Content:       content,
-			CreatedAt:     time.Now(),
-			IsOwner:       true,
-		}),
+		templates.CreateCommentForm(templates.CreateCommentFormParams{VideoId: videoId, CurrentUsername: currentUser.Username}),
 
-		// clear the input
-		hyper.DIV(hyper.AttrId("#comment-input"), hyper.Attr("hx-swap-oob", "innerHTML")),
+		hyper.DIV(hyper.AttrId("comments-list"), hyper.Attr("hx-swap-oob", "prepend"))(
+			templates.Comment(templates.CommentParams{
+				Id:            *commentId,
+				VideoId:       videoId,
+				OwnerUsername: currentUser.Username,
+				Content:       content,
+				CreatedAt:     time.Now(),
+				IsOwner:       true,
+			}),
+		),
 	))
 }
 
-// func (me *Handler) HandleEditComment(c fiber.Ctx) error {
-// 	videoId, err := uuid.Parse(c.Params("video_id"))
-// 	if err != nil {
-// 		return fiber.NewError(fiber.StatusNotFound, "video not found")
-// 	}
-// 	commentId, err := uuid.Parse(c.Params("comment_id"))
-// 	if err != nil {
-// 		return fiber.NewError(fiber.StatusNotFound, "comment not found")
-// 	}
-// 	userId := c.Locals("user_id").(uuid.UUID)
-//
-// 	content := strings.TrimSpace(c.FormValue("content"))
-//
-// 	contentErr := validation.Validate(content, validation.Required, validation.Length(1, 500))
-// 	if contentErr != nil {
-// 		return render(c, templates.EditCommentForm(templates.EditCommentFormParams{
-// 			VideoId:    videoId,
-// 			CommentId:  commentId,
-// 			Content:    content,
-// 			ContentErr: contentErr,
-// 		}))
-// 	}
-//
-// 	if err := me.reactionService.EditComment(c.RequestCtx(), userId, commentId, content); err != nil {
-// 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-// 			return fiber.NewError(fiber.StatusNotFound, "comment not found")
-// 		}
-// 		return err
-// 	}
-//
-// 	return render(c, hyper.Group(
-// 		templates.EditCommentForm(templates.EditCommentFormParams{
-// 			VideoId:   videoId,
-// 			CommentId: commentId,
-// 			Content:   content,
-// 			Hide:      true,
-// 		}),
-// 		hyper.DIV(
-// 			hyper.AttrId(fmt.Sprintf("comment-content-%s", commentId)),
-// 			hyper.Attr("hx-swap-oob", "outerHTML"),
-// 		)(
-// 			hyper.P(hyper.AttrClass("text-sm"))(content),
-// 		),
-// 	))
-// }
+func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "comment not found")
+	}
+
+	currentUser, err := me.getCurrentUser(c)
+	if err != nil {
+		return err
+	}
+
+	content := strings.TrimSpace(c.FormValue("comment"))
+	if err := validation.Validate(content, validation.Required, validation.Length(1, 500)); err != nil {
+		return render(c, templates.CreateReplyForm(templates.CreateReplyFormParams{
+			VideoId:    videoId,
+			CommentId:  commentId,
+			ContentErr: err,
+		}))
+	}
+
+	me.videoMutex.RLock(videoId.String())
+	defer me.videoMutex.RUnlock(videoId.String())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return fiber.NewError(fiber.StatusNotFound, "video not found")
+	}
+
+	replyId, err := me.reactionService.CreateComment(c.RequestCtx(), videoId, currentUser.Id, content, commentId)
+	if err != nil {
+		return err
+	}
+
+	return render(c, hyper.Group(
+		templates.CreateReplyForm(templates.CreateReplyFormParams{VideoId: videoId, CommentId: commentId}),
+
+		hyper.DIV(hyper.AttrId(fmt.Sprintf("replies-%s", commentId)), hyper.Attr("hx-swap-oob", "prepend"))(
+			templates.Comment(templates.CommentParams{
+				Id:            *replyId,
+				VideoId:       videoId,
+				OwnerUsername: currentUser.Username,
+				Content:       content,
+				CreatedAt:     time.Now(),
+				IsOwner:       true,
+			}),
+		),
+	))
+}
 
 func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
