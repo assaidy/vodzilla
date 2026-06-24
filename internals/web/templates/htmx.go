@@ -43,7 +43,7 @@ var (
 // It maps the specified event (e.g., "click", "htmx:config:request") to a JavaScript expression string.
 //
 // Example: AttrHxOn("click", "alert('Hello!')") becomes hx-on:click="alert('Hello!')"
-func AttrHxOn(event, value string) PairAttribute {
+func AttrHxOn(event, value string) Attribute {
 	return PairAttribute{Key: "hx-on:" + event, Value: value}
 }
 

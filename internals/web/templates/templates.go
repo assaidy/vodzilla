@@ -835,7 +835,7 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		}`, pendingVideoId)),
 		AttrHxOn(EventHtmxBeforeRequest, strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
 		AttrHxOn(EventHtmxAfterRequest, strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
-		AttrHxOn(EventHtmxAfterProcess, IfElseZero(p.CloseDialogModal, `$('#post-video-modal').close()`)),
+		IfElseZero(p.CloseDialogModal, AttrHxOn(EventHtmxAfterProcess, `$('#post-video-modal').close()`)),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-title"))(
