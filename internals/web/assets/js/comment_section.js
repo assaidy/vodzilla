@@ -25,7 +25,9 @@ function handleRepliesToggle(toggle) {
   if (!container) return;
 
   container.classList.toggle("hidden");
-  toggle.textContent = container.classList.contains("hidden") ? toggle.dataset.viewText : "Hide replies";
+  const isOpened = !container.classList.contains("hidden");
+  toggle.classList.toggle("opened", isOpened);
+  toggle.textContent = isOpened ? "Hide replies" : toggle.dataset.viewText;
 }
 
 function handleToggleReplyForm(btn) {
@@ -83,3 +85,13 @@ function handleCancelReply(btn) {
     }
   });
 })();
+
+document.addEventListener("htmx:after:swap", () => {
+  document.querySelectorAll("[data-replies-toggle]").forEach((btn) => {
+    const container = document.querySelector(`#replies-${btn.dataset.commentId}`);
+    if (!container) return;
+    const isOpened = !container.classList.contains("hidden");
+    btn.classList.toggle("opened", isOpened);
+    btn.textContent = isOpened ? "Hide replies" : btn.dataset.viewText;
+  });
+});

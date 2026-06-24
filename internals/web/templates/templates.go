@@ -1616,6 +1616,7 @@ type CommentParams struct {
 	Content       string
 	CreatedAt     time.Time
 	IsOwner       bool
+	RepliesCount  int
 }
 
 func Comment(params CommentParams) HyperNode {
@@ -1660,9 +1661,9 @@ func Comment(params CommentParams) HyperNode {
 						RawText(lucide.Trash2(icons.Params{Class: "w-4 h-4"})), " Delete",
 					),
 				),
-				SPAN(AttrId(strf("show-replies-btn-%s", params.Id)))(
-					ShowRepliesButton(params.Id),
-				),
+			SPAN(AttrId(strf("show-replies-btn-%s", params.Id)))(
+				If(params.RepliesCount > 0, ShowRepliesButton(params.Id)),
+			),
 			),
 			DIV(AttrId(strf("reply-form-%s", params.Id)), AttrClass("hidden mt-2"))(
 				CreateReplyForm(CreateReplyFormParams{VideoId: params.VideoId, CommentId: params.Id}),
@@ -1674,9 +1675,6 @@ func Comment(params CommentParams) HyperNode {
 	)
 }
 
-// TODO : this is always visible event if the comment doesn't have any replies.
-// it's confusing to the user.
-// handle state for comments/replies count.
 func ShowRepliesButton(commentId uuid.UUID) HyperNode {
 	return BUTTON(
 		AttrClass("btn btn-ghost btn-xs"),

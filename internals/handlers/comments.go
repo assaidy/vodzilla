@@ -96,6 +96,7 @@ func (me *Handler) toTemplateComments(c fiber.Ctx, comments []reaction_service.C
 			Content:       comment.Content,
 			CreatedAt:     comment.CreatedAt,
 			IsOwner:       currentUser.Id == comment.OwnerId,
+			RepliesCount:  comment.RepliesCount,
 		}))
 	}
 
@@ -206,6 +207,7 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 				Content:       content,
 				CreatedAt:     time.Now(),
 				IsOwner:       true,
+				RepliesCount:  0,
 			}),
 		),
 	))
@@ -260,7 +262,12 @@ func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
 				Content:       content,
 				CreatedAt:     time.Now(),
 				IsOwner:       true,
+				RepliesCount:  0,
 			}),
+		),
+
+		hyper.SPAN(hyper.AttrId(fmt.Sprintf("show-replies-btn-%s", commentId)), templates.AttrHxSwapOob(templates.SwapOuterMorph))(
+			templates.ShowRepliesButton(commentId),
 		),
 	))
 }
