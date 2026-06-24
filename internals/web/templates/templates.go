@@ -797,7 +797,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 					}
 				})
 				v.addEventListener('playing', () => { attempts = 0 })
-			})
+			})()
 		`,
 			params.Id,
 		))),
@@ -938,7 +938,7 @@ func VideoUploader(params VideoUploaderParams) HyperNode {
 				console.error(err)
 				window._videoUploadManager.removeUpload(pendingVideoId)
 			}
-		})
+		})()
 	`,
 		params.PendingVideoId,
 		params.VideoTitle,
@@ -1661,9 +1661,9 @@ func Comment(params CommentParams) HyperNode {
 						RawText(lucide.Trash2(icons.Params{Class: "w-4 h-4"})), " Delete",
 					),
 				),
-			SPAN(AttrId(strf("show-replies-btn-%s", params.Id)))(
-				If(params.RepliesCount > 0, ShowRepliesButton(params.Id)),
-			),
+				SPAN(AttrId(strf("show-replies-btn-%s", params.Id)))(
+					If(params.RepliesCount > 0, ShowRepliesButton(params.Id)),
+				),
 			),
 			DIV(AttrId(strf("reply-form-%s", params.Id)), AttrClass("hidden mt-2"))(
 				CreateReplyForm(CreateReplyFormParams{VideoId: params.VideoId, CommentId: params.Id}),
@@ -1675,6 +1675,7 @@ func Comment(params CommentParams) HyperNode {
 	)
 }
 
+// TODO: disply & sync replies/comments count when adding a comment or a reply.
 func ShowRepliesButton(commentId uuid.UUID) HyperNode {
 	return BUTTON(
 		AttrClass("btn btn-ghost btn-xs"),
