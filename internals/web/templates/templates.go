@@ -378,7 +378,7 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 		return basicPageLayout("Vodzilla")(
 			DIV(AttrClass("flex flex-col min-h-screen"))(
 				Navbar(params.navbarParams),
-				DIV(AttrClass("flex-1 relative pt-20"))(
+				DIV(AttrClass("flex-1 relative ml-20"))(
 					MAIN(AttrId("app-page-content"), AttrClass("w-full p-6"))(
 						Group(children...),
 					),
@@ -402,50 +402,52 @@ type NavbarParams struct {
 }
 
 func Navbar(params NavbarParams) HyperNode {
-	return NAV(AttrId("navbar"), AttrClass("w-full fixed top-0 z-10 py-2 flex justify-center"))(
-		DIV(AttrClass("card bg-base-100 p-2 flex-row gap-2"))(
-			appPageButton(appPageButtonParams{
-				tab:      PageFeed,
-				pageLink: "/feed",
-				icon:     lucide.Timeline(),
-				isActive: params.CurrentPage == PageFeed,
-			}),
-			appPageButton(appPageButtonParams{
-				tab:      PageDiscover,
-				pageLink: "/discover",
-				icon:     lucide.Binoculars(),
-				isActive: params.CurrentPage == PageDiscover,
-			}),
-			DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", "Search"))(
-				BUTTON(AttrClass("p-2 btn btn-ghost"))(
-					RawText(lucide.Search()),
-				),
+	return NAV(
+		AttrId("navbar"),
+		AttrClass("w-16 fixed left-0 top-0 h-screen z-20 flex flex-col items-center gap-2 py-4 bg-base-100 border-r border-base-content/10"),
+	)(
+		appPageButton(appPageButtonParams{
+			tab:      PageFeed,
+			pageLink: "/feed",
+			icon:     lucide.Timeline(),
+			isActive: params.CurrentPage == PageFeed,
+		}),
+		appPageButton(appPageButtonParams{
+			tab:      PageDiscover,
+			pageLink: "/discover",
+			icon:     lucide.Binoculars(),
+			isActive: params.CurrentPage == PageDiscover,
+		}),
+		DIV(AttrClass("tooltip tooltip-right"), Attr("data-tip", "Search"))(
+			BUTTON(AttrClass("p-2 btn btn-ghost"))(
+				RawText(lucide.Search()),
 			),
-			appPageButton(appPageButtonParams{
-				tab:      PageWatchLater,
-				pageLink: "/watchlater",
-				icon:     lucide.Clock(),
-				isActive: params.CurrentPage == PageWatchLater,
-			}),
-			appPageButton(appPageButtonParams{
-				tab:      PagePlaylists,
-				pageLink: "/playlists",
-				icon:     lucide.ListVideo(),
-				isActive: params.CurrentPage == PagePlaylists,
-			}),
-			appPageButton(appPageButtonParams{
-				tab:      PageNotifications,
-				pageLink: "/notifications",
-				icon:     lucide.Bell(),
-				isActive: params.CurrentPage == PageNotifications,
-			}),
-			appPageButton(appPageButtonParams{
-				tab:      PageProfile,
-				pageLink: "/@" + params.Username,
-				icon:     lucide.User(),
-				isActive: params.CurrentPage == PageProfile,
-			}),
 		),
+		appPageButton(appPageButtonParams{
+			tab:      PageWatchLater,
+			pageLink: "/watchlater",
+			icon:     lucide.Clock(),
+			isActive: params.CurrentPage == PageWatchLater,
+		}),
+		appPageButton(appPageButtonParams{
+			tab:      PagePlaylists,
+			pageLink: "/playlists",
+			icon:     lucide.ListVideo(),
+			isActive: params.CurrentPage == PagePlaylists,
+		}),
+		appPageButton(appPageButtonParams{
+			tab:      PageNotifications,
+			pageLink: "/notifications",
+			icon:     lucide.Bell(),
+			isActive: params.CurrentPage == PageNotifications,
+		}),
+		appPageButton(appPageButtonParams{
+			tab:      PageProfile,
+			pageLink: "/@" + params.Username,
+			icon:     lucide.User(),
+			isActive: params.CurrentPage == PageProfile,
+			tooltip:  "Profile @" + params.Username,
+		}),
 	)
 }
 
@@ -465,10 +467,15 @@ type appPageButtonParams struct {
 	pageLink string
 	icon     string
 	isActive bool
+	tooltip  string
 }
 
 func appPageButton(params appPageButtonParams) HyperNode {
-	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
+	tip := params.tab
+	if params.tooltip != "" {
+		tip = params.tooltip
+	}
+	return DIV(AttrClass("tooltip tooltip-right"), Attr("data-tip", tip))(
 		BUTTON(
 			AttrClass(Classes("btn btn-ghost p-2", IfElseZero(params.isActive, "btn-primary"))),
 			AttrHxGet(strf("%s/content", params.pageLink)),
