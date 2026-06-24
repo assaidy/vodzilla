@@ -71,11 +71,11 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		t = timeout[0]
 	}
 
-	return DIV(AttrId("alert-toast"), Attr("hx-swap-oob", "prepend"))(
+	return DIV(AttrId("alert-toast"), AttrHxSwapOob(SwapPrepend))(
 		DIV(
 			AttrRole("alert"),
 			AttrClass(strf("alert alert-%s", level)),
-			Attr("hx-on::after:process", strf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
+			AttrHxOn(EventHtmxAfterProcess, strf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
 		)(
 			RawText(icon), SPAN()(message),
 		),
@@ -121,10 +121,10 @@ func RegisterForm(params ...RegisterFormParams) HyperNode {
 	return FORM(
 		AttrId("register-form"),
 		AttrClass("space-y-4"),
-		Attr("hx-post", "/register"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .register-button"),
-		Attr("hx-disable", "find button"),
+		AttrHxPost("/register"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .register-button"),
+		AttrHxDisable("find button"),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-name"))(
@@ -312,10 +312,10 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 	return FORM(
 		AttrId("login-form"),
 		AttrClass("space-y-4"),
-		Attr("hx-post", "/login"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .login-button"),
-		Attr("hx-disable", "find button"),
+		AttrHxPost("/login"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .login-button"),
+		AttrHxDisable("find button"),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-email"))(
@@ -362,10 +362,10 @@ func LoginForm(params ...LoginFormParams) HyperNode {
 
 func appPageContentLoader(contentPath string) HyperNode {
 	return DIV(
-		Attr("hx-get", contentPath),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-trigger", "load"),
-		Attr("hx-indicator", "#page-content-indicator"),
+		AttrHxGet(contentPath),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxTrigger("load"),
+		AttrHxIndicator("#page-content-indicator"),
 	)
 }
 
@@ -471,11 +471,11 @@ func appPageButton(params appPageButtonParams) HyperNode {
 	return DIV(AttrClass("tooltip tooltip-bottom"), Attr("data-tip", params.tab))(
 		BUTTON(
 			AttrClass(Classes("btn btn-ghost p-2", IfElseZero(params.isActive, "btn-primary"))),
-			Attr("hx-get", strf("%s/content", params.pageLink)),
-			Attr("hx-push-url", params.pageLink),
-			Attr("hx-target", "#app-page-content"),
-			Attr("hx-swap", "innerHTML"),
-			Attr("hx-indicator", "#page-content-indicator"),
+			AttrHxGet(strf("%s/content", params.pageLink)),
+			AttrHxPushUrl(params.pageLink),
+			AttrHxTarget("#app-page-content"),
+			AttrHxSwap(SwapInnerHtml),
+			AttrHxIndicator("#page-content-indicator"),
 		)(
 			RawText(params.icon),
 		),
@@ -572,10 +572,10 @@ func FollowButton(params FollowButtonParams) HyperNode {
 		If(params.IsFollowed,
 			BUTTON(
 				AttrClass("btn btn-outline btn-accent hover:btn-error group/follow"),
-				Attr("hx-delete", strf("/follow/%s", params.ProfileOwnerId)),
-				Attr("hx-target", "#follow-button"),
-				Attr("hx-swap", "outerHTML"),
-				Attr("hx-disable", "this"),
+				AttrHxDelete(strf("/follow/%s", params.ProfileOwnerId)),
+				AttrHxTarget("#follow-button"),
+				AttrHxSwap(SwapOuterHtml),
+				AttrHxDisable("this"),
 			)(
 				SPAN(AttrClass("group-hover/follow:hidden"))("Following"),
 				SPAN(AttrClass("hidden group-hover/follow:inline"))("Unfollow"),
@@ -583,11 +583,13 @@ func FollowButton(params FollowButtonParams) HyperNode {
 		).Else(
 			BUTTON(
 				AttrClass("btn btn-accent"),
-				Attr("hx-post", strf("/follow/%s", params.ProfileOwnerId)),
-				Attr("hx-target", "#follow-button"),
-				Attr("hx-swap", "outerHTML"),
-				Attr("hx-disable", "this"),
-			)("Follow"),
+				AttrHxPost(strf("/follow/%s", params.ProfileOwnerId)),
+				AttrHxTarget("#follow-button"),
+				AttrHxSwap(SwapOuterHtml),
+				AttrHxDisable("this"),
+			)(
+				"Follow",
+			),
 		),
 	)
 }
@@ -605,10 +607,10 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 	return FORM(
 		AttrId("edit-profile-form"),
 		AttrClass("space-y-4"),
-		Attr("hx-put", "/profiles"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .submit-button"),
-		Attr("hx-disable", "find .submit-button"),
+		AttrHxPut("/profiles"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .submit-button"),
+		AttrHxDisable("find .submit-button"),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-name"))(
@@ -713,17 +715,17 @@ type VideoPageContentParams struct {
 func VideoPageContent(params VideoPageContentParams) HyperNode {
 	ownerProfileLink := "/@" + params.OwnerUsername
 	visitProfileAttrs := []Attribute{
-		Attr("hx-get", strf("%s/content", ownerProfileLink)),
-		Attr("hx-push-url", ownerProfileLink),
-		Attr("hx-target", "#app-page-content"),
-		Attr("hx-swap", "innerHTML"),
-		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#page-content-indicator"),
+		AttrHxGet(strf("%s/content", ownerProfileLink)),
+		AttrHxPushUrl(ownerProfileLink),
+		AttrHxTarget("#app-page-content"),
+		AttrHxSwap(SwapInnerHtml),
+		AttrHxTrigger("click consume"),
+		AttrHxIndicator("#page-content-indicator"),
 	}
 
 	return DIV(AttrClass("max-w-6xl mx-auto"))(
 		If(!params.IsViewed,
-			DIV(Attr("hx-post", strf("/videos/%s/views", params.Id)), Attr("hx-trigger", "load")),
+			DIV(AttrHxPost(strf("/videos/%s/views", params.Id)), AttrHxTrigger("load")),
 		),
 		VIDEO(
 			AttrId("video-player"),
@@ -815,18 +817,18 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 	return FORM(
 		AttrId("post-video-form"),
 		AttrClass("space-y-4"),
-		Attr("hx-post", "/videos"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .submit-button"),
-		Attr("hx-disable", "find .submit-button"),
-		Attr("hx-vals", strf(`js:{
+		AttrHxPost("/videos"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .submit-button"),
+		AttrHxDisable("find .submit-button"),
+		AttrHxVals(strf(`js:{
 			contentType:    $('#form-video').files[0].type,
 			fileSize:       $('#form-video').files[0].size,
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
-		Attr("hx-on::before:request", strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
-		Attr("hx-on::after:request", strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
-		IfElseZero(p.CloseDialogModal, Attr("hx-on::after:process", `$('#post-video-modal').close()`)),
+		AttrHxOn(EventHtmxBeforeRequest, strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
+		AttrHxOn(EventHtmxAfterRequest, strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
+		AttrHxOn(EventHtmxAfterProcess, IfElseZero(p.CloseDialogModal, `$('#post-video-modal').close()`)),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-title"))(
@@ -1076,21 +1078,21 @@ func VideoCard(params VideoCardParams) HyperNode {
 	ownerProfilePageLink := "/@" + params.OwnerUsername
 	videoPageLink := strf("/videos/%s", params.VideoId)
 	visiteProfileAttrs := []Attribute{
-		Attr("hx-get", strf("%s/content", ownerProfilePageLink)),
-		Attr("hx-push-url", ownerProfilePageLink),
-		Attr("hx-target", "#app-page-content"),
-		Attr("hx-swap", "innerHTML"),
-		Attr("hx-trigger", "click consume"),
-		Attr("hx-indicator", "#page-content-indicator"),
+		AttrHxGet(strf("%s/content", ownerProfilePageLink)),
+		AttrHxPushUrl(ownerProfilePageLink),
+		AttrHxTarget("#app-page-content"),
+		AttrHxSwap(SwapInnerHtml),
+		AttrHxTrigger("click consume"),
+		AttrHxIndicator("#page-content-indicator"),
 	}
 
 	return DIV(
 		AttrClass("card bg-base-100 cursor-pointer"),
-		Attr("hx-get", strf("%s/content", videoPageLink)),
-		Attr("hx-push-url", videoPageLink),
-		Attr("hx-target", "#app-page-content"),
-		Attr("hx-swap", "innerHTML"),
-		Attr("hx-indicator", "#page-content-indicator"),
+		AttrHxGet(strf("%s/content", videoPageLink)),
+		AttrHxPushUrl(videoPageLink),
+		AttrHxTarget("#app-page-content"),
+		AttrHxSwap(SwapInnerHtml),
+		AttrHxIndicator("#page-content-indicator"),
 	)(
 		FIGURE(AttrClass("relative aspect-video overflow-hidden"))(
 			DIV(AttrClass("w-full h-full"))(
@@ -1188,14 +1190,26 @@ type WatchlaterButtonParams struct {
 
 func WatchlaterButton(params WatchlaterButtonParams) HyperNode {
 	return DIV(AttrId("watchlater-button"))(
-		BUTTON(
-			AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
-			Attr("data-tip", IfElse(params.IsActive, "Remove from Watch Later", "Add to Watch Later")),
-			Attr(IfElse(params.IsActive, "hx-delete", "hx-post"), strf("/videos/%s/watchlater", params.VideoId)),
-			Attr("hx-target", "#watchlater-button"),
-			Attr("hx-swap", "outerHTML"),
-		)(
-			RawText(lucide.Clock(icons.Params{Class: IfElseZero(params.IsActive, "text-primary")})),
+		If(params.IsActive,
+			BUTTON(
+				AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
+				Attr("data-tip", "Remove from Watch Later"),
+				AttrHxDelete(strf("/videos/%s/watchlater", params.VideoId)),
+				AttrHxTarget("#watchlater-button"),
+				AttrHxSwap(SwapOuterHtml),
+			)(
+				RawText(lucide.Clock(icons.Params{Class: "text-primary"})),
+			),
+		).Else(
+			BUTTON(
+				AttrClass("btn btn-soft btn-sm tooltip tooltip-top"),
+				Attr("data-tip", "Add to Watch Later"),
+				AttrHxPost(strf("/videos/%s/watchlater", params.VideoId)),
+				AttrHxTarget("#watchlater-button"),
+				AttrHxSwap(SwapOuterHtml),
+			)(
+				RawText(lucide.Clock()),
+			),
 		),
 	)
 }
@@ -1214,10 +1228,13 @@ func PlaylistCheckbox(params PlaylistCheckboxParams) HyperNode {
 			INPUT(
 				AttrType(TypeCheckbox),
 				AttrClass("checkbox checkbox-sm checkbox-primary"),
-				Attr(IfElse(params.Checked, "hx-delete", "hx-post"), strf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
-				Attr("hx-target", "#playlist-checkbox"),
-				Attr("hx-swap", "outerHTML"),
-				Attr("hx-vals", Json(Object{"playlistName": params.Name})),
+				IfElse(params.Checked,
+					AttrHxDelete(strf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
+					AttrHxPost(strf("/videos/%s/playlists/%s", params.VideoId, params.PlaylistId)),
+				),
+				AttrHxTarget("#playlist-checkbox"),
+				AttrHxSwap(SwapOuterHtml),
+				AttrHxVals(Json(Object{"playlistName": params.Name})),
 				AttrChecked(params.Checked),
 			),
 		),
@@ -1274,10 +1291,10 @@ func CreatePlaylistForm(params ...CreatePlaylistFormParams) HyperNode {
 	return FORM(
 		AttrId("create-playlist-form"),
 		AttrClass("flex gap-2"),
-		Attr("hx-post", "/playlists"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-target", "this"),
-		Attr("hx-vals", Json(Object{"videoId": p.VideoId})),
+		AttrHxPost("/playlists"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxTarget("this"),
+		AttrHxVals(Json(Object{"videoId": p.VideoId})),
 	)(
 		INPUT(
 			AttrId("form-playlist-name"),
@@ -1314,9 +1331,12 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Like"),
-			Attr(IfElse(params.IsLiked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=like", params.VideoId)),
-			Attr("hx-target", "#reactions-widget"),
-			Attr("hx-swap", "outerHTML"),
+			IfElse(params.IsLiked,
+				AttrHxDelete(strf("/videos/%s/reactions?kind=like", params.VideoId)),
+				AttrHxPost(strf("/videos/%s/reactions?kind=like", params.VideoId)),
+			),
+			AttrHxTarget("#reactions-widget"),
+			AttrHxSwap(SwapOuterHtml),
 		)(
 			RawText(lucide.ThumbsUp(icons.Params{Class: IfElseZero(params.IsLiked, "text-primary")})),
 			SPAN(AttrClass("text-sm"))(params.LikesCount),
@@ -1324,9 +1344,12 @@ func ReactionsWidget(params ReactionsWidgetParams) HyperNode {
 		BUTTON(
 			AttrClass("join-item btn btn-soft btn-sm tooltip tooltip-top"),
 			Attr("data-tip", "Dislike"),
-			Attr(IfElse(params.IsDisliked, "hx-delete", "hx-post"), strf("/videos/%s/reactions?kind=dislike", params.VideoId)),
-			Attr("hx-target", "#reactions-widget"),
-			Attr("hx-swap", "outerHTML"),
+			IfElse(params.IsDisliked,
+				AttrHxDelete(strf("/videos/%s/reactions?kind=dislike", params.VideoId)),
+				AttrHxPost(strf("/videos/%s/reactions?kind=dislike", params.VideoId)),
+			),
+			AttrHxTarget("#reactions-widget"),
+			AttrHxSwap(SwapOuterHtml),
 		)(
 			RawText(lucide.ThumbsDown(icons.Params{Class: IfElseZero(params.IsDisliked, "text-primary")})),
 			SPAN(AttrClass("text-sm"))(params.DislikesCount),
@@ -1366,11 +1389,11 @@ func PlaylistsPageContent(params PlaylistsPageContentParams) HyperNode {
 				playlistLink := strf("/playlists/%s", p.Id)
 				return DIV(
 					AttrClass("card bg-base-100 p-0 cursor-pointer transition-shadow duration-200 flex flex-row items-stretch overflow-hidden"),
-					Attr("hx-get", strf("%s/content", playlistLink)),
-					Attr("hx-push-url", playlistLink),
-					Attr("hx-target", "#app-page-content"),
-					Attr("hx-swap", "innerHTML"),
-					Attr("hx-indicator", "#page-content-indicator"),
+					AttrHxGet(strf("%s/content", playlistLink)),
+					AttrHxPushUrl(playlistLink),
+					AttrHxTarget("#app-page-content"),
+					AttrHxSwap(SwapInnerHtml),
+					AttrHxIndicator("#page-content-indicator"),
 				)(
 					DIV(AttrClass("flex items-center justify-center bg-base-200 px-6"))(
 						RawText(lucide.ListVideo(icons.Params{Class: "text-base-content/80"})),
@@ -1466,11 +1489,11 @@ func CreateCommentForm(params CreateCommentFormParams) HyperNode {
 	return FORM(
 		AttrId("create-comment-form"),
 		AttrClass("w-full flex flex-col gap-2 bg-base-100 p-2 rounded-xl border border-base-300 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all"),
-		Attr("hx-post", strf("/videos/%s/comments", params.VideoId)),
-		Attr("hx-target", "this"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "#comment-post-btn"),
-		Attr("hx-disable", "#comment-buttons button"),
+		AttrHxPost(strf("/videos/%s/comments", params.VideoId)),
+		AttrHxTarget("this"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("#comment-post-btn"),
+		AttrHxDisable("#comment-buttons button"),
 	)(
 		TEXTAREA(
 			AttrId("comment-input"),
@@ -1513,11 +1536,11 @@ func CreateReplyForm(params CreateReplyFormParams) HyperNode {
 	return FORM(
 		AttrId(strf("create-reply-form-%s", params.CommentId)),
 		AttrClass("w-full flex flex-col gap-2 bg-base-100 p-2 rounded-xl border border-base-300 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all"),
-		Attr("hx-post", strf("/videos/%s/comments/%s/replies", params.VideoId, params.CommentId)),
-		Attr("hx-target", "this"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", strf("#reply-post-btn-%s", params.CommentId)),
-		Attr("hx-disable", strf("#reply-buttons-%s button", params.CommentId)),
+		AttrHxPost(strf("/videos/%s/comments/%s/replies", params.VideoId, params.CommentId)),
+		AttrHxTarget("this"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator(strf("#reply-post-btn-%s", params.CommentId)),
+		AttrHxDisable(strf("#reply-buttons-%s button", params.CommentId)),
 	)(
 		TEXTAREA(
 			AttrId(strf("reply-input-%s", params.CommentId)),
@@ -1568,10 +1591,10 @@ func CommentsLoader(params CommentsLoaderParams) HyperNode {
 	}
 
 	return DIV(
-		Attr("hx-get", strf("/videos/%s/comments?%s", params.VideoId, urlQuery)),
-		Attr("hx-trigger", "intersect"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .htmx-indicator"),
+		AttrHxGet(strf("/videos/%s/comments?%s", params.VideoId, urlQuery)),
+		AttrHxTrigger("intersect"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .htmx-indicator"),
 	)(
 		DIV(AttrClass("htmx-indicator hidden [.htmx-request]:flex justify-center pt-4"))(
 			SPAN(AttrClass("loading loading-spinner loading-sm")),
@@ -1603,7 +1626,7 @@ func Comment(params CommentParams) HyperNode {
 		DIV(AttrClass("flex-1"))(
 			DIV(AttrClass("flex items-center gap-2 text-sm"))(
 				A(AttrClass("link link-hover font-bold"), AttrHref("/@"+params.OwnerUsername))("@"+params.OwnerUsername),
-				SPAN(AttrClass("text-base-content/40 text-xs"))(normalizeTimestamp(params.CreatedAt)),
+				SPAN(AttrClass("text-base-content/60 text-xs"))(normalizeTimestamp(params.CreatedAt)),
 			),
 			DIV(AttrClass("comment-text-container"))(
 				P(AttrClass("text-sm mt-1"))(displayContent),
@@ -1611,7 +1634,7 @@ func Comment(params CommentParams) HyperNode {
 					BUTTON(AttrClass("comment-read-more text-xs link link-primary mt-1"), Attr("data-full-text", params.Content))("Read more"),
 				),
 			),
-			DIV(AttrClass("flex items-center gap-1 mt-1 text-base-content/40"))(
+			DIV(AttrClass("flex items-center gap-1 mt-1 text-base-content/60"))(
 				BUTTON(
 					AttrClass("btn btn-ghost btn-xs"),
 					Attr("data-reply-toggle", ""),
@@ -1622,10 +1645,10 @@ func Comment(params CommentParams) HyperNode {
 				If(params.IsOwner,
 					BUTTON(
 						AttrClass("btn btn-ghost btn-xs"),
-						Attr("hx-delete", strf("/videos/%s/comments/%s", params.VideoId, params.Id)),
-						Attr("hx-target", strf("#comment-%s", params.Id)),
-						Attr("hx-swap", "delete"),
-						Attr("hx-disable", "this"),
+						AttrHxDelete(strf("/videos/%s/comments/%s", params.VideoId, params.Id)),
+						AttrHxTarget(strf("#comment-%s", params.Id)),
+						AttrHxSwap(SwapDelete),
+						AttrHxDisable("this"),
 					)(
 						RawText(lucide.Trash2(icons.Params{Class: "w-4 h-4"})), " Delete",
 					),
@@ -1674,10 +1697,10 @@ func RepliesLoader(params RepliesLoaderParams) HyperNode {
 	}
 
 	return DIV(
-		Attr("hx-get", strf("/videos/%s/comments/%s/replies?%s", params.VideoId, params.CommentId, urlQuery)),
-		Attr("hx-trigger", "intersect"),
-		Attr("hx-swap", "outerHTML"),
-		Attr("hx-indicator", "find .htmx-indicator"),
+		AttrHxGet(strf("/videos/%s/comments/%s/replies?%s", params.VideoId, params.CommentId, urlQuery)),
+		AttrHxTrigger("intersect"),
+		AttrHxSwap(SwapOuterHtml),
+		AttrHxIndicator("find .htmx-indicator"),
 	)(
 		DIV(AttrClass("htmx-indicator hidden [.htmx-request]:flex justify-center pt-4"))(
 			SPAN(AttrClass("loading loading-spinner loading-sm")),

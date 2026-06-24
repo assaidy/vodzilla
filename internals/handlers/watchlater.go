@@ -85,7 +85,7 @@ func (me *Handler) HandleWatchLaterPageContent(c fiber.Ctx) error {
 			Videos:   templateVideos,
 		}),
 
-		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PageWatchLater,

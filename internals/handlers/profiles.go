@@ -67,7 +67,7 @@ func (me *Handler) HandleProfilePageContent(c fiber.Ctx) error {
 			IsFollowed:     isFollowed,
 		}),
 
-		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PageProfile,
@@ -154,9 +154,9 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 			Bio:      bio,
 		}),
 
-		hyper.H1(hyper.AttrId("profile-card-name"), hyper.Attr("hx-swap-oob", "innerHTML"))(name),
-		hyper.P(hyper.AttrId("profile-card-username"), hyper.Attr("hx-swap-oob", "innerHTML"))("@"+username),
-		hyper.P(hyper.AttrId("profile-card-bio"), hyper.Attr("hx-swap-oob", "innerHTML"))(bio),
+		hyper.H1(hyper.AttrId("profile-card-name"), templates.AttrHxSwapOob(templates.SwapInnerHtml))(name),
+		hyper.P(hyper.AttrId("profile-card-username"), templates.AttrHxSwapOob(templates.SwapInnerHtml))("@"+username),
+		hyper.P(hyper.AttrId("profile-card-bio"), templates.AttrHxSwapOob(templates.SwapInnerHtml))(bio),
 		templates.Alert(templates.AlertInfo, "Profile was updated successfully."),
 	))
 }

@@ -43,7 +43,7 @@ func (me *Handler) HandleFeedPageContent(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.FeedPageContent(templateVideos),
 
-		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PageFeed,

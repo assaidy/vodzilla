@@ -57,7 +57,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 
 		hyper.DIV(
 			hyper.AttrId("playlist-checkbox-list"),
-			hyper.Attr("hx-swap-oob", "prepend"),
+			templates.AttrHxSwapOob(templates.SwapPrepend),
 		)(
 			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
 				VideoId:    videoId,
@@ -182,7 +182,7 @@ func (me *Handler) HandlePlaylistsPageContent(c fiber.Ctx) error {
 			Playlists: templatePlaylists,
 		}),
 
-		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PagePlaylists,
@@ -257,7 +257,7 @@ func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
 			Videos: templateVideos,
 		}),
 
-		hyper.DIV(hyper.AttrId("navbar"), hyper.Attr("hx-swap-oob", "outerHTML"))(
+		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
 			templates.Navbar(templates.NavbarParams{
 				Username:    currentUser.Username,
 				CurrentPage: templates.PagePlaylists,

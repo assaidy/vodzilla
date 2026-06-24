@@ -198,7 +198,7 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.CreateCommentForm(templates.CreateCommentFormParams{VideoId: videoId, CurrentUsername: currentUser.Username}),
 
-		hyper.DIV(hyper.AttrId("comments-list"), hyper.Attr("hx-swap-oob", "prepend"))(
+		hyper.DIV(hyper.AttrId("comments-list"), templates.AttrHxSwapOob(templates.SwapPrepend))(
 			templates.Comment(templates.CommentParams{
 				Id:            *commentId,
 				VideoId:       videoId,
@@ -252,7 +252,7 @@ func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.CreateReplyForm(templates.CreateReplyFormParams{VideoId: videoId, CommentId: commentId}),
 
-		hyper.DIV(hyper.AttrId(fmt.Sprintf("replies-%s", commentId)), hyper.Attr("hx-swap-oob", "prepend"))(
+		hyper.DIV(hyper.AttrId(fmt.Sprintf("replies-%s", commentId)), templates.AttrHxSwapOob(templates.SwapPrepend))(
 			templates.Comment(templates.CommentParams{
 				Id:            *replyId,
 				VideoId:       videoId,
