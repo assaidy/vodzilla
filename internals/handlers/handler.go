@@ -11,6 +11,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services/user"
 	"github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/utils/keyed_mutex"
+	"github.com/assaidy/vodzilla/internals/web/templates"
 	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"
 )
@@ -48,12 +49,12 @@ func New(
 		videoMutex:      keyed_mutex.New(),
 	}
 
-	// TODO: goroutine leak! later, impl a stop mechanims.
+	// TODO: GOROUTINE LEAK! impl a stop/cancel mechanism later.
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
-			handler.userMutex.ClearUnused(10 * time.Minute)
-			handler.videoMutex.ClearUnused(10 * time.Minute)
+			handler.userMutex.ClearUnused(1 * time.Hour)
+			handler.videoMutex.ClearUnused(1 * time.Hour)
 		}
 	}()
 
@@ -66,10 +67,10 @@ func render(c fiber.Ctx, node hyper.HyperNode) error {
 }
 
 func redirect(c fiber.Ctx, endpoint string) error {
-	if c.Get("HX-Request") == "true" {
-		c.Set("HX-Redirect", endpoint)
-	} else if c.Get("HX-Boosted") == "true" {
-		c.Set("HX-Location", endpoint)
+	if c.Get(templates.HeaderHxRequest) == "true" {
+		c.Set(templates.HeaderHxRedirect, endpoint)
+	} else if c.Get(templates.HeaderHxBoosted) == "true" {
+		c.Set(templates.HeaderHxLocation, endpoint)
 	} else {
 		return c.Redirect().To(endpoint)
 	}

@@ -75,10 +75,16 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 		DIV(
 			AttrRole("alert"),
 			AttrClass(strf("alert alert-%s", level)),
-			AttrHxOn(EventHtmxAfterProcess, strf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
+			AttrHxOnEvent(EventHtmxAfterProcess, strf("setTimeout(() => this.remove(), %d)", t.Milliseconds())),
 		)(
 			RawText(icon), SPAN()(message),
 		),
+	)
+}
+
+func PlaygroundPage() HyperNode {
+	return basicPageLayout("Vodzilla - Playground")(
+		"Playground",
 	)
 }
 
@@ -833,9 +839,9 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			fileSize:       $('#form-video').files[0].size,
 			pendingVideoId: %q,
 		}`, pendingVideoId)),
-		AttrHxOn(EventHtmxBeforeRequest, strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
-		AttrHxOn(EventHtmxAfterRequest, strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
-		IfElseZero(p.CloseDialogModal, AttrHxOn(EventHtmxAfterProcess, `$('#post-video-modal').close()`)),
+		AttrHxOnEvent(EventHtmxBeforeRequest, strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
+		AttrHxOnEvent(EventHtmxAfterRequest, strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
+		IfElseZero(p.CloseDialogModal, AttrHxOnEvent(EventHtmxAfterProcess, `$('#post-video-modal').close()`)),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-title"))(

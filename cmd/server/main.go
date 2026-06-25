@@ -124,6 +124,7 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 
 	router.Get("/", h.HandleHomePage)
+	router.Get("/playground", h.HandlePlaygroundPage)
 
 	router.Get("/register", h.HandleRegisterPage)
 	router.Post("/register", h.HandleRegister)
