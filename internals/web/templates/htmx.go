@@ -14,48 +14,79 @@ func HxPartial(attrs ...Attribute) ChildrenInserter {
 	return MakeChildrenInserter(Element{Tag: "hx-partial", Attributes: attrs})
 }
 
+func makeHtmxAttribute(key string) func(value string, option ...htmxAttriubteInheritanceOption) Attribute {
+	return func(value string, option ...htmxAttriubteInheritanceOption) Attribute {
+		if len(option) != 0 {
+			key = option[0](key)
+		}
+		return PairAttribute{Key: key, Value: value}
+	}
+}
+
+type htmxAttriubteInheritanceOption func(key string) string
+
+func Inherited(key string) string {
+	return key + ":inherited"
+}
+
+func InheritedAppend(key string) string {
+	return key + ":inherited:append"
+}
+
 var (
-	AttrHxGet        = MakePairAttribute("hx-get")         // Issues a GET request to the specified URL
-	AttrHxPost       = MakePairAttribute("hx-post")        // Issues a POST request to the specified URL
-	AttrHxPut        = MakePairAttribute("hx-put")         // Issues a PUT request to the specified URL
-	AttrHxPatch      = MakePairAttribute("hx-patch")       // Issues a PATCH request to the specified URL
-	AttrHxDelete     = MakePairAttribute("hx-delete")      // Issues a DELETE request to the specified URL
-	AttrHxTrigger    = MakePairAttribute("hx-trigger")     // Controls when the element issues a request
-	AttrHxSwap       = MakePairAttribute("hx-swap")        // Controls how the response is inserted
-	AttrHxTarget     = MakePairAttribute("hx-target")      // Controls where the response is inserted
-	AttrHxSelect     = MakePairAttribute("hx-select")      // Controls which part of the response to insert
-	AttrHxSwapOob    = MakePairAttribute("hx-swap-oob")    // Marks response elements to swap into the page by ID
-	AttrHxSelectOob  = MakePairAttribute("hx-select-oob")  // Picks response elements to swap into the page by ID
-	AttrHxConfirm    = MakePairAttribute("hx-confirm")     // Shows a confirmation dialog before the request
-	AttrHxOn         = MakePairAttribute("hx-on")          // Runs inline JavaScript when an event fires
-	AttrHxVals       = MakePairAttribute("hx-vals")        // Adds values to request parameters
-	AttrHxInclude    = MakePairAttribute("hx-include")     // Includes additional element values in the request
-	AttrHxHeaders    = MakePairAttribute("hx-headers")     // Adds custom headers to the request
-	AttrHxEncoding   = MakePairAttribute("hx-encoding")    // Sets the request encoding type
-	AttrHxPushUrl    = MakePairAttribute("hx-push-url")    // Pushes the URL into browser history
-	AttrHxReplaceUrl = MakePairAttribute("hx-replace-url") // Replaces the current URL in browser history
-	AttrHxHistoryElt = MakePairAttribute("hx-history-elt") // Marks the element to swap on history restore
-	AttrHxBoost      = MakePairAttribute("hx-boost")       // Converts links and forms to AJAX
-	AttrHxPreload    = MakePairAttribute("hx-preload")     // Preloads content before the user triggers a request
-	AttrHxOptimistic = MakePairAttribute("hx-optimistic")  // Shows optimistic content during the request
-	AttrHxIndicator  = MakePairAttribute("hx-indicator")   // Specifies the loading indicator element
-	AttrHxStatus     = MakePairAttribute("hx-status")      // Handles responses differently by status code
-	AttrHxSync       = MakePairAttribute("hx-sync")        // Synchronizes requests between elements
-	AttrHxValidate   = MakePairAttribute("hx-validate")    // Validates before submitting the request
-	AttrHxDisable    = MakePairAttribute("hx-disable")     // Disables elements during the request
-	AttrHxIgnore     = MakePairAttribute("hx-ignore")      // Disables htmx processing for the element
-	AttrHxPreserve   = MakePairAttribute("hx-preserve")    // Preserves the element during swaps
-	AttrHxAction     = MakePairAttribute("hx-action")      // Specifies the URL to receive the request
-	AttrHxMethod     = MakePairAttribute("hx-method")      // Specifies the HTTP method for the request
-	AttrHxConfig     = MakePairAttribute("hx-config")      // Configures request behavior with JSON
+	AttrHxGet        = makeHtmxAttribute("hx-get")         // Issues a GET request to the specified URL
+	AttrHxPost       = makeHtmxAttribute("hx-post")        // Issues a POST request to the specified URL
+	AttrHxPut        = makeHtmxAttribute("hx-put")         // Issues a PUT request to the specified URL
+	AttrHxPatch      = makeHtmxAttribute("hx-patch")       // Issues a PATCH request to the specified URL
+	AttrHxDelete     = makeHtmxAttribute("hx-delete")      // Issues a DELETE request to the specified URL
+	AttrHxTrigger    = makeHtmxAttribute("hx-trigger")     // Controls when the element issues a request
+	AttrHxSwap       = makeHtmxAttribute("hx-swap")        // Controls how the response is inserted
+	AttrHxTarget     = makeHtmxAttribute("hx-target")      // Controls where the response is inserted
+	AttrHxSelect     = makeHtmxAttribute("hx-select")      // Controls which part of the response to insert
+	AttrHxSwapOob    = makeHtmxAttribute("hx-swap-oob")    // Marks response elements to swap into the page by ID
+	AttrHxSelectOob  = makeHtmxAttribute("hx-select-oob")  // Picks response elements to swap into the page by ID
+	AttrHxConfirm    = makeHtmxAttribute("hx-confirm")     // Shows a confirmation dialog before the request
+	AttrHxOn         = makeHtmxAttribute("hx-on")          // Runs inline JavaScript when an event fires
+	AttrHxVals       = makeHtmxAttribute("hx-vals")        // Adds values to request parameters
+	AttrHxInclude    = makeHtmxAttribute("hx-include")     // Includes additional element values in the request
+	AttrHxHeaders    = makeHtmxAttribute("hx-headers")     // Adds custom headers to the request
+	AttrHxEncoding   = makeHtmxAttribute("hx-encoding")    // Sets the request encoding type
+	AttrHxPushUrl    = makeHtmxAttribute("hx-push-url")    // Pushes the URL into browser history
+	AttrHxReplaceUrl = makeHtmxAttribute("hx-replace-url") // Replaces the current URL in browser history
+	AttrHxHistoryElt = makeHtmxAttribute("hx-history-elt") // Marks the element to swap on history restore
+	AttrHxBoost      = makeHtmxAttribute("hx-boost")       // Converts links and forms to AJAX
+	AttrHxPreload    = makeHtmxAttribute("hx-preload")     // Preloads content before the user triggers a request
+	AttrHxOptimistic = makeHtmxAttribute("hx-optimistic")  // Shows optimistic content during the request
+	AttrHxIndicator  = makeHtmxAttribute("hx-indicator")   // Specifies the loading indicator element
+	AttrHxSync       = makeHtmxAttribute("hx-sync")        // Synchronizes requests between elements
+	AttrHxValidate   = makeHtmxAttribute("hx-validate")    // Validates before submitting the request
+	AttrHxDisable    = makeHtmxAttribute("hx-disable")     // Disables elements during the request
+	AttrHxIgnore     = makeHtmxAttribute("hx-ignore")      // Disables htmx processing for the element
+	AttrHxPreserve   = makeHtmxAttribute("hx-preserve")    // Preserves the element during swaps
+	AttrHxAction     = makeHtmxAttribute("hx-action")      // Specifies the URL to receive the request
+	AttrHxMethod     = makeHtmxAttribute("hx-method")      // Specifies the HTTP method for the request
+	AttrHxConfig     = makeHtmxAttribute("hx-config")      // Configures request behavior with JSON
 )
+
+// Handles responses differently by status code
+func AttrHxStatus(pattern, value string, option ...htmxAttriubteInheritanceOption) Attribute {
+	key := "hx-status:" + pattern
+	if len(option) != 0 {
+		key = option[0](key)
+	}
+	return PairAttribute{Key: key, Value: value}
+}
 
 // AttrHxOnEvent Runs inline JavaScript when an event fires.
 // It maps the specified event (e.g., "click", "htmx:config:request") to a JavaScript expression string.
 //
 // Example: AttrHxOnEvent("click", "alert('Hello!')") becomes hx-on:click="alert('Hello!')"
-func AttrHxOnEvent(event, value string) Attribute {
-	return PairAttribute{Key: "hx-on:" + event, Value: value}
+func AttrHxOnEvent(event, value string, option ...htmxAttriubteInheritanceOption) Attribute {
+	key := "hx-on:" + event
+	if len(option) != 0 {
+		key = option[0](key)
+	}
+	return PairAttribute{Key: key, Value: value}
 }
 
 const (

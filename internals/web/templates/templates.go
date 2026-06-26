@@ -33,8 +33,8 @@ func basicPageLayout(title string) ChildrenInserter {
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
-					Attr("hx-status:5xx:inherited", "swap:none"),
 					Attr("data-client-id", clientId.String()),
+					AttrHxStatus("5xx", "swap:none", Inherited),
 				)(
 					DIV(AttrId("alert-toast"), AttrClass("toast toast-top w-md z-[1000000]")),
 					Group(children...),
@@ -84,7 +84,7 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 
 func PlaygroundPage() HyperNode {
 	return basicPageLayout("Vodzilla - Playground")(
-		"Playground",
+		BUTTON(AttrClass("btn btn-primary"), AttrHxGet("/playground/test"), AttrHxSwap(SwapInnerHtml))("show 5xx alert"),
 	)
 }
 
@@ -1130,14 +1130,14 @@ func VideoCard(params VideoCardParams) HyperNode {
 				H2(AttrClass("card-title text-base font-bold leading-tight line-clamp-2"))(params.Title),
 				A(append(visiteProfileAttrs, AttrClass("link link-hover text-xs text-base-content/60"))...)(params.OwnerName),
 				DIV(AttrClass("text-xs text-base-content/60"))(
-					normalizeViewsCount(params.ViewsCount), " views", " . ", normalizeTimestamp(params.Timestamp), " ago",
+					normalizeViewsCount(params.ViewsCount), " . ", normalizeTimestamp(params.Timestamp),
 				),
 			),
 		),
 	)
 }
 
-func normalizeTimestamp(t time.Time) any {
+func normalizeTimestamp(t time.Time) string {
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
@@ -1175,16 +1175,16 @@ func normalizeTimestamp(t time.Time) any {
 	}
 }
 
-func normalizeViewsCount(i int) any {
+func normalizeViewsCount(i int) string {
 	switch {
 	case i >= 1_000_000_000:
-		return strf("%.1fB", float64(i)/1_000_000_000)
+		return strf("%.1fB Views", float64(i)/1_000_000_000)
 	case i >= 1_000_000:
-		return strf("%.1fM", float64(i)/1_000_000)
+		return strf("%.1fM Views", float64(i)/1_000_000)
 	case i >= 1_000:
-		return strf("%.1fK", float64(i)/1_000)
+		return strf("%.1fK Views", float64(i)/1_000)
 	default:
-		return strf("%d", i)
+		return strf("%d Views", i)
 	}
 }
 

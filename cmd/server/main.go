@@ -78,9 +78,7 @@ func main() {
 		reactionService,
 		socialService,
 	)
-	router := fiber.New(fiber.Config{
-		AppName: "Vodzilla",
-	})
+	router := fiber.New(fiber.Config{AppName: "Vodzilla"})
 	registerRoutes(router, handler)
 
 	quitCtx, quitCtxCancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -123,8 +121,11 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	}))
 	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 
-	router.Get("/", h.HandleHomePage)
+	// development playground
 	router.Get("/playground", h.HandlePlaygroundPage)
+	router.Get("/playground/test", h.HandlePlaygroundTest)
+
+	router.Get("/", h.HandleHomePage)
 
 	router.Get("/register", h.HandleRegisterPage)
 	router.Post("/register", h.HandleRegister)
