@@ -91,6 +91,7 @@ func (me *Handler) toTemplateComments(c fiber.Ctx, comments []reaction_service.C
 		}
 		templateComments = append(templateComments, templates.Comment(templates.CommentParams{
 			Id:            comment.Id,
+			ParentId:      comment.ParentId,
 			VideoId:       videoId,
 			OwnerUsername: owner.Username,
 			Content:       comment.Content,
@@ -175,7 +176,7 @@ func (me *Handler) HandleCreateComment(c fiber.Ctx) error {
 
 	content := strings.TrimSpace(c.FormValue("comment"))
 	if err := validation.Validate(content, validation.Required, validation.Length(1, 500)); err != nil {
-		return render(c, templates.CreateCommentForm(templates.CreateCommentFormParams{
+		return render(c.Status(fiber.StatusBadRequest), templates.CreateCommentForm(templates.CreateCommentFormParams{
 			VideoId:         videoId,
 			CurrentUsername: currentUser.Username,
 			ContentErr:      err,
@@ -230,10 +231,10 @@ func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
 
 	content := strings.TrimSpace(c.FormValue("comment"))
 	if err := validation.Validate(content, validation.Required, validation.Length(1, 500)); err != nil {
-		return render(c, templates.CreateReplyForm(templates.CreateReplyFormParams{
-			VideoId:    videoId,
-			CommentId:  commentId,
-			ContentErr: err,
+		return render(c.Status(fiber.StatusBadRequest), templates.CreateReplyForm(templates.CreateReplyFormParams{
+			VideoId:         videoId,
+			ParentCommentId: commentId,
+			ContentErr:      err,
 		}))
 	}
 
@@ -252,11 +253,12 @@ func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
 	}
 
 	return render(c, hyper.Group(
-		templates.CreateReplyForm(templates.CreateReplyFormParams{VideoId: videoId, CommentId: commentId}),
+		templates.CreateReplyForm(templates.CreateReplyFormParams{VideoId: videoId, ParentCommentId: commentId}),
 
-		hyper.DIV(hyper.AttrId(fmt.Sprintf("replies-%s", commentId)), templates.AttrHxSwapOob(templates.SwapPrepend))(
+		hyper.DIV(hyper.AttrId(fmt.Sprintf("replies-list-%s", commentId)), templates.AttrHxSwapOob(templates.SwapPrepend))(
 			templates.Comment(templates.CommentParams{
 				Id:            *replyId,
+				ParentId:      commentId,
 				VideoId:       videoId,
 				OwnerUsername: currentUser.Username,
 				Content:       content,
@@ -264,10 +266,6 @@ func (me *Handler) HandleCreateReply(c fiber.Ctx) error {
 				IsOwner:       true,
 				RepliesCount:  0,
 			}),
-		),
-
-		hyper.SPAN(hyper.AttrId(fmt.Sprintf("show-replies-btn-%s", commentId)), templates.AttrHxSwapOob(templates.SwapOuterMorph))(
-			templates.ShowRepliesButton(commentId),
 		),
 	))
 }

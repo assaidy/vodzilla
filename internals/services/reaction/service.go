@@ -258,6 +258,7 @@ func (me *Service) DeleteComment(ctx context.Context, userId, commentId uuid.UUI
 
 type Comment struct {
 	Id           uuid.UUID
+	ParentId     uuid.UUID
 	OwnerId      uuid.UUID
 	Content      string
 	CreatedAt    time.Time
@@ -323,6 +324,7 @@ func (me *Service) GetCommentReplies(ctx context.Context, commentId, lastComment
 	for _, c := range dbComments {
 		result = append(result, Comment{
 			Id:           c.Id,
+			ParentId:     commentId,
 			OwnerId:      c.OwnerId,
 			Content:      c.Content,
 			CreatedAt:    c.CreatedAt,
