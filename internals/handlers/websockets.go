@@ -12,7 +12,7 @@ func (me *Handler) WithPassClientIdToLocals(c fiber.Ctx) error {
 	if clientId := c.Get("X-Client-ID"); clientId != "" {
 		c.Locals("client_id", clientId)
 	} else {
-		me.logger.Warn("request with not client id", "method", c.Method(), "path", c.Path())
+		me.logger.Warn("request with no client id", "method", c.Method(), "path", c.Path())
 	}
 	return c.Next()
 }

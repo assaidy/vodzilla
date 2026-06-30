@@ -16,6 +16,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// TODO: return warn alerts from some handlers that return NotFound errors
+
 type Handler struct {
 	logger          *slog.Logger
 	redis           *redis.Client

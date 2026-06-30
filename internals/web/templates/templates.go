@@ -12,10 +12,34 @@ import (
 )
 
 var (
-	strf          = fmt.Sprintf
-	Attr_         = MakePairAttribute("_")
-	AttrComponent = MakePairAttribute("component")
+	strf                    = fmt.Sprintf
+	Attr_                   = MakePairAttribute("_") // put hyperscirpt inside it
+	VideoPlaybackErrorAlert string
+	VideoUploadErrorAlert   string
 )
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func init() {
+	must(RenderThen(
+		Alert(AlertError, "Faild to play video. Please refresh the page or try again later."),
+		func(data []byte) error {
+			VideoPlaybackErrorAlert = string(data)
+			return nil
+		},
+	))
+	must(RenderThen(
+		Alert(AlertError, "Faild to upload video."),
+		func(data []byte) error {
+			VideoUploadErrorAlert = string(data)
+			return nil
+		},
+	))
+}
 
 func basicPageLayout(title string) ChildrenInserter {
 	clientId := uuid.New()
@@ -33,14 +57,20 @@ func basicPageLayout(title string) ChildrenInserter {
 					LINK(AttrRel("stylesheet"), AttrHref("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap")),
 					LINK(AttrRel("stylesheet"), AttrHref("/assets/css/style.css")),
 					SCRIPT(AttrSrc("/assets/js/lib/htmx@4.0.0_beta2.js")),
-					SCRIPT(AttrSrc("/assets/js/lib/hyperscript@0.9.91.js")),
-					SCRIPT(AttrSrc("/assets/js/lib/hyperscript@0.9.91_ext_component.js")),
-					SCRIPT(AttrSrc("/assets/js/main.js")),
+					SCRIPT(AttrSrc("/assets/js/lib/hyperscript@0.9.93.js")),
 				),
 				BODY(
 					AttrClass("min-h-screen bg-base-300"),
-					Attr("data-client-id", clientId.String()),
 					AttrHxStatus("5xx", "swap:none", Inherited),
+					Attr_(strf(`
+						init
+							set $clientId to %q
+						on htmx:config:request(ctx)
+							set ctx.request.headers['X-CSRF-Token'] to cookies['csrf_token']
+							set ctx.request.headers['X-Client-ID'] to $clientId
+					`,
+						clientId,
+					)),
 				)(
 					DIV(AttrId("alert-toast"), AttrClass("toast toast-top w-md z-[1000000]")),
 					Group(children...),
@@ -90,7 +120,20 @@ func Alert(level AlertLevel, message string, timeout ...time.Duration) HyperNode
 
 func PlaygroundPage() HyperNode {
 	return basicPageLayout("Vodzilla - Playground")(
-		BUTTON(AttrClass("btn btn-primary"), AttrHxGet("/playground/test"), AttrHxSwap(SwapInnerHtml))("show 5xx alert"),
+		DIV()(
+			DIV(AttrId("#first")),
+			DIV(AttrId("#second")),
+			BUTTON(Attr_(`
+				on click
+					fetch /playground/multi_swap
+					then
+						put it.first  at start of #first
+						put it.second at end of #second
+					catch
+						if it.status is 400 put it after me then remove me end
+					end
+			`)),
+		),
 	)
 }
 
@@ -402,7 +445,6 @@ func appPageLayout(params appPageLayoutParams) ChildrenInserter {
 					),
 				),
 				videoUploadersContainer(),
-				videoUploadIndicator(),
 			),
 		)
 	}
@@ -548,7 +590,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 
 		If(params.IsOwner,
 			DIV(AttrClass("mt-4 flex justify-center lg:justify-start gap-2"))(
-				BUTTON(AttrClass("btn btn-soft"), AttrOnClick("$('#edit-profile-modal').show()"))(
+				BUTTON(AttrClass("btn btn-soft"), Attr_(`on click call #edit-profile-modal.show()`))(
 					RawText(lucide.UserPen()), "edit profile",
 				),
 				DIALOG(AttrId("edit-profile-modal"), AttrClass("modal"))(
@@ -563,7 +605,7 @@ func ProfilePageContent(params ProfilePageContentParams) HyperNode {
 						BUTTON()("close"),
 					),
 				),
-				BUTTON(AttrClass("btn btn-soft"), AttrOnClick("$('#post-video-modal').show()"))(
+				BUTTON(AttrClass("btn btn-soft"), Attr_(`on click call #post-video-modal.show()`))(
 					RawText(lucide.Plus()), "post a video",
 				),
 				DIALOG(AttrId("post-video-modal"), AttrClass("modal"))(
@@ -698,7 +740,7 @@ func EditProfileForm(params EditProfileFormParams) HyperNode {
 
 func profileCardAvatarPlaceholder() HyperNode {
 	return DIV(AttrClass("w-full aspect-square md:w-48 md:h-48 md:aspect-auto lg:w-64 lg:h-64 rounded-box shrink-0 flex items-center justify-center bg-neutral text-neutral-content"))(
-		RawText(lucide.User()),
+		RawText(lucide.User(icons.Params{Class: "w-20 h-20"})),
 	)
 }
 
@@ -753,6 +795,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			AttrSrc(params.SourceUrl),
 			AttrControls(true),
 			AttrPlaysInline(true),
+			Attr_(strf(`on error put %q at the start of #alert-toast`, VideoPlaybackErrorAlert)),
 		),
 		DIV(AttrClass("mt-4"))(
 			H1(AttrClass("text-2xl font-bold"))(params.Title),
@@ -765,10 +808,7 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 				),
 
 				If(params.CurrentUserId != params.OwnerId,
-					FollowButton(FollowButtonParams{
-						ProfileOwnerId: params.OwnerId,
-						IsFollowed:     params.IsFollowed,
-					}),
+					FollowButton(FollowButtonParams{ProfileOwnerId: params.OwnerId, IsFollowed: params.IsFollowed}),
 				),
 
 				ReactionsWidget(params.ReactionsParams),
@@ -790,31 +830,6 @@ func VideoPageContent(params VideoPageContentParams) HyperNode {
 			CurrentUsername: params.CurrentUsername,
 			CommentsCount:   params.CommentsCount,
 		}),
-
-		SCRIPT()(RawText(strf(`
-			(() => {
-				const v = $('#video-player')
-				let attempts = 0
-				v.addEventListener('error', async () => {
-					if (v.error && v.error.code !== v.error.MEDIA_ERR_NETWORK) return
-					if (++attempts > 3) return
-					try {
-						const r = await fetch('/videos/%s/stream_url')
-						const d = await r.json()
-						const t = v.currentTime
-						const p = !v.paused
-						v.src = d.url
-						v.currentTime = t
-						if (p) await v.play()
-					} catch(e) {
-						console.error(e)
-					}
-				})
-				v.addEventListener('playing', () => { attempts = 0 })
-			})()
-		`,
-			params.Id,
-		))),
 	)
 }
 
@@ -828,12 +843,12 @@ type PostVideoFormParams struct {
 }
 
 func PostVideoForm(params ...PostVideoFormParams) HyperNode {
+	pendingUploadId := uuid.New()
+
 	var p PostVideoFormParams
 	if len(params) > 0 {
 		p = params[0]
 	}
-
-	pendingVideoId := uuid.New()
 
 	return FORM(
 		AttrId("post-video-form"),
@@ -842,14 +857,19 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 		AttrHxSwap(SwapOuterHtml),
 		AttrHxIndicator("find .submit-button"),
 		AttrHxDisable("find .submit-button"),
-		AttrHxVals(strf(`js:{
-			contentType:    $('#form-video').files[0].type,
-			fileSize:       $('#form-video').files[0].size,
-			pendingVideoId: %q,
-		}`, pendingVideoId)),
-		AttrHxOnEvent(EventHtmxBeforeRequest, strf(`window._pendingVideos[%q] = $('#form-video').files[0]`, pendingVideoId)),
-		AttrHxOnEvent(EventHtmxAfterRequest, strf(`if (event.detail.ctx.response.status >= 400) delete window._pendingVideos[%q]`, pendingVideoId)),
-		IfElseZero(p.CloseDialogModal, AttrHxOnEvent(EventHtmxAfterProcess, `$('#post-video-modal').close()`)),
+		Attr("data-close-modal", p.CloseDialogModal),
+		Attr("data-pending-upload-id", pendingUploadId.String()),
+		Attr_(`
+			init
+				if @data-close-modal exists call #post-video-modal.close() end
+				set :pendingUploadId to @data-pending-upload-id
+			on htmx:before:request
+				set $pendingUploads[:pendingUploadId] to #form-video's files[0]
+			on htmx:after:request(ctx)
+				if not ctx.response.raw.ok remove $pendingUploads[:pendingUploadId] end
+			on htmx:error
+				remove $pendingUploads[:pendingUploadId]
+		`),
 	)(
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-title"))(
@@ -888,6 +908,10 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 			),
 		),
 
+		INPUT(AttrType(TypeHidden), AttrName("pendingUploadId"), AttrValue(pendingUploadId.String())),
+		INPUT(AttrType(TypeHidden), AttrName("fileSize"), AttrId("form-file-size")),
+		INPUT(AttrType(TypeHidden), AttrName("contentType"), AttrId("form-content-type")),
+
 		DIV(AttrClass("fieldset"))(
 			LABEL(AttrClass("label"), AttrFor("form-video"))(
 				SPAN(AttrClass("label-text"))("Video"),
@@ -899,6 +923,13 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 				AttrType(TypeFile),
 				AttrAccept("video/*"),
 				AttrRequired(true),
+				Attr_(`
+					on change
+						if my files.length > 0
+							set value of #form-file-size    to my files[0].size
+							set value of #form-content-type to my files[0].type
+						end
+				`),
 			),
 			If(p.VideoErr != nil,
 				LABEL(AttrClass("label"))(
@@ -917,157 +948,135 @@ func PostVideoForm(params ...PostVideoFormParams) HyperNode {
 }
 
 type VideoUploaderParams struct {
-	PendingVideoId uuid.UUID
-	VideoTitle     string
-	VideoId        uuid.UUID
-	UploadId       string
-	PartSize       int64
-	UploadUrls     []string
+	PendingUploadId string
+	Title           string
+	VideoId         uuid.UUID
+	UploadId        string
+	PartSize        int
+	UploadUrls      []string
+	FileSize        int
 }
 
-// TODO: refactor this to use htmx and ws to store progress in media service
-// so all user sessions can see the uploading videos (with the initiating session)
-// and also the processing ones.
 func VideoUploader(params VideoUploaderParams) HyperNode {
-	return SCRIPT()(RawText(strf(`
-		(async () => {
-			const pendingVideoId = %q
-			const videoTitle     = %q
-			const videoId        = %q
-			const uploadId       = %q
-			const partSize       = %d
-			const uploadUrls     = %s
+	type chunk struct {
+		Offset int    `json:"offset"`
+		Size   int    `json:"size"`
+		Url    string `json:"url"`
+	}
 
-			try {
-				await window._videoUploadManager.upload({
-					pendingVideoId,
-					videoTitle,
-					videoId,
-					uploadId,
-					partSize,
-					uploadUrls,
-					completeUploadUrl: "/videos/complete_upload",
-				})
-			} catch (err) {
-				console.error(err)
-				window._videoUploadManager.removeUpload(pendingVideoId)
-			}
-		})()
-	`,
-		params.PendingVideoId,
-		params.VideoTitle,
-		params.VideoId,
-		params.UploadId,
-		params.PartSize,
-		Json(params.UploadUrls),
-	)))
-}
+	chunks := make([]chunk, 0, len(params.UploadUrls))
+	for i, url := range params.UploadUrls {
+		c := chunk{
+			Offset: i * params.PartSize,
+			Size:   params.PartSize,
+			Url:    url,
+		}
+		if c.Offset+c.Size > params.FileSize {
+			c.Size = params.FileSize - c.Offset + 1
+		}
+		chunks = append(chunks, c)
+	}
 
-func videoUploadersContainer() HyperNode {
-	return DIV(AttrId("video-uploaders-container"))(
-		SCRIPT()(RawText(`
-			window._pendingVideos = {}
+	return DIV(
+		AttrClass("flex flex-col gap-1 py-2"),
+		Attr("data-pending-upload-id", params.PendingUploadId),
+		Attr("data-title", params.Title),
+		Attr("data-video-id", params.VideoId.String()),
+		Attr("data-upload-id", params.UploadId),
+		Attr("data-chunks", Json(chunks)),
+		Attr("data-error-alert", VideoUploadErrorAlert),
+		Attr_(`
+			init
+				set pendingUploadId to @data-pending-upload-id
+				set videoId         to @data-video-id
+				set uploadId        to @data-upload-id
+				set chunks          to @data-chunks as JSON
+				set ^completed      to 0
+				set title           to @data-title
 
-			window._videoUploadManager = {
-				_uploads: {},
-				addUpload(id, title, totalChunks) {
-					this._uploads[id] = { title, totalChunks, completedChunks: 0 }
-					this._updateIndicator()
-				},
-				markChunkComplete(id) {
-					const u = this._uploads[id]
-					if (!u) return
-					u.completedChunks++
-					if (u.completedChunks >= u.totalChunks) delete this._uploads[id]
-					this._updateIndicator()
-				},
-				removeUpload(id) {
-					delete this._uploads[id]
-					this._updateIndicator()
-				},
-				_updateIndicator() {
-					const count = Object.keys(this._uploads).length
-					$('#upload-indicator-count').textContent = count
-					this._renderUploadList()
-					$('#upload-indicator').classList.toggle('hidden', count === 0)
-				},
-				_renderUploadList() {
-					const entries = Object.entries(this._uploads)
-					if (entries.length === 0) {
-						$('#upload-list-dialog').close()
-						return
-					}
-					let html = ''
-					for (const [, u] of entries) {
-						html += '<div class="flex flex-col gap-1 py-2">'
-						     +  '<div class="flex justify-between text-sm">'
-						     +  '<span class="truncate">' + u.title + '</span>'
-						     +  '<span class="shrink-0">' + u.completedChunks + '/' + u.totalChunks + '</span>'
-						     +  '</div>'
-						     +  '<progress class="progress progress-primary w-full" value="' + u.completedChunks + '" max="' + u.totalChunks + '"></progress>'
-						     +  '</div>'
-					}
-					$('#upload-list-body').innerHTML = html
-				},
-			  async upload({ pendingVideoId, videoTitle, partSize, uploadUrls, videoId, uploadId, completeUploadUrl }) {
-					this.addUpload(pendingVideoId, videoTitle, uploadUrls.length)
+				set file to $pendingUploads[pendingUploadId]
+				if not file
+					log 'could not find file in pending uplaods'
+					send cleanupError to me
+					exit
+				end
 
-					const file = window._pendingVideos[pendingVideoId]
-					if (!file) throw new Error("pending video not found")
+				set parts to []
+				for c in chunks index i
+					fetch c.url as Response with method:'PUT', body:file.slice(c.offset, c.offset+c.size)
+					if it.ok
+						set etag to it.headers.get('Etag').replaceAll('"', '')
+						append {etag: etag, partNumber: i+1} to parts
+						increment ^completed
+					else
+						log 'failed to upload parts: ' + it.status + ' ' + it.statusText
+						send cleanupError to me
+						exit
+					end
+				end
 
-					const completedParts = []
-					const uploads = uploadUrls.map(async (url, i) => {
-						const start = i * partSize
-						const end = i === uploadUrls.length - 1 ? file.size : start + partSize
-						const blob = file.slice(start, end)
+				fetch /videos/complete_upload as Response with
+					method:'POST',
+					body:{videoId: videoId, uploadId: uploadId, parts: parts} as JSONString,
+					headers:{'Content-Type': 'application/json'}
+				if not it.ok
+					log 'failed to complete uplaod: ' + it.status + ' ' + it.statusText
+					send cleanupError to me
+					exit
+				end
 
-						const response = await fetch(url, { method: 'PUT', body: blob })
-						if (!response.ok) throw new Error("upload failed")
+				send cleanup to me
 
-						completedParts.push({
-							etag: (response.headers.get('ETag') ?? '').replaceAll('"', ''),
-							partNumber: i + 1,
-						})
-
-						this.markChunkComplete(pendingVideoId)
-					})
-
-					await Promise.all(uploads)
-
-					await fetch(completeUploadUrl, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ videoId, uploadId, parts: completedParts }),
-					})
-
-					delete window._pendingVideos[pendingVideoId]
-			 	}
-			}
-	`)),
+			on cleanup:rror from me
+				put @data-error-alert at the start of #alert-toast
+				send cleanup to me
+			on cleanup from me
+				remove $pendingUploads[pendingUploadId]
+				remove me
+		`),
+	)(
+		DIV(AttrClass("flex justify-between text-sm"))(
+			SPAN(AttrClass("truncate"))(params.Title),
+			SPAN(AttrClass("shrink-0"))(SPAN(Attr_(`live put ^completed into me`)), "/", len(params.UploadUrls)),
+			// TODO: refactor video upload
+			// - each chunk uploaded by a htmx div
+			// - add abort button that sends htmx:abort to all chunk divs on click
+			// - add confirmation message before closing window when uploading
+		),
+		PROGRESS(AttrClass("progress progress-primary w-full"), AttrMax(fmt.Sprint(len(params.UploadUrls))), Attr_("live set value to ^completed")),
 	)
 }
 
-func videoUploadIndicator() HyperNode {
+func videoUploadersContainer() HyperNode {
 	return DIV(
-		AttrId("upload-indicator"),
+		AttrId("video-upload-indicator"),
 		AttrClass("hidden fixed bottom-6 right-6 z-50"),
 	)(
 		DIV(AttrClass("indicator"))(
-			BUTTON(
-				AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"),
-				AttrOnClick("$('#upload-list-dialog').showModal()"),
-			)(
+			BUTTON(AttrClass("btn btn-circle btn-primary btn-lg shadow-lg relative"), Attr_(`on click call #upload-list-dialog.show()`))(
 				RawText(lucide.ArrowUpFromLine(icons.Params{Class: "w-5 h-5 animate-bounce"})),
 			),
-			SPAN(
-				AttrId("upload-indicator-count"),
-				AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"),
-			)("0"),
+			SPAN(AttrId("upload-indicator-count"), AttrClass("indicator-item indicator-bottom indicator-center badge badge-secondary"))("0"),
 		),
 		DIALOG(AttrId("upload-list-dialog"), AttrClass("modal"))(
 			DIV(AttrClass("modal-box"))(
 				H3(AttrClass("text-lg font-bold"))("Uploading Videos"),
-				DIV(AttrId("upload-list-body"), AttrClass("mt-4 space-y-2")),
+				DIV(
+					AttrId("video-uploaders-container"),
+					AttrClass("mt-4 space-y-2"),
+					Attr_(`
+						init
+							set $pendingUploads to {}
+						on mutation
+							set count to the length of my children
+							put count into #upload-indicator-count
+							if count > 0
+								remove .hidden from #video-upload-indicator
+							else
+								add .hidden to #video-upload-indicator
+							end
+				`),
+				),
 			),
 			FORM(AttrMethod(MethodDialog), AttrClass("modal-backdrop"))(
 				BUTTON()("close"),
@@ -1269,7 +1278,7 @@ type AddToPlaylistModalParams struct {
 
 func addToPlaylistButton() HyperNode {
 	return DIV(AttrClass("tooltip tooltip-top"), Attr("data-tip", "Add to Playlist"))(
-		BUTTON(AttrClass("btn btn-soft btn-sm"), AttrOnClick("$('#add-to-playlist-modal').show()"))(
+		BUTTON(AttrClass("btn btn-soft btn-sm"), Attr_(`on click call #add-to-playlist-modal.show()`))(
 			RawText(lucide.ListVideo()),
 		),
 	)

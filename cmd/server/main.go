@@ -29,8 +29,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: add profile avatar upload
-
 // TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 // TODO: rethink all cleanup workers and deletion of data. we might need data.
 func main() {
@@ -174,6 +172,7 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 
 	router.Get("/videos/:video_id/comments", h.WithSession, h.HandleGetVideoComments)
 	router.Get("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.HandleGetCommentReplies)
+	// TODO: make reply creation endependent of video id; only depenend on comment id
 	router.Post("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.WithCsrfToken, h.HandleCreateReply)
 	router.Post("/videos/:video_id/comments", h.WithSession, h.WithCsrfToken, h.HandleCreateComment)
 	// router.Put("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment) // TODO: edit comment

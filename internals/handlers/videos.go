@@ -17,6 +17,11 @@ import (
 )
 
 func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
+	pendingUploadId := c.FormValue("pendingUploadId")
+	if pendingUploadId == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "missing pending upload id")
+	}
+
 	title := strings.TrimSpace(c.FormValue("title"))
 	description := strings.TrimSpace(c.FormValue("description"))
 	contentType := strings.TrimSpace(c.FormValue("contentType"))
@@ -33,18 +38,13 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	fileSizeErr := validation.Validate(fileSize, validation.Required, validation.Max(32<<30))
 
 	if errors.Join(titleErr, descriptionErr, contentTypeErr, fileSizeErr) != nil {
-		return render(c, templates.PostVideoForm(templates.PostVideoFormParams{
+		return render(c.Status(fiber.StatusBadRequest), templates.PostVideoForm(templates.PostVideoFormParams{
 			Title:          title,
 			TitleErr:       titleErr,
 			Description:    description,
 			DescriptionErr: descriptionErr,
 			VideoErr:       errors.Join(contentTypeErr, fileSizeErr),
 		}))
-	}
-
-	pendingVideoId, err := uuid.Parse(c.FormValue("pendingVideoId"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid pending video id")
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -74,14 +74,15 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	return render(c, hyper.Group(
 		templates.PostVideoForm(templates.PostVideoFormParams{CloseDialogModal: true}),
 
-		hyper.DIV(hyper.AttrId("video-uploaders-container"), templates.AttrHxSwapOob(templates.SwapAppend))(
+		hyper.DIV(hyper.AttrId("video-uploaders-container"), templates.AttrHxSwapOob(templates.SwapPrepend))(
 			templates.VideoUploader(templates.VideoUploaderParams{
-				PendingVideoId: pendingVideoId,
-				VideoId:        *videoId,
-				UploadId:       presignedUpload.UploadId,
-				PartSize:       presignedUpload.PartSize,
-				UploadUrls:     presignedUpload.Urls,
-				VideoTitle:     title,
+				PendingUploadId: pendingUploadId,
+				Title:           title,
+				VideoId:         *videoId,
+				UploadId:        presignedUpload.UploadId,
+				PartSize:        int(presignedUpload.PartSize),
+				UploadUrls:      presignedUpload.Urls,
+				FileSize:        int(fileSize),
 			}),
 		),
 	))
