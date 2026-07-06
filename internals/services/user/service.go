@@ -183,7 +183,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 	user, err := qtx.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return ErrUserNotFound
+			return ErrEmailNotFound
 		}
 		return fmt.Errorf("failed to get user by email: %w", err)
 	}
@@ -245,8 +245,6 @@ type Session struct {
 }
 
 func (me *Service) Login(ctx context.Context, email, password string) (*Session, error) {
-	email = strings.ToLower(strings.TrimSpace(email))
-
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -468,6 +466,50 @@ func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	}
 	if err := me.redis.Publish(ctx, events.UserDeletedEvent, payload).Err(); err != nil {
 		return fmt.Errorf("failed to publish %q event: %w", events.UserDeletedEvent, err)
+	}
+
+	return nil
+}
+
+func (me *Service) EditCredentials(ctx context.Context, userId uuid.UUID, email, password string) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	user, err := me.queries.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if user.Email != email {
+		if ok, err := qtx.CheckEmail(ctx, email); err != nil {
+			return fmt.Errorf("failed to check email: %w", err)
+		} else if ok {
+			return ErrEmailConflict
+		}
+	}
+
+	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	if err := qtx.UpdateCredentials(ctx, queries.UpdateCredentialsParams{
+		UserId:       userId,
+		Email:        email,
+		PasswordHash: string(password_hash),
+	}); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil

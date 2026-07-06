@@ -2,266 +2,298 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
-	"strings"
 
-	"github.com/assaidy/hyper/v2"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
-	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
 func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
-	name := strings.TrimSpace(c.FormValue("name"))
-	videoIdStr := c.FormValue("videoId")
-
-	var videoId uuid.UUID
-	if videoIdStr != "" {
-		var err error
-		videoId, err = uuid.Parse(videoIdStr)
-		if err != nil {
-			return fiber.NewError(fiber.StatusBadRequest, "invalid video id")
-		}
+	var request struct {
+		Name string `json:"name"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
 	}
 
-	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 50))
-
-	if nameErr != nil {
-		return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoId,
-			Name:    name,
-			NameErr: nameErr,
-		}))
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
+	); err != nil {
+		return extractValidationError(err)
 	}
 
-	userId := c.Locals("user_id").(uuid.UUID)
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	playlistId, err := me.videoService.CreatePlaylist(c.RequestCtx(), userId, name)
+	playlistId, err := me.videoService.CreatePlaylist(c.RequestCtx(), currentUserId, request.Name)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNameConflict) {
-			return render(c, templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-				VideoId: videoId,
-				Name:    name,
-				NameErr: fmt.Errorf("playlist with this name already exists"),
-			}))
+			return errPlaylistNameConflict
 		}
 		return err
 	}
 
-	return render(c, hyper.Group(
-		templates.CreatePlaylistForm(templates.CreatePlaylistFormParams{
-			VideoId: videoId,
-		}),
-
-		hyper.DIV(
-			hyper.AttrId("playlist-checkbox-list"),
-			templates.AttrHxSwapOob(templates.SwapPrepend),
-		)(
-			templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
-				VideoId:    videoId,
-				PlaylistId: *playlistId,
-				Name:       name,
-				Checked:    false,
-			}),
-		),
-	))
+	return c.JSON(fiber.Map{"playlistId": *playlistId})
 }
 
-func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
-	videoId, err := uuid.Parse(c.Params("video_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "video not found")
-	}
-	playlistId, err := uuid.Parse(c.Params("playlist_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
-	}
+type playlistResponse struct {
+	Id          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	VideosCount int       `json:"videosCount"`
+}
 
+func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 	var request struct {
-		PlaylistName string `json:"playlistName"`
+		UserId         uuid.UUID `uri:"user_id"`
+		LastPlaylistId uuid.UUID `query:"last_playlist_id"`
+		Limit          int       `query:"limit"`
 	}
 	if err := c.Bind().All(&request); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "missing playlistName field in request body")
+		return errInvalidRequest.details(err)
 	}
 
-	userId := c.Locals("user_id").(uuid.UUID)
-
-	if err := me.videoService.AddVideoToPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
-		switch {
-		case errors.Is(err, video_service.ErrVideoNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "video not found")
-		case errors.Is(err, video_service.ErrPlaylistVideoConflict):
-			return fiber.NewError(fiber.StatusConflict, "already in playlist")
-		case errors.Is(err, video_service.ErrPlaylistNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
-		default:
-			return err
-		}
+	if request.Limit == 0 {
+		request.Limit = 15
 	}
 
-	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
-		VideoId:    videoId,
-		PlaylistId: playlistId,
-		Name:       request.PlaylistName,
-		Checked:    true,
-	}))
-}
+	me.userMutex.RLock(request.UserId.String())
+	defer me.userMutex.RUnlock(request.UserId.String())
 
-func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
-	videoId, err := uuid.Parse(c.Params("video_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "video not found")
-	}
-	playlistId, err := uuid.Parse(c.Params("playlist_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
 	}
 
-	var request struct {
-		PlaylistName string `json:"playlistName"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "missing playlistName field in request body")
-	}
-
-	userId := c.Locals("user_id").(uuid.UUID)
-
-	if err := me.videoService.DeleteVideoFromPlaylist(c.RequestCtx(), videoId, userId, playlistId); err != nil {
-		switch {
-		case errors.Is(err, video_service.ErrPlaylistNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
-		case errors.Is(err, video_service.ErrVideoNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "video not in playlist")
-		default:
-			return err
-		}
-	}
-
-	return render(c, templates.PlaylistCheckbox(templates.PlaylistCheckboxParams{
-		VideoId:    videoId,
-		PlaylistId: playlistId,
-		Name:       request.PlaylistName,
-		Checked:    false,
-	}))
-}
-
-func (me *Handler) HandlePlaylistsPage(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
+	playlists, err := me.videoService.GetPlaylists(
+		c.RequestCtx(),
+		request.UserId,
+		request.LastPlaylistId,
+		request.Limit,
+	)
 	if err != nil {
 		return err
 	}
 
-	return render(c, templates.PlaylistsPage(currentUser.Username))
-}
-
-func (me *Handler) HandlePlaylistsPageContent(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
-	playlists, err := me.videoService.GetAllPlaylists(c.RequestCtx(), currentUser.Id)
-	if err != nil {
-		return err
-	}
-
-	templatePlaylists := make([]templates.PlaylistCardParams, 0, len(playlists))
+	response := make([]playlistResponse, 0, len(playlists))
 	for _, p := range playlists {
-		templatePlaylists = append(templatePlaylists, templates.PlaylistCardParams{
+		response = append(response, playlistResponse{
 			Id:          p.Id,
 			Name:        p.Name,
 			VideosCount: p.VideosCount,
 		})
 	}
 
-	return render(c, hyper.Group(
-		templates.PlaylistsPageContent(templates.PlaylistsPageContentParams{
-			Username:  currentUser.Username,
-			Playlists: templatePlaylists,
-		}),
-
-		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
-			templates.Navbar(templates.NavbarParams{
-				Username:    currentUser.Username,
-				CurrentPage: templates.PagePlaylists,
-			}),
-		),
-	))
+	return c.JSON(response)
 }
 
-func (me *Handler) HandleNotificationsPage(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
+func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
+	var request struct {
+		UserId         uuid.UUID `uri:"userId"`
+		VideoId        uuid.UUID `uri:"videoId"`
+		LastPlaylistId uuid.UUID `query:"last_playlist_id"`
+		Limit          int       `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	me.userMutex.RLock(request.UserId.String())
+	defer me.userMutex.RUnlock(request.UserId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
 		return err
+	} else if !ok {
+		return errUserNotFound
 	}
 
-	return render(c, templates.NotificationsPage(currentUser.Username))
-}
-
-func (me *Handler) HandlePlaylistDetailPage(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
+	playlists, err := me.videoService.GetPlaylistsWithVideoStatus(
+		c.RequestCtx(),
+		request.UserId,
+		request.VideoId,
+		request.LastPlaylistId,
+		request.Limit,
+	)
 	if err != nil {
-		return err
-	}
-
-	playlistId, err := uuid.Parse(c.Params("playlist_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
-	}
-
-	return render(c, templates.PlaylistDetailPage(currentUser.Username, playlistId))
-}
-
-func (me *Handler) HandlePlaylistDetailPageContent(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
-	playlistId, err := uuid.Parse(c.Params("playlist_id"))
-	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "playlist not found")
-	}
-
-	playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
-	if err != nil {
-		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound //
 		}
 		return err
 	}
 
-	videos, err := me.videoService.GetAllVideosInPlaylist(c.RequestCtx(), currentUser.Id, playlistId)
+	// I cannot add HasVideo field with tag omitempty to [playlistResponse] and reused it;
+	// omitempty would drop HasVideo=false, but the this response must include it.
+	type playlistWithStatusResponse struct {
+		Id          uuid.UUID `json:"id"`
+		Name        string    `json:"name"`
+		VideosCount int       `json:"videosCount"`
+		HasVideo    bool      `json:"hasVideo"`
+	}
+
+	response := make([]playlistWithStatusResponse, 0, len(playlists))
+	for _, p := range playlists {
+		response = append(response, playlistWithStatusResponse{
+			Id:          p.Id,
+			Name:        p.Name,
+			VideosCount: p.VideosCount,
+			HasVideo:    p.HasVideo,
+		})
+	}
+
+	return c.JSON(response)
+}
+
+func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "playlist not found")
+			return errPlaylistNotFound
 		}
 		return err
 	}
 
-	templateVideos, err := me.toTemplateVideos(c, videos)
+	return c.JSON(playlistResponse{
+		Id:          playlist.Id,
+		Name:        playlist.Name,
+		VideosCount: playlist.VideosCount,
+	})
+}
+
+func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
+	var request struct {
+		PlaylistId uuid.UUID `uri:"playlist_id"`
+		LastId     int64     `query:"last_id"`
+		Limit      int       `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	videos, err := me.videoService.GetVideosInPlaylist(
+		c.RequestCtx(),
+		request.PlaylistId,
+		request.LastId,
+		request.Limit,
+	)
 	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
 		return err
 	}
 
-	return render(c, hyper.Group(
-		templates.PlaylistDetailPageContent(templates.PlaylistDetailPageContentParams{
-			Username: currentUser.Username,
-			Playlist: templates.PlaylistCardParams{
-				Id:          playlist.Id,
-				Name:        playlist.Name,
-				VideosCount: playlist.VideosCount,
-			},
-			Videos: templateVideos,
-		}),
+	resposne := make([]videoResponse, 0, len(videos))
+	for _, v := range videos {
+		resposne = append(resposne, videoResponse{
+			Id:              v.Id,
+			OwnerId:         v.OwnerId,
+			Timestamp:       v.Timestamp,
+			Title:           v.Title,
+			Description:     v.Description,
+			PlaylistVideoId: v.PlaylistVideoId,
+		})
+	}
 
-		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
-			templates.Navbar(templates.NavbarParams{
-				Username:    currentUser.Username,
-				CurrentPage: templates.PagePlaylists,
-			}),
-		),
-	))
+	return c.JSON(resposne)
+}
+
+func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.videoService.DeletePlaylist(c.RequestCtx(), currentUserId, playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
+	var request struct {
+		VideoId    uuid.UUID `uri:"video_id"`
+		PlaylistId uuid.UUID `uri:"playlist_id"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.videoService.AddVideoToPlaylist(
+		c.RequestCtx(),
+		currentUserId,
+		request.VideoId,
+		request.PlaylistId,
+	); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		if errors.Is(err, video_service.ErrPlaylistVideoConflict) {
+			return errPlaylistVideoConflict
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
+	var request struct {
+		VideoId    uuid.UUID `uri:"video_id"`
+		PlaylistId uuid.UUID `uri:"playlist_id"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.videoService.DeleteVideoFromPlaylist(
+		c.RequestCtx(),
+		currentUserId,
+		request.VideoId,
+		request.PlaylistId,
+	); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
+		if errors.Is(err, video_service.ErrPlaylistVideoNotFound) {
+			return errPlaylistVideoNotFound
+		}
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }

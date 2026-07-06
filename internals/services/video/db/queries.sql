@@ -9,10 +9,14 @@ update video_service.videos
 set is_published = true
 where id = $1;
 
--- name: GetAllPublishedVideosForUser :many
+-- name: GetPublishedVideosForUser :many
 select * from video_service.videos
-where owner_id = $1 and is_published = true
-order by id desc;
+where owner_id = @user_id and is_published = true and (
+    sqlc.narg(last_video_id)::uuid is null
+    or id < sqlc.narg(last_video_id)::uuid
+)
+order by id desc
+limit $1;
 
 -- name: GetAllPublishedVideosForMultipleUsers :many
 select * from video_service.videos
@@ -34,12 +38,16 @@ insert into video_service.watchlaters (video_id, user_id) values ($1, $2);
 -- name: DeleteFromWatchlaters :execrows
 delete from video_service.watchlaters where video_id = $1 and user_id = $2;
 
--- name: GetAllVideosInWatchlatersForUser :many
-select v.*
+-- name: GetVideosInWatchlaters :many
+select v.*, wl.id as watchlater_id
 from video_service.watchlaters wl
 join video_service.videos v on v.id = wl.video_id and v.owner_id = wl.user_id
-where wl.user_id = $1
-order by wl.added_at desc;
+where wl.user_id = $1 and (
+    sqlc.narg(last_watchlater_id)::bigint is null
+    or wl.id < sqlc.narg(last_watchlater_id)::bigint
+)
+order by wl.id desc
+limit $2;
 
 -- name: CheckPlaylistByNameForUser :one
 select exists (select 1 from video_service.playlists where name = $1 and owner_id = $2 for update);
@@ -62,35 +70,43 @@ select exists (select 1 from video_service.playlists where id = $1 and owner_id 
 -- name: DeleteVideoFromPlaylist :execrows
 delete from video_service.playlist_videos where playlist_id = $1 and video_id = $2;
 
--- name: GetAllPlaylistsForUser :many
+-- name: GetPlaylistsForUser :many
 select 
   p.id,
   p.name,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
-where owner_id = $1
+where owner_id = @user_id and (
+  sqlc.narg(last_playlist_id)::uuid is null
+  or p.id < sqlc.narg(last_playlist_id)::uuid
+)
 group by p.id
-order by p.created_at desc;
+order by p.id desc
+limit $1;
 
--- name: GetAllVideosInPlaylist :many
-select v.*
+-- name: GetVideosInPlaylist :many
+select v.*, pv.id as playlist_video_id
 from video_service.playlist_videos pv
 join video_service.videos v on v.id = pv.video_id
-where pv.playlist_id = $1
-order by pv.added_at desc;
+where pv.playlist_id = $1 and (
+  sqlc.narg(last_id)::bigint is null
+  or pv.id < sqlc.narg(last_id)::bigint
+)
+order by pv.id desc
+limit $2;
 
 -- name: CheckVideoInPlaylist :one
 select exists (select 1 from video_service.playlist_videos where playlist_id = $1 and video_id = $2 for update);
 
--- name: GetPlaylistForUser :one
+-- name: GetPlaylist :one
 select
   p.id,
   p.name,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
-where p.id = $1 and p.owner_id = $2
+where p.id = $1
 group by p.id;
 
 -- name: DeleteAllVideosForUser :many
@@ -104,6 +120,25 @@ delete from video_service.playlists where owner_id = $1;
 
 -- name: DeleteVideoByIdForUser :execrows
 delete from video_service.videos where id = $1 and owner_id = $2 and is_published = $3;
+
+-- name: GetPlaylistsWithVideoStatusForUser :many
+select 
+  p.id,
+  p.name,
+  count(pv.video_id) as videos_count,
+  exists (
+    select 1 from video_service.playlist_videos pv2
+    where pv2.playlist_id = p.id and pv2.video_id = @video_id
+  ) as has_video
+from video_service.playlists p
+left join video_service.playlist_videos pv on p.id = pv.playlist_id
+where p.owner_id = @user_id and (
+  sqlc.narg(last_playlist_id)::uuid is null
+  or p.id < sqlc.narg(last_playlist_id)::uuid
+)
+group by p.id
+order by p.id desc
+limit $1;
 
 -- name: DeleteVideoById :exec
 delete from video_service.videos where id = $1;

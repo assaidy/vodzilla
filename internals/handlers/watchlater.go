@@ -3,93 +3,94 @@ package handlers
 import (
 	"errors"
 
-	"github.com/assaidy/hyper/v2"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
-	"github.com/assaidy/vodzilla/internals/web/templates"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleAddToWatchLater(c fiber.Ctx) error {
+func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
+	var request struct {
+		LastId int64 `query:"last_id"`
+		Limit  int   `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	videos, err := me.videoService.GetVideosInWatchlater(
+		c.RequestCtx(),
+		currentUserId,
+		request.LastId,
+		request.Limit,
+	)
+	if err != nil {
+		return err
+	}
+
+	response := make([]videoResponse, 0, len(videos))
+	for _, v := range videos {
+		response = append(response, videoResponse{
+			Id:                v.Id,
+			OwnerId:           v.OwnerId,
+			Timestamp:         v.Timestamp,
+			Title:             v.Title,
+			Description:       v.Description,
+			WatchlaterVideoId: v.WatchlaterId,
+		})
+	}
+
+	return c.JSON(response)
+}
+
+func (me *Handler) HandleAddToWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "video not found")
+		return errInvalidRequest.details(err)
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
-		switch {
-		case errors.Is(err, video_service.ErrWatchlaterConflict):
-			return fiber.NewError(fiber.StatusConflict, "already in watch later")
-		case errors.Is(err, video_service.ErrVideoNotFound):
-			return fiber.NewError(fiber.StatusNotFound, "video not found")
-		default:
-			return err
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
 		}
+		if errors.Is(err, video_service.ErrWatchlaterConflict) {
+			return errWatchlaterConflict
+		}
+		return err
 	}
 
-	return render(c, templates.WatchlaterButton(templates.WatchlaterButtonParams{
-		VideoId:  videoId,
-		IsActive: true,
-	}))
+	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteFromWatchLater(c fiber.Ctx) error {
+func (me *Handler) HandleDeleteFromWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "video not found")
+		return errInvalidRequest.details(err)
 	}
 	userId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
-			return fiber.NewError(fiber.StatusNotFound, "not in watch later")
+			return errVideoNotFound
+		}
+		if errors.Is(err, video_service.ErrWatchlaterVideoNotFound) {
+			return errWatchlaterVideoNotFound
 		}
 		return err
 	}
 
-	return render(c, templates.WatchlaterButton(templates.WatchlaterButtonParams{
-		VideoId:  videoId,
-		IsActive: false,
-	}))
-}
-
-func (me *Handler) HandleWatchLaterPage(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
-	return render(c, templates.WatchlaterPage(currentUser.Username))
-}
-
-func (me *Handler) HandleWatchLaterPageContent(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
-	videos, err := me.videoService.GetAllVideosInWatchlater(c.RequestCtx(), currentUser.Id)
-	if err != nil {
-		return err
-	}
-
-	templateVideos, err := me.toTemplateVideos(c, videos)
-	if err != nil {
-		return err
-	}
-
-	return render(c, hyper.Group(
-		templates.WatchlaterPageContent(templates.WatchlaterPageContentParams{
-			Username: currentUser.Username,
-			Videos:   templateVideos,
-		}),
-
-		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
-			templates.Navbar(templates.NavbarParams{
-				Username:    currentUser.Username,
-				CurrentPage: templates.PageWatchLater,
-			}),
-		),
-	))
+	return c.SendStatus(fiber.StatusOK)
 }

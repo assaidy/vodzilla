@@ -20,17 +20,15 @@ import (
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
-	"github.com/assaidy/vodzilla/internals/web"
 	"github.com/charmbracelet/log"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/etag"
-	"github.com/gofiber/fiber/v3/middleware/static"
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: add pagination to all list endpoints (cursor-based with limit/offset fallback).
 // TODO: rethink all cleanup workers and deletion of data. we might need data.
+// TODO: add db indexes
+
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
 		Formatter:       log.TextFormatter,
@@ -50,22 +48,24 @@ func main() {
 		utils.MustGetEnv("PAPERCUT_PASSWORD"),
 	)
 
-	serviceManager := services.NewManager(logger.WithGroup("service manager"))
-
 	userService := user_service.New(postgres, redis, s3, mailer, logger.WithGroup("user service"))
-	serviceManager.Add("user service", userService)
 	videoService := video_service.New(postgres, redis, logger.WithGroup("video service"))
-	serviceManager.Add("video service", videoService)
 	mediaService := media_service.New(postgres, redis, s3, logger.WithGroup("media service"))
-	serviceManager.Add("media service", mediaService)
 	reactionService := reaction_service.New(postgres, redis, logger.WithGroup("reaction service"))
-	serviceManager.Add("reaction service", reactionService)
 	socialService := social_service.New(postgres, redis, logger.WithGroup("social service"))
-	serviceManager.Add("social service", socialService)
 	_ = search_service.New()
 	_ = history_service.New()
-	serviceManager.StartAll(context.Background())
-	defer serviceManager.StopAll(context.Background())
+
+	serviceManager := services.NewManager(logger.WithGroup("service manager"))
+	{
+		serviceManager.Add("user service", userService)
+		serviceManager.Add("video service", videoService)
+		serviceManager.Add("media service", mediaService)
+		serviceManager.Add("reaction service", reactionService)
+		serviceManager.Add("social service", socialService)
+	}
+	serviceManager.StartAll()
+	defer serviceManager.StopAll()
 
 	handler := handlers.New(
 		logger.WithGroup("handler"),
@@ -105,76 +105,83 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Use(h.WithLogging)
 	router.Use(h.WithErrorResolver)
 	router.Use(h.WithPassClientIdToLocals)
-	router.Use(etag.New())
 
+	// Misc.
 	router.Get("/health", h.HandleCheckHealth)
-	router.Get("/assets/*", static.New("assets", static.Config{
-		FS:       web.AssetsFS,
-		Compress: true,
-		ModifyResponse: func(c fiber.Ctx) error {
-			// necessary for etag to work with assets
-			c.Response().Header.Del(fiber.HeaderLastModified)
-			return nil
-		},
-	}))
 	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 
-	// development playground
-	router.Get("/playground", h.HandlePlaygroundPage)
-	router.Get("/playground/test", h.HandlePlaygroundTest)
+	// Auth
+	router.Post("/auth/register", h.HandleRegister)
+	router.Post("/auth/login", h.HandleLogin)
+	router.Post("/auth/logout", h.WithSession, h.HandleLogout).Name("logout")
+	router.Post("/auth/verification_email", h.HandleSendVerificationEmail)
+	router.Post("/auth/verification_email/verify", h.HandleVerifyEmail)
+	router.Put("/auth/credentials", h.HandleEditCredentials)
 
-	router.Get("/", h.HandleHomePage)
-
-	router.Get("/register", h.HandleRegisterPage)
-	router.Post("/register", h.HandleRegister)
-	router.Get("/login", h.HandleLoginPage)
-	router.Post("/login", h.HandleLogin)
-	// TODO: app.Post("/verification_email", h.HandleGetVerificationEmail)
-	router.Get("/verification_email/sent", h.HandleVerificationEmailSentPage)
-	router.Get("/verification_email/verify", h.HandleVerifyEmailPage)
-
-	router.Get("/@:username", h.WithSession, h.HandleProfilePage)
-	router.Get("/@:username/content", h.WithSession, h.HandleProfilePageContent)
+	// Profiles
+	router.Get("/profiles", h.WithSession, h.HandleGetProfile)
+	router.Get("/profiles/:username", h.WithSession, h.HandleGetProfileByUsername)
 	router.Put("/profiles", h.WithSession, h.WithCsrfToken, h.HandleEditProfile)
-	// TODO: edit account: email, password, delete account
+	router.Delete("/profiles", h.WithSession, h.WithCsrfToken, h.HandleDeleteProfile).Name("delete_profile")
+	router.Put("/profiles/avatar", h.WithSession, h.WithCsrfToken, h.HandleEditProfileAvatar)
+	router.Put("/profiles/avatar/confirm_upload", h.WithSession, h.WithCsrfToken, h.HandleConfirmProfileAvatarUpload)
+	router.Delete("/profiles/avatar", h.WithSession, h.WithCsrfToken, h.HandleDeleteProfileAvatar)
 
-	router.Get("/discover", h.WithSession, h.HandleDiscoverPage)
-	router.Get("/discover/content", h.WithSession, h.HandleDiscoverPageContent)
-	router.Get("/notifications", h.WithSession, h.HandleNotificationsPage)
-	router.Get("/notifications/content", h.WithSession, h.HandleNotificationsPageContent)
+	// Social
+	router.Post("/follows/:user_id", h.WithSession, h.WithCsrfToken, h.HandleFollow)
+	router.Delete("/follows/:user_id", h.WithSession, h.WithCsrfToken, h.HandleUnfollow)
+	router.Get("/follows/:user_id/counts", h.WithSession, h.HandleGetFollowCounts)
+	router.Get("/follows/:user_id/followers", h.WithSession, h.HandleGetFollowers)
+	router.Get("/follows/:user_id/followeds", h.WithSession, h.HandleGetFolloweds)
 
-	router.Get("/feed", h.WithSession, h.HandleFeedPage)
-	router.Get("/feed/content", h.WithSession, h.HandleFeedPageContent)
-	router.Post("/follow/:id", h.WithSession, h.WithCsrfToken, h.HandleFollow)
-	router.Delete("/follow/:id", h.WithSession, h.WithCsrfToken, h.HandleUnfollow)
-
+	// Videos
 	router.Post("/videos", h.WithSession, h.WithCsrfToken, h.HandlePostVideo)
-	router.Post("/videos/complete_upload", h.WithSession, h.HandleCompleteVideoUpload)
-	router.Get("/videos/:video_id", h.WithSession, h.HandleVideoPage)
-	router.Get("/videos/:video_id/content", h.WithSession, h.HandleVideoPageContent)
+	router.Put("/videos/:video_id/confirm_upload", h.WithSession, h.HandleConfirmVideoUpload)
+	router.Put("/videos/:video_id/thumbnail", h.WithSession, h.HandleEditVideoThumbnail)
+	router.Put("/videos/:video_id/thumbnail/confirm_upload", h.WithSession, h.HandleConfirmVideoThumbnailUpload)
+	router.Delete("/videos/:video_id/thumbnail", h.WithSession, h.HandleDeleteVideoThumbnail)
+	router.Get("/videos/:video_id", h.WithSession, h.HandleGetVideo)
 	router.Get("/videos/:video_id/stream_url", h.WithSession, h.HandleGetVideoStreamUrl)
-	router.Post("/videos/:video_id/views", h.WithSession, h.WithCsrfToken, h.HandleViewVideo)
-	router.Post("/videos/:video_id/reactions", h.WithSession, h.WithCsrfToken, h.HandleAddVideoReaction)
-	router.Delete("/videos/:video_id/reactions", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoReaction)
+	router.Delete("/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideo)
+	router.Get("/videos/users/:user_id", h.WithSession, h.HandleGetVideosForUser)
+	router.Get("/videos/users/:user_id/count", h.WithSession, h.HandleGetVideosCountForUser)
 
-	router.Get("/watchlater", h.WithSession, h.HandleWatchLaterPage)
-	router.Get("/watchlater/content", h.WithSession, h.HandleWatchLaterPageContent)
-	router.Post("/videos/:video_id/watchlater", h.WithSession, h.WithCsrfToken, h.HandleAddToWatchLater)
-	router.Delete("/videos/:video_id/watchlater", h.WithSession, h.WithCsrfToken, h.HandleDeleteFromWatchLater)
+	// Watch Later
+	router.Get("/watchlaters", h.WithSession, h.HandleGetWatchlaters)
+	router.Post("/watchlaters/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleAddToWatchLaters)
+	router.Delete("/watchlaters/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteFromWatchLaters)
 
-	router.Get("/playlists", h.WithSession, h.HandlePlaylistsPage)
-	router.Get("/playlists/content", h.WithSession, h.HandlePlaylistsPageContent)
-	router.Get("/playlists/:playlist_id", h.WithSession, h.HandlePlaylistDetailPage)
-	router.Get("/playlists/:playlist_id/content", h.WithSession, h.HandlePlaylistDetailPageContent)
+	// Playlists
 	router.Post("/playlists", h.WithSession, h.WithCsrfToken, h.HandleCreatePlaylist)
-	router.Post("/videos/:video_id/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleAddVideoToPlaylist)
-	router.Delete("/videos/:video_id/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoFromPlaylist)
+	router.Get("/playlists/users/:user_id", h.WithSession, h.HandleGetPlaylists)
+	router.Get("/playlists/users/:user_id/videos/:video_id", h.WithSession, h.HandleGetPlaylistsWithVideoStatus)
+	router.Get("/playlists/:playlist_id", h.WithSession, h.HandleGetPlaylist)
+	router.Get("/playlists/:playlist_id/videos", h.WithSession, h.HandleGetPlaylistVideos)
+	router.Delete("/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleDeletePlaylist)
+	router.Post("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleAddVideoToPlaylist)
+	router.Delete("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoFromPlaylist)
+	// TODO: add playlist video index so users can reorder playlists.
 
-	router.Get("/videos/:video_id/comments", h.WithSession, h.HandleGetVideoComments)
-	router.Get("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.HandleGetCommentReplies)
-	// TODO: make reply creation endependent of video id; only depenend on comment id
-	router.Post("/videos/:video_id/comments/:comment_id/replies", h.WithSession, h.WithCsrfToken, h.HandleCreateReply)
-	router.Post("/videos/:video_id/comments", h.WithSession, h.WithCsrfToken, h.HandleCreateComment)
-	// router.Put("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment) // TODO: edit comment
-	router.Delete("/videos/:video_id/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteComment)
+	// Reactions
+	router.Post("/reactions/views/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleViewVideo)
+	router.Post("/reactions/comments/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleCreateVideoComment)
+	router.Get("/reactions/comments/videos/:video_id", h.WithSession, h.HandleGetVideoComments)
+	router.Post("/reactions/comments/:comment_id/replies", h.WithSession, h.WithCsrfToken, h.HandleCreateCommentReply)
+	router.Get("/reactions/comments/:comment_id/replies", h.WithSession, h.HandleGetCommentReplies)
+	router.Put("/reactions/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleEditComment)
+	router.Delete("/reactions/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteComment)
+	router.Post("/reactions/feelings/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleAddVideoFeeling)
+	router.Delete("/reactions/feelings/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoFeeling)
+	router.Post("/reactions/feelings/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleAddCommentFeeling)
+	router.Delete("/reactions/feelings/comments/:comment_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteCommentFeeling)
+
+	// Feed
+	router.Get("/feed", h.WithSession, h.HandleGetFeed)
+
+	// Notifications
+	router.Post("/notifications/notifications/count", h.WithSession, h.HandleGetUnreadNotoficationsCount)
+	router.Post("/notifications/notifications", h.WithSession, h.HandleGetNotofications)
+	router.Post("/notifications/:notification_id/mark_read", h.WithSession, h.HandleMarkNotificationAsRead)
+
+	// TODO: search, recommendations, history
 }

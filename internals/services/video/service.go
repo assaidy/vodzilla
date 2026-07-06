@@ -126,6 +126,16 @@ type Video struct {
 	Description string
 }
 
+type WatchlaterVideo struct {
+	Video
+	WatchlaterId int64
+}
+
+type PlaylistVideo struct {
+	Video
+	PlaylistVideoId int64
+}
+
 func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
 	video, err := me.queries.GetVideoById(ctx, id)
 	if err != nil {
@@ -148,17 +158,21 @@ func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, erro
 	}, nil
 }
 
-func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (uint, error) {
+func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (int, error) {
 	n, err := me.queries.GetPublishedVideosCountForUser(ctx, userId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get videos count for user: %w", err)
 	}
 
-	return uint(n), nil
+	return int(n), nil
 }
 
-func (me *Service) GetAllVideosForUser(ctx context.Context, userId uuid.UUID) ([]Video, error) {
-	videos, err := me.queries.GetAllPublishedVideosForUser(ctx, userId)
+func (me *Service) GetAllVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error) {
+	videos, err := me.queries.GetPublishedVideosForUser(ctx, queries.GetPublishedVideosForUserParams{
+		UserId:      userId,
+		LastVideoId: uuid.NullUUID{UUID: lastVideoId, Valid: lastVideoId != uuid.Nil},
+		Limit:       int32(limit),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all published videos for user: %w", err)
 	}
@@ -257,32 +271,59 @@ func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId uui
 }
 
 func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
-	if n, err := me.queries.DeleteFromWatchlaters(ctx, queries.DeleteFromWatchlatersParams{
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if ok, err := qtx.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:          videoId,
+		IsPublished: true,
+	}); err != nil {
+		return fmt.Errorf("failed to check video: %w", err)
+	} else if !ok {
+		return ErrVideoNotFound
+	}
+
+	if n, err := qtx.DeleteFromWatchlaters(ctx, queries.DeleteFromWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete from watchlater: %w", err)
 	} else if n == 0 {
-		return ErrVideoNotFound
+		return ErrWatchlaterVideoNotFound
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil
 }
 
-func (me *Service) GetAllVideosInWatchlater(ctx context.Context, userId uuid.UUID) ([]Video, error) {
-	videos, err := me.queries.GetAllVideosInWatchlatersForUser(ctx, userId)
+func (me *Service) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error) {
+	rows, err := me.queries.GetVideosInWatchlaters(ctx, queries.GetVideosInWatchlatersParams{
+		UserId:           userId,
+		LastWatchlaterId: sql.NullInt64{Int64: lastId, Valid: lastId != 0},
+		Limit:            int32(limit),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get videos in watchlater: %w", err)
 	}
 
-	result := make([]Video, 0, len(videos))
-	for _, v := range videos {
-		result = append(result, Video{
-			Id:          v.Id,
-			OwnerId:     v.OwnerId,
-			Timestamp:   v.CreatedAt,
-			Title:       v.Title,
-			Description: v.Description.String,
+	result := make([]WatchlaterVideo, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, WatchlaterVideo{
+			Video: Video{
+				Id:          row.Id,
+				OwnerId:     row.OwnerId,
+				Timestamp:   row.CreatedAt,
+				Title:       row.Title,
+				Description: row.Description.String,
+			},
+			WatchlaterId: row.WatchlaterId,
 		})
 	}
 
@@ -335,7 +376,7 @@ func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.U
 	return nil
 }
 
-func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, playlistId uuid.UUID) error {
+func (me *Service) AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -381,13 +422,22 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, videoId, userId, play
 	return nil
 }
 
-func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, videoId, userId, playlistId uuid.UUID) error {
+func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
+
+	if ok, err := qtx.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:          videoId,
+		IsPublished: true,
+	}); err != nil {
+		return fmt.Errorf("failed to check video: %w", err)
+	} else if !ok {
+		return ErrVideoNotFound
+	}
 
 	if ok, err := qtx.CheckPlaylistForUser(ctx, queries.CheckPlaylistForUserParams{
 		Id:      playlistId,
@@ -404,7 +454,7 @@ func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, videoId, userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete video from playlist: %w", err)
 	} else if n == 0 {
-		return ErrVideoNotFound
+		return ErrPlaylistVideoNotFound
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -421,13 +471,16 @@ type Playlist struct {
 }
 
 type PlaylistWithVideoStatus struct {
-	Id       uuid.UUID
-	Name     string
+	Playlist
 	HasVideo bool
 }
 
-func (me *Service) GetAllPlaylists(ctx context.Context, userId uuid.UUID) ([]Playlist, error) {
-	playlists, err := me.queries.GetAllPlaylistsForUser(ctx, userId)
+func (me *Service) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error) {
+	playlists, err := me.queries.GetPlaylistsForUser(ctx, queries.GetPlaylistsForUserParams{
+		UserId:         userId,
+		LastPlaylistId: uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
+		Limit:          int32(limit),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all playlists for user: %w", err)
 	}
@@ -444,37 +497,54 @@ func (me *Service) GetAllPlaylists(ctx context.Context, userId uuid.UUID) ([]Pla
 	return result, nil
 }
 
-func (me *Service) GetAllPlaylistsWithVideoStatus(ctx context.Context, userId, videoId uuid.UUID) ([]PlaylistWithVideoStatus, error) {
-	playlists, err := me.queries.GetAllPlaylistsForUser(ctx, userId)
+func (me *Service) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error) {
+	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all playlists for user: %w", err)
+		return nil, fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if ok, err := qtx.CheckVideo(ctx, queries.CheckVideoParams{
+		Id:          videoId,
+		IsPublished: true,
+	}); err != nil {
+		return nil, fmt.Errorf("failed to check video: %w", err)
+	} else if !ok {
+		return nil, ErrVideoNotFound
 	}
 
-	result := make([]PlaylistWithVideoStatus, 0, len(playlists))
-	for _, p := range playlists {
-		hasVideo, err := me.queries.CheckVideoInPlaylist(ctx, queries.CheckVideoInPlaylistParams{
-			PlaylistId: p.Id,
-			VideoId:    videoId,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to check video in playlist: %w", err)
-		}
+	rows, err := qtx.GetPlaylistsWithVideoStatusForUser(ctx, queries.GetPlaylistsWithVideoStatusForUserParams{
+		UserId:         userId,
+		VideoId:        videoId,
+		LastPlaylistId: uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
+		Limit:          int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get playlists with video status: %w", err)
+	}
 
+	result := make([]PlaylistWithVideoStatus, 0, len(rows))
+	for _, row := range rows {
 		result = append(result, PlaylistWithVideoStatus{
-			Id:       p.Id,
-			Name:     p.Name,
-			HasVideo: hasVideo,
+			Playlist: Playlist{
+				Id:          row.Id,
+				Name:        row.Name,
+				VideosCount: int(row.VideosCount),
+			},
+			HasVideo: row.HasVideo,
 		})
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return result, nil
 }
 
-func (me *Service) GetPlaylist(ctx context.Context, userId, playlistId uuid.UUID) (*Playlist, error) {
-	playlist, err := me.queries.GetPlaylistForUser(ctx, queries.GetPlaylistForUserParams{
-		Id:      playlistId,
-		OwnerId: userId,
-	})
+func (me *Service) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error) {
+	playlist, err := me.queries.GetPlaylist(ctx, playlistId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrPlaylistNotFound
@@ -489,40 +559,27 @@ func (me *Service) GetPlaylist(ctx context.Context, userId, playlistId uuid.UUID
 	}, nil
 }
 
-func (me *Service) GetAllVideosInPlaylist(ctx context.Context, userId, playlistId uuid.UUID) ([]Video, error) {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckPlaylistForUser(ctx, queries.CheckPlaylistForUserParams{
-		Id:      playlistId,
-		OwnerId: userId,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to check playlist for user: %w", err)
-	} else if !ok {
-		return nil, ErrPlaylistNotFound
-	}
-
-	videos, err := qtx.GetAllVideosInPlaylist(ctx, playlistId)
+func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
+	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
+		PlaylistId: playlistId,
+		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},
+		Limit:      int32(limit),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get videos in playlist: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	result := make([]Video, 0, len(videos))
-	for _, v := range videos {
-		result = append(result, Video{
-			Id:          v.Id,
-			OwnerId:     v.OwnerId,
-			Timestamp:   v.CreatedAt,
-			Title:       v.Title,
-			Description: v.Description.String,
+	result := make([]PlaylistVideo, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, PlaylistVideo{
+			Video: Video{
+				Id:          row.Id,
+				OwnerId:     row.OwnerId,
+				Timestamp:   row.CreatedAt,
+				Title:       row.Title,
+				Description: row.Description.String,
+			},
+			PlaylistVideoId: row.PlaylistVideoId,
 		})
 	}
 

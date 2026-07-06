@@ -19,7 +19,7 @@ func (me *Handler) WithPassClientIdToLocals(c fiber.Ctx) error {
 
 func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
 	if !c.IsWebSocket() {
-		return fiber.ErrUpgradeRequired
+		return errUpgradeRequired
 	}
 
 	c.Locals("fiber_app", c.App())

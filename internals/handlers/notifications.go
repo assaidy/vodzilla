@@ -1,25 +1,18 @@
 package handlers
 
-import (
-	"github.com/assaidy/hyper/v2"
-	"github.com/assaidy/vodzilla/internals/web/templates"
-	"github.com/gofiber/fiber/v3"
-)
+import "github.com/gofiber/fiber/v3"
 
-func (me *Handler) HandleNotificationsPageContent(c fiber.Ctx) error {
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return err
-	}
+// TODO: implement mark notifications as read
+func (me *Handler) HandleMarkNotificationAsRead(c fiber.Ctx) error {
+	return c.SendStatus(fiber.StatusNotImplemented)
+}
 
-	return render(c, hyper.Group(
-		templates.NotificationsPageContent(),
+// TODO: implement get unread notifications count
+func (me *Handler) HandleGetUnreadNotoficationsCount(c fiber.Ctx) error {
+	return c.SendStatus(fiber.StatusNotImplemented)
+}
 
-		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
-			templates.Navbar(templates.NavbarParams{
-				Username:    currentUser.Username,
-				CurrentPage: templates.PageNotifications,
-			}),
-		),
-	))
+// TODO: implement get notifications
+func (me *Handler) HandleGetNotofications(c fiber.Ctx) error {
+	return c.SendStatus(fiber.StatusNotImplemented)
 }

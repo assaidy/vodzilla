@@ -53,6 +53,10 @@ set
   bio = $3
 where id = @user_id;
 
+-- name: UpdateCredentials :exec
+update user_service.users set email = $1, password_hash = $2 where id = @user_id;
+
+
 -- name: BatchDeleteExpiredEmailVerificationTokens :exec
 do $$
 declare

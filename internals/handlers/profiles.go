@@ -5,163 +5,112 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/assaidy/hyper/v2"
+	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
-	"github.com/assaidy/vodzilla/internals/web/templates"
+	"github.com/assaidy/vodzilla/internals/utils"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleProfilePage(c fiber.Ctx) error {
-	profileUser, currentUser, err := me.getProfileUserAndCurrentUser(c)
-	if err != nil {
-		return err
-	}
-
-	return render(c, templates.ProfilePage(currentUser.Username, profileUser.Username))
+type profileResponse struct {
+	Id        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Bio       string    `json:"bio"`
+	AvatarUrl string    `json:"avatarUrl"`
 }
 
-// TODO: we can do a lot of lazy loading and pagination here and in other places
-func (me *Handler) HandleProfilePageContent(c fiber.Ctx) error {
-	profileUser, currentUser, err := me.getProfileUserAndCurrentUser(c)
+func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	user, err := me.userService.GetUserById(c.RequestCtx(), currentUserId)
 	if err != nil {
 		return err
 	}
 
-	videosCount, err := me.videoService.GetVideosCountForUser(c.RequestCtx(), profileUser.Id)
-	if err != nil {
+	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), currentUserId)
+	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
 		return err
 	}
 
-	videos, err := me.videoService.GetAllVideosForUser(c.RequestCtx(), profileUser.Id)
-	if err != nil {
-		return err
-	}
-
-	templateVideos, err := me.toTemplateVideos(c, videos)
-	if err != nil {
-		return err
-	}
-
-	followersCount, err := me.socialService.GetFollowersCount(c.RequestCtx(), profileUser.Id)
-	if err != nil {
-		return err
-	}
-
-	isFollowed, err := me.socialService.IsFollower(c.RequestCtx(), currentUser.Id, profileUser.Id)
-	if err != nil {
-		return err
-	}
-
-	return render(c, hyper.Group(
-		templates.ProfilePageContent(templates.ProfilePageContentParams{
-			OwnerId:        profileUser.Id,
-			Username:       profileUser.Username,
-			Name:           profileUser.Name,
-			Bio:            profileUser.Bio,
-			IsOwner:        profileUser.Username == currentUser.Username,
-			Videos:         templateVideos,
-			FollowersCount: followersCount,
-			PostsCount:     videosCount,
-			IsFollowed:     isFollowed,
-		}),
-
-		hyper.DIV(hyper.AttrId("navbar"), templates.AttrHxSwapOob(templates.SwapOuterHtml))(
-			templates.Navbar(templates.NavbarParams{
-				Username:    currentUser.Username,
-				CurrentPage: templates.PageProfile,
-			}),
-		),
-	))
+	return c.JSON(profileResponse{
+		Id:        user.Id,
+		Name:      user.Name,
+		Username:  user.Username,
+		Email:     user.Email,
+		Bio:       user.Bio,
+		AvatarUrl: avatarUrl,
+	})
 }
 
-func (me *Handler) getCurrentUser(c fiber.Ctx) (*user_service.User, error) {
-	userId := c.Locals("user_id").(uuid.UUID)
+func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
+	username := c.Params("username")
 
-	user, err := me.userService.GetUserById(c.RequestCtx(), userId)
+	user, err := me.userService.GetUserByUsername(c.RequestCtx(), username)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUserNotFound) {
-			return nil, redirect(c, "/login")
+			return errUserNotFound
 		}
-		return nil, err
+		return err
 	}
 
-	return user, nil
-}
-
-func (me *Handler) getProfileUserAndCurrentUser(c fiber.Ctx) (*user_service.User, *user_service.User, error) {
-	profileUser, err := me.userService.GetUserByUsername(c.RequestCtx(), c.Params("username"))
-	if err != nil {
-		if errors.Is(err, user_service.ErrUserNotFound) {
-			return nil, nil, fiber.NewError(fiber.StatusNotFound, "user not found")
-		}
-		return nil, nil, fmt.Errorf("failed to get profile user: %w", err)
+	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
+	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
+		return err
 	}
 
-	currentUser, err := me.getCurrentUser(c)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get current user: %w", err)
-	}
-
-	return profileUser, currentUser, nil
+	return c.JSON(profileResponse{
+		Id:        user.Id,
+		Name:      user.Name,
+		Username:  user.Username,
+		Email:     user.Email,
+		Bio:       user.Bio,
+		AvatarUrl: avatarUrl,
+	})
 }
 
 func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
-	name := strings.TrimSpace(c.FormValue("name"))
-	username := strings.TrimSpace(c.FormValue("username"))
-	bio := strings.TrimSpace(c.FormValue("bio"))
-
-	nameErr := validation.Validate(&name, validation.Required, validation.Length(1, 256))
-	usernameErr := validation.Validate(&username, validation.Required, validation.Length(1, 32),
-		validation.Match(usernameRegex).Error("can only cotain letters, digits or _"))
-	bioErr := validation.Validate(&bio, validation.Length(0, 500))
-
-	if errors.Join(nameErr, usernameErr, bioErr) != nil {
-		return render(c, templates.EditProfileForm(templates.EditProfileFormParams{
-			Name:        name,
-			NameErr:     nameErr,
-			Username:    username,
-			UsernameErr: usernameErr,
-			Bio:         bio,
-			BioErr:      bioErr,
-		}))
+	var request struct {
+		Name     string `json:"name"`
+		Username string `json:"username"`
+		Bio      string `json:"bio"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
 	}
 
-	userId := c.Locals("user_id").(uuid.UUID)
+	request.Name = strings.TrimSpace(request.Name)
+	request.Username = strings.TrimSpace(request.Username)
+	request.Bio = strings.TrimSpace(request.Bio)
 
-	if err := me.userService.EditProfile(c.RequestCtx(), userId, name, username, bio); err != nil {
-		switch {
-		case errors.Is(err, fiber.ErrNotFound):
-			return redirect(c, "/login")
-		case errors.Is(err, user_service.ErrUsernameConflict):
-			return render(c, templates.EditProfileForm(templates.EditProfileFormParams{
-				Name:        name,
-				Username:    username,
-				UsernameErr: fmt.Errorf("username already exists"),
-				Bio:         bio,
-			}))
-		default:
-			return err
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Name, validation.Required, validation.Length(1, 256)),
+		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
+		validation.Field(&request.Bio, validation.Length(0, 500)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.userService.EditProfile(
+		c.RequestCtx(),
+		currentUserId,
+		request.Name,
+		request.Username,
+		request.Bio,
+	); err != nil {
+		if errors.Is(err, user_service.ErrUsernameConflict) {
+			return errUsernameConflict
 		}
+		return err
 	}
 
-	c.Set("HX-Replace-Url", fmt.Sprintf("/@%s", username))
-	return render(c, hyper.Group(
-		templates.EditProfileForm(templates.EditProfileFormParams{
-			Name:     name,
-			Username: username,
-			Bio:      bio,
-		}),
-
-		hyper.H1(hyper.AttrId("profile-card-name"), templates.AttrHxSwapOob(templates.SwapInnerHtml))(name),
-		hyper.P(hyper.AttrId("profile-card-username"), templates.AttrHxSwapOob(templates.SwapInnerHtml))("@"+username),
-		hyper.P(hyper.AttrId("profile-card-bio"), templates.AttrHxSwapOob(templates.SwapInnerHtml))(bio),
-		templates.Alert(templates.AlertInfo, "Profile was updated successfully."),
-	))
+	return c.SendStatus(fiber.StatusOK)
 }
 
-// TODO: add a route for this
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
@@ -169,11 +118,76 @@ func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	defer me.userMutex.Unlock(currentUserId.String())
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
-		if errors.Is(err, user_service.ErrUserNotFound) {
-			return redirect(c, "/login")
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
+	var request struct {
+		ContentType string `json:"contentType"`
+		FileSize    int64  `json:"fileSize"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.ContentType = strings.TrimSpace(request.ContentType)
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.ContentType, validation.Required, validation.By(func(v any) error {
+			if !strings.HasPrefix(v.(string), "image/") {
+				return fmt.Errorf("must be an image type")
+			}
+			return nil
+		})),
+		validation.Field(&request.FileSize, validation.Required, validation.Max(2*utils.MegaByte)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	upload, err := me.mediaService.GeneratePresignedAvatarUpload(
+		c.RequestCtx(),
+		currentUserId,
+		request.ContentType,
+		request.FileSize,
+	)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"uploadUrl": upload.UploadUrl,
+		"objectKey": upload.ObjectKey,
+	})
+}
+
+func (me *Handler) HandleConfirmProfileAvatarUpload(c fiber.Ctx) error {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	avatarUrl, err := me.mediaService.ConfirmAvatarUpload(c.RequestCtx(), currentUserId)
+	if err != nil {
+		if errors.Is(err, media_service.ErrNoPendingAvatarUpload) {
+			return errAvatarNotFound
 		}
 		return err
 	}
 
-	return redirect(c, "/login")
+	return c.JSON(fiber.Map{"avatarUrl": avatarUrl})
+}
+
+func (me *Handler) HandleDeleteProfileAvatar(c fiber.Ctx) error {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.mediaService.DeleteAvatar(c.RequestCtx(), currentUserId); err != nil {
+		if errors.Is(err, media_service.ErrAvatarNotFound) {
+			return errAvatarNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }

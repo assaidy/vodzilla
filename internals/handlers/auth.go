@@ -2,124 +2,132 @@ package handlers
 
 import (
 	"errors"
-	"fmt"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
-	"github.com/assaidy/vodzilla/internals/utils"
-	"github.com/assaidy/vodzilla/internals/web/templates"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-var usernameRegex = regexp.MustCompile(`^[A-Za-z0-9_]*$`)
-
-func (me *Handler) HandleRegisterPage(c fiber.Ctx) error {
-	return render(c, templates.RegisterPage())
-}
+var usernameLettersRule = validation.Match(regexp.MustCompile(`^[A-Za-z0-9_]*$`)).Error("can only contain letters, digits or _")
 
 func (me *Handler) HandleRegister(c fiber.Ctx) error {
-	email := strings.ToLower(strings.TrimSpace(c.FormValue("email")))
-	password := c.FormValue("password")
-	name := strings.TrimSpace(c.FormValue("name"))
-	username := strings.TrimSpace(c.FormValue("username"))
-
-	emailErr := validation.Validate(email, validation.Required, is.Email)
-	passwordErr := validation.Validate(password, validation.Required, validation.Length(8, 50))
-	nameErr := validation.Validate(name, validation.Required, validation.Length(1, 256))
-	usernameErr := validation.Validate(username, validation.Required, validation.Length(1, 32),
-		validation.Match(usernameRegex).Error("can only contain letters, digits or _"))
-
-	if errors.Join(emailErr, passwordErr, nameErr, usernameErr) != nil {
-		return render(c, templates.RegisterForm(templates.RegisterFormParams{
-			Name:        name,
-			NameErr:     nameErr,
-			Username:    username,
-			UsernameErr: usernameErr,
-			Email:       email,
-			EmailErr:    emailErr,
-			Password:    password,
-			PasswordErr: passwordErr,
-		}))
+	var request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+		Username string `json:"username"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
 	}
 
-	if err := me.userService.Register(c.RequestCtx(), email, password, name, username); err != nil {
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+	request.Name = strings.TrimSpace(request.Name)
+	request.Username = strings.TrimSpace(request.Username)
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Email, validation.Required, is.Email),
+		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
+		validation.Field(&request.Name, validation.Required, validation.Length(1, 256)),
+		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	if err := me.userService.Register(
+		c.RequestCtx(),
+		request.Email,
+		request.Password,
+		request.Name,
+		request.Username,
+	); err != nil {
 		if errors.Is(err, user_service.ErrEmailConflict) {
-			return render(c, templates.RegisterForm(templates.RegisterFormParams{
-				Name:     name,
-				Username: username,
-				Email:    email,
-				EmailErr: errors.New("email already exists"),
-				Password: password,
-			}))
+			return errEmailConflict
 		}
 		if errors.Is(err, user_service.ErrUsernameConflict) {
-			return render(c, templates.RegisterForm(templates.RegisterFormParams{
-				Name:        name,
-				Username:    username,
-				UsernameErr: errors.New("username already exists"),
-				Email:       email,
-				Password:    password,
-			}))
+			return errUsernameConflict
 		}
 		return err
 	}
 
-	url, err := url.JoinPath(utils.MustGetEnv("APP_BASE_URL"), "/verification_email/verify")
-	if err != nil {
-		return fmt.Errorf("failed to general email verification url")
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
+	var request struct {
+		Email   string `json:"email"`
+		BaseUrl string `json:"baseUrl"`
 	}
-	if err := me.userService.SendVerificationEmail(c.RequestCtx(), email, url); err != nil {
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+	request.BaseUrl = strings.TrimSpace(request.BaseUrl)
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Email, validation.Required, is.Email),
+		validation.Field(&request.BaseUrl, validation.Required, is.URL),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	if err := me.userService.SendVerificationEmail(c.RequestCtx(), request.Email, request.BaseUrl); err != nil {
+		if errors.Is(err, user_service.ErrEmailNotFound) {
+			return errUserNotFound
+		}
 		return err
 	}
 
-	return redirect(c, "/verification_email/sent")
+	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleVerificationEmailSentPage(c fiber.Ctx) error {
-	return render(c, templates.VerificationEmailSentPage())
-}
-
-func (me *Handler) HandleVerifyEmailPage(c fiber.Ctx) error {
-	token := fiber.Query[string](c, "token")
+func (me *Handler) HandleVerifyEmail(c fiber.Ctx) error {
+	token := strings.TrimSpace(c.Query("token"))
+	if token == "" {
+		return errInvalidRequest.details("missing token query")
+	}
 
 	if err := me.userService.VerifyEmail(c.RequestCtx(), token); err != nil {
 		if errors.Is(err, user_service.ErrTokenNotFound) {
-			return render(c, templates.InvalidVerificationLinkPage())
+			return errTokenNotFound
 		}
 		return err
 	}
 
-	return render(c, templates.EmailVerifiedPage())
-}
-
-func (me *Handler) HandleLoginPage(c fiber.Ctx) error {
-	return render(c, templates.LoginPage())
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func (me *Handler) HandleLogin(c fiber.Ctx) error {
-	email := c.FormValue("email")
-	password := c.FormValue("password")
-	session, err := me.userService.Login(c.RequestCtx(), email, password)
+	var request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Email, validation.Required, is.Email),
+		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	session, err := me.userService.Login(c.RequestCtx(), request.Email, request.Password)
 	if err != nil {
 		if errors.Is(err, user_service.ErrUnauthorized) {
-			return render(c, templates.LoginForm(templates.LoginFormParams{
-				Email:    email,
-				Password: password,
-				Err:      templates.ErrInvalidCredentials,
-			}))
+			return errUnauthorized
 		}
 		if errors.Is(err, user_service.ErrUnverified) {
-			return render(c, templates.LoginForm(templates.LoginFormParams{
-				Email:    email,
-				Password: password,
-				Err:      templates.ErrEmailNotVerified,
-			}))
+			return errEmailNotVerified
 		}
 		return err
 	}
@@ -142,31 +150,33 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 		Expires: session.ExpiresAt,
 	})
 
-	return redirect(c, "/")
+	return c.SendStatus(fiber.StatusOK)
+}
+
+type WithSessionRequest struct {
+	SessionId    uuid.UUID `cookie:"session_id"`
+	SessionToken string    `cookie:"session_token"`
 }
 
 func (me *Handler) WithSession(c fiber.Ctx) error {
-	sessionIdStr := c.Cookies("session_id")
-	sessionToken := c.Cookies("session_token")
-
-	if sessionIdStr == "" || sessionToken == "" {
-		return redirect(c, "/login")
+	var request WithSessionRequest
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details("malformed cookies")
 	}
 
-	sessionId, err := uuid.Parse(sessionIdStr)
-	if err != nil {
-		return redirect(c, "/login")
+	if request.SessionId == uuid.Nil || request.SessionToken == "" {
+		return errUnauthorized.details("missing auth cookies")
 	}
 
-	session, err := me.userService.GetSession(c.RequestCtx(), sessionId)
+	session, err := me.userService.GetSession(c.RequestCtx(), request.SessionId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrSessionNotFound) {
-			return redirect(c, "/login")
+			return errUnauthorized.details("invalid cookies")
 		}
 		return err
 	}
 	if !session.ExpiresAt.After(time.Now()) {
-		return redirect(c, "/login")
+		return errUnauthorized.details("expired session")
 	}
 
 	c.Locals("session_id", session.Id)
@@ -174,13 +184,75 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	c.Locals("csrf_token", session.CsrfToken)
 	c.Locals("user_id", session.OwnerId)
 
+	if c.Route().Name != "logout" {
+		// block session deletetion (logout) requests until other requests complete.
+		me.sessionMutex.RLock(session.Id.String())
+		defer me.sessionMutex.RUnlock(session.Id.String())
+	} else if c.Route().Name != "delete_profile" {
+		// block profile deletetion requests until other requests complete.
+		me.userMutex.RLock(session.OwnerId.String())
+		defer me.userMutex.RUnlock(session.OwnerId.String())
+	}
+
 	return c.Next()
 }
 
 // must go through [WithSession] first
 func (me *Handler) WithCsrfToken(c fiber.Ctx) error {
 	if c.Locals("csrf_token").(string) != c.Get("X-CSRF-Token") {
-		return fiber.NewError(fiber.StatusForbidden, "missing CSRF token")
+		return errUnauthorized.details("missing or invalid CSRF token")
 	}
 	return c.Next()
+}
+
+func (me *Handler) HandleLogout(c fiber.Ctx) error {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+	currentSessionId := c.Locals("session_id").(uuid.UUID)
+
+	me.sessionMutex.Lock(currentSessionId.String())
+	defer me.sessionMutex.Unlock(currentSessionId.String())
+
+	if err := me.userService.Logout(c.RequestCtx(), currentUserId, currentSessionId); err != nil {
+		if errors.Is(err, user_service.ErrSessionNotFound) {
+			return err
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
+	var request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Email, validation.Required, is.Email),
+		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.userService.EditCredentials(
+		c.RequestCtx(),
+		currentUserId,
+		request.Email,
+		request.Password,
+	); err != nil {
+		if errors.Is(err, user_service.ErrEmailConflict) {
+			return errEmailConflict
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }

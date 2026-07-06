@@ -105,13 +105,21 @@ func (me *Service) Unfollow(ctx context.Context, followerId, followedId uuid.UUI
 	return nil
 }
 
-func (me *Service) GetFollowersCount(ctx context.Context, userId uuid.UUID) (uint, error) {
-	n, err := me.queries.GetFollowersCount(ctx, userId)
+type FollowCounts struct {
+	Followers int64
+	Followeds int64
+}
+
+func (me *Service) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error) {
+	result, err := me.queries.GetFollowCounts(ctx, userId)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get followers count: %w", err)
+		return nil, fmt.Errorf("failed to get followers count: %w", err)
 	}
 
-	return uint(n), nil
+	return &FollowCounts{
+		Followers: result.FollowersCount,
+		Followeds: result.FollowedsCount,
+	}, nil
 }
 
 func (me *Service) IsFollower(ctx context.Context, followerId, followedId uuid.UUID) (bool, error) {
@@ -126,10 +134,26 @@ func (me *Service) IsFollower(ctx context.Context, followerId, followedId uuid.U
 	return ok, err
 }
 
-func (me *Service) GetFollowedUserIdsForUser(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
-	ids, err := me.queries.GetFollowedUserIdsForUsers(ctx, userId)
+func (me *Service) GetFollowerIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
+	ids, err := me.queries.GetFollowerIds(ctx, queries.GetFollowerIdsParams{
+		UserId:     userId,
+		LastUserId: uuid.NullUUID{UUID: lastUserId, Valid: lastUserId != uuid.Nil},
+		Limit:      int32(limit),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get followed user ids for user: %w", err)
+		return nil, fmt.Errorf("failed to get follower ids for user: %w", err)
+	}
+	return ids, nil
+}
+
+func (me *Service) GetFollowedIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
+	ids, err := me.queries.GetFollowedIds(ctx, queries.GetFollowedIdsParams{
+		UserId:     userId,
+		LastUserId: uuid.NullUUID{UUID: lastUserId, Valid: lastUserId != uuid.Nil},
+		Limit:      int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get followed ids for user: %w", err)
 	}
 	return ids, nil
 }

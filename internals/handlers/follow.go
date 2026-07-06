@@ -3,19 +3,18 @@ package handlers
 import (
 	"errors"
 
+	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
-	"github.com/assaidy/vodzilla/internals/web/templates"
+	user_service "github.com/assaidy/vodzilla/internals/services/user"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-// TODO: implement notifications for new comments/follows.
-// also, update video comment/follow counts for all user's online clients.
-
 func (me *Handler) HandleFollow(c fiber.Ctx) error {
-	userId, err := uuid.Parse(c.Params("id"))
+	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return errInvalidRequest.details(err)
 	}
 
 	me.userMutex.RLock(userId.String())
@@ -24,45 +23,198 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return errUserNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.socialService.Follow(c.RequestCtx(), currentUserId, userId); err != nil {
-		switch {
-		case errors.Is(err, social_service.ErrSelfFollowNotAllowed):
-			return fiber.NewError(fiber.StatusForbidden, "self follow is not allowed")
-		case errors.Is(err, social_service.ErrAlreadyFollowing):
-			return fiber.NewError(fiber.StatusConflict, "already following")
-		default:
-			return err
+		if errors.Is(err, social_service.ErrSelfFollowNotAllowed) {
+			return errSelfFollowNotAllowed
 		}
+		if errors.Is(err, social_service.ErrAlreadyFollowing) {
+			return errAlreadyFollowing
+		}
+		return err
 	}
 
-	return render(c, templates.FollowButton(templates.FollowButtonParams{
-		ProfileOwnerId: userId,
-		IsFollowed:     true,
-	}))
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
-	userId, err := uuid.Parse(c.Params("id"))
+	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return fiber.NewError(fiber.StatusNotFound, "user not found")
+		return errInvalidRequest.details(err)
+	}
+
+	me.userMutex.RLock(userId.String())
+	defer me.userMutex.RUnlock(userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.socialService.Unfollow(c.RequestCtx(), currentUserId, userId); err != nil {
 		if errors.Is(err, social_service.ErrNotFollowing) {
-			return fiber.NewError(fiber.StatusNotFound, "not following")
+			return errNotFollowing
 		}
 		return err
 	}
 
-	return render(c, templates.FollowButton(templates.FollowButtonParams{
-		ProfileOwnerId: userId,
-		IsFollowed:     false,
-	}))
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	me.userMutex.RLock(userId.String())
+	defer me.userMutex.RUnlock(userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
+	}
+
+	counts, err := me.socialService.GetFollowCounts(c.RequestCtx(), userId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"followers": counts.Followers,
+		"followeds": counts.Followeds,
+	})
+}
+
+func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
+	var request struct {
+		UserId     uuid.UUID `uri:"user_id"`
+		LastUserId uuid.UUID `query:"last_user_id"`
+		Limit      int       `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	me.userMutex.RLock(request.UserId.String())
+	defer me.userMutex.RUnlock(request.UserId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
+	}
+
+	ids, err := me.socialService.GetFollowerIds(
+		c.RequestCtx(),
+		request.UserId,
+		request.LastUserId,
+		request.Limit,
+	)
+	if err != nil {
+		return err
+	}
+
+	response, err := me.getProfilesByIds(c, ids)
+	if err != nil {
+		return err
+	}
+
+	// NOTE: client can send know if no more pages when the last request is empty.
+	return c.JSON(response)
+}
+
+func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
+	var request struct {
+		UserId     uuid.UUID `uri:"user_id"`
+		LastUserId uuid.UUID `query:"last_user_id"`
+		Limit      int       `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	me.userMutex.RLock(request.UserId.String())
+	defer me.userMutex.RUnlock(request.UserId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
+	}
+
+	ids, err := me.socialService.GetFollowedIds(
+		c.RequestCtx(),
+		request.UserId,
+		request.LastUserId,
+		request.Limit,
+	)
+	if err != nil {
+		return err
+	}
+
+	response, err := me.getProfilesByIds(c, ids)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(response)
+}
+
+func (me *Handler) getProfilesByIds(c fiber.Ctx, ids []uuid.UUID) ([]profileResponse, error) {
+	profiles := make([]profileResponse, 0, len(ids))
+
+	for _, id := range ids {
+		user, err := me.userService.GetUserById(c.RequestCtx(), id)
+		if err != nil {
+			if errors.Is(err, user_service.ErrUserNotFound) {
+				continue
+			}
+			return nil, err
+		}
+
+		avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
+		if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
+			return nil, err
+		}
+
+		profiles = append(profiles, profileResponse{
+			Id:        user.Id,
+			Name:      user.Name,
+			Username:  user.Username,
+			Email:     user.Email,
+			Bio:       user.Bio,
+			AvatarUrl: avatarUrl,
+		})
+	}
+
+	return profiles, nil
 }
