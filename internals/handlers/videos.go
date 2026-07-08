@@ -75,8 +75,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"videoId":  videoId,
 		"uploadId": presignedUpload.UploadId,
-		"partSize": presignedUpload.PartSize,
-		"urls":     presignedUpload.Urls,
+		"chunks":   presignedUpload.Chunks,
 	})
 }
 

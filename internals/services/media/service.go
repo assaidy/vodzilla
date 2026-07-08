@@ -93,10 +93,15 @@ const (
 
 const videoUploadRedisPrefix = "media_service:video_upload:"
 
+type VideoUploadChunk struct {
+	Url    string
+	Offset int64
+	Size   int64
+}
+
 type VideoPresignedUpload struct {
 	UploadId string
-	PartSize int64
-	Urls     []string
+	Chunks   []VideoUploadChunk
 }
 
 func (me *Service) GenerateVideoPresignedPutUrls(
@@ -118,7 +123,7 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 	requiredPartSize := (fileSize + maxVideoPartCount - 1) / maxVideoPartCount
 	partSize := max(minVideoPartSize, requiredPartSize)
 	partCount := (fileSize + partSize - 1) / partSize
-	urls := make([]string, 0, partCount)
+	chunks := make([]VideoUploadChunk, 0, partCount)
 
 	presigner := s3.NewPresignClient(me.s3)
 	for partNumber := 1; partNumber <= int(partCount); partNumber++ {
@@ -139,7 +144,17 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 			return nil, fmt.Errorf("failed to presign url: %w", err)
 		}
 
-		urls = append(urls, request.URL)
+		offset := int64(partNumber-1) * partSize
+		size := partSize
+		if offset+size > fileSize {
+			size = fileSize - offset
+		}
+
+		chunks = append(chunks, VideoUploadChunk{
+			Url:    request.URL,
+			Offset: offset,
+			Size:   size,
+		})
 	}
 
 	payload, err := json.Marshal(map[string]any{
@@ -161,11 +176,9 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 		return nil, fmt.Errorf("failed to store pending video upload: %w", err)
 	}
 
-	// FIX: instead of returning urls slice, i wanna return a slice of chunks, each with offset and size.
 	return &VideoPresignedUpload{
 		UploadId: uploadId,
-		Urls:     urls,
-		PartSize: partSize,
+		Chunks:   chunks,
 	}, nil
 }
 
