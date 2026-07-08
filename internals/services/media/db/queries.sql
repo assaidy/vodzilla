@@ -18,3 +18,12 @@ select object_key from media_service.avatars where user_id = $1;
 
 -- name: DeleteAvatarByUserId :exec
 delete from media_service.avatars where user_id = $1;
+
+-- name: InsertThumbnail :exec
+insert into media_service.thumbnails (video_id, object_key) values ($1, $2);
+
+-- name: GetThumbnailByVideoId :one
+select object_key from media_service.thumbnails where video_id = $1;
+
+-- name: DeleteThumbnailByVideoId :exec
+delete from media_service.thumbnails where video_id = $1;

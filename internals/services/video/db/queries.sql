@@ -1,3 +1,6 @@
+-- name: GetVideoOwner :one
+select owner_id from video_service.videos where id = $1;
+
 -- name: InsertVideo :exec
 insert into video_service.videos (id, owner_id, title, description) values ($1, $2, $3, $4);
 
@@ -18,10 +21,14 @@ where owner_id = @user_id and is_published = true and (
 order by id desc
 limit $1;
 
--- name: GetAllPublishedVideosForMultipleUsers :many
+-- name: GetPublishedVideosForMultipleUsers :many
 select * from video_service.videos
-where owner_id = any (@user_ids::uuid[]) and is_published = true
-order by id desc;
+where owner_id = any (@user_ids::uuid[]) and is_published = true and (
+    sqlc.narg(last_video_id)::uuid is null
+    or id < sqlc.narg(last_video_id)::uuid
+)
+order by id desc
+limit $1;
 
 -- name: GetPublishedVideosCountForUser :one
 select count(*) from video_service.videos where owner_id = $1 and is_published = true;

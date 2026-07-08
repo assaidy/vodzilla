@@ -73,7 +73,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{"commentId": *commentId})
+	return c.JSON(fiber.Map{"commentId": commentId})
 }
 
 type commentResponse struct {
@@ -166,7 +166,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{"replyId": *replyId})
+	return c.JSON(fiber.Map{"replyId": replyId})
 }
 
 func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {

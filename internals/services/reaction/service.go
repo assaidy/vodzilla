@@ -234,7 +234,7 @@ func (me *Service) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) 
 	return FeelingKind(kind), nil
 }
 
-func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (*uuid.UUID, error) {
+func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
 	commentId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertComment(ctx, queries.InsertCommentParams{
 		Id:      commentId,
@@ -242,10 +242,10 @@ func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.
 		UserId:  userId,
 		Content: content,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to insert comment: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to insert comment: %w", err)
 	}
 
-	return &commentId, nil
+	return commentId, nil
 }
 
 func (me *Service) EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error {
@@ -354,10 +354,10 @@ func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId 
 	return result, nil
 }
 
-func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (*uuid.UUID, error) {
+func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin tx: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
@@ -366,9 +366,9 @@ func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uui
 		Id:     commentId,
 		UserId: userId,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to check comment: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to check comment: %w", err)
 	} else if !ok {
-		return nil, ErrCommentNotFound
+		return uuid.Nil, ErrCommentNotFound
 	}
 
 	replyId := uuid.Must(uuid.NewV7())
@@ -378,14 +378,14 @@ func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uui
 		UserId:  userId,
 		Content: content,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to insert comment: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to insert comment: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit tx: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	return &replyId, nil
+	return replyId, nil
 }
 
 func (me *Service) GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error) {

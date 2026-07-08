@@ -9,4 +9,7 @@ var (
 
 	ErrAvatarNotFound        = errors.New("avatar not found")
 	ErrNoPendingAvatarUpload = errors.New("no pending avatar upload")
+
+	ErrThumbnailNotFound        = errors.New("thumbnail not found")
+	ErrNoPendingThumbnailUpload = errors.New("no pending thumbnail upload")
 )

@@ -33,7 +33,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{"playlistId": *playlistId})
+	return c.JSON(fiber.Map{"playlistId": playlistId})
 }
 
 type playlistResponse struct {

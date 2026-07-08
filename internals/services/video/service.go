@@ -80,7 +80,7 @@ type CreateVideoParams struct {
 	Description string
 }
 
-func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (*uuid.UUID, error) {
+func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error) {
 	videoId := uuid.Must(uuid.NewV7())
 
 	if err := me.queries.InsertVideo(ctx, queries.InsertVideoParams{
@@ -89,10 +89,10 @@ func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (*
 		Title:       params.Title,
 		Description: sql.NullString{Valid: params.Description != "", String: params.Description},
 	}); err != nil {
-		return nil, fmt.Errorf("failed to insert video: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	return &videoId, nil
+	return videoId, nil
 }
 
 func (me *Service) videoIsReadyEventConsumerJob(ctx context.Context) error {
@@ -167,14 +167,14 @@ func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) 
 	return int(n), nil
 }
 
-func (me *Service) GetAllVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error) {
+func (me *Service) GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error) {
 	videos, err := me.queries.GetPublishedVideosForUser(ctx, queries.GetPublishedVideosForUserParams{
 		UserId:      userId,
 		LastVideoId: uuid.NullUUID{UUID: lastVideoId, Valid: lastVideoId != uuid.Nil},
 		Limit:       int32(limit),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all published videos for user: %w", err)
+		return nil, fmt.Errorf("failed to get published videos for user: %w", err)
 	}
 
 	result := make([]Video, 0, len(videos))
@@ -191,10 +191,18 @@ func (me *Service) GetAllVideosForUser(ctx context.Context, userId, lastVideoId 
 	return result, nil
 }
 
-func (me *Service) GetAllVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID) ([]Video, error) {
-	videos, err := me.queries.GetAllPublishedVideosForMultipleUsers(ctx, userIds)
+func (me *Service) GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error) {
+	if len(userIds) == 0 {
+		return nil, nil
+	}
+
+	videos, err := me.queries.GetPublishedVideosForMultipleUsers(ctx, queries.GetPublishedVideosForMultipleUsersParams{
+		UserIds:     userIds,
+		LastVideoId: uuid.NullUUID{UUID: lastVideoId, Valid: lastVideoId != uuid.Nil},
+		Limit:       int32(limit),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all published videos for user: %w", err)
+		return nil, fmt.Errorf("failed to get published videos for multiple users: %w", err)
 	}
 
 	result := make([]Video, 0, len(videos))
@@ -330,10 +338,22 @@ func (me *Service) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, 
 	return result, nil
 }
 
-func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (*uuid.UUID, error) {
+func (me *Service) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error) {
+	ownerId, err := me.queries.GetVideoOwner(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.Nil, ErrVideoNotFound
+		}
+		return uuid.Nil, fmt.Errorf("failed to get video owner: %w", err)
+	}
+
+	return ownerId, nil
+}
+
+func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin tx: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to begin tx: %w", err)
 	}
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
@@ -342,9 +362,9 @@ func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlis
 		Name:    playlistName,
 		OwnerId: userId,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to check playlist by name for user: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to check playlist by name for user: %w", err)
 	} else if ok {
-		return nil, ErrPlaylistNameConflict
+		return uuid.Nil, ErrPlaylistNameConflict
 	}
 
 	playlistId := uuid.Must(uuid.NewV7())
@@ -353,14 +373,14 @@ func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlis
 		Name:    playlistName,
 		OwnerId: userId,
 	}); err != nil {
-		return nil, fmt.Errorf("failed to insert playlist: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to insert playlist: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit tx: %w", err)
+		return uuid.Nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	return &playlistId, nil
+	return playlistId, nil
 }
 
 func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error {

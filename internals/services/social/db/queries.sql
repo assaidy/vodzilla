@@ -34,5 +34,10 @@ where follower_id = @user_id and (
 order by followed_id desc
 limit $1;
 
+-- name: GetAllFollowedIds :many
+select followed_id
+from social_service.follows
+where follower_id = @user_id;
+
 -- name: DeleteFollowsForUser :exec
 delete from social_service.follows where follower_id = $1 or followed_id = $1;

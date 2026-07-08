@@ -136,10 +136,10 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 
 	// Videos
 	router.Post("/videos", h.WithSession, h.WithCsrfToken, h.HandlePostVideo)
-	router.Put("/videos/:video_id/confirm_upload", h.WithSession, h.HandleConfirmVideoUpload)
-	router.Put("/videos/:video_id/thumbnail", h.WithSession, h.HandleEditVideoThumbnail)
-	router.Put("/videos/:video_id/thumbnail/confirm_upload", h.WithSession, h.HandleConfirmVideoThumbnailUpload)
-	router.Delete("/videos/:video_id/thumbnail", h.WithSession, h.HandleDeleteVideoThumbnail)
+	router.Put("/videos/:video_id/confirm_upload", h.WithSession, h.WithCsrfToken, h.HandleConfirmVideoUpload)
+	router.Put("/videos/:video_id/thumbnail", h.WithSession, h.WithCsrfToken, h.HandleEditVideoThumbnail)
+	router.Put("/videos/:video_id/thumbnail/confirm_upload", h.WithSession, h.WithCsrfToken, h.HandleConfirmVideoThumbnailUpload)
+	router.Delete("/videos/:video_id/thumbnail", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoThumbnail)
 	router.Get("/videos/:video_id", h.WithSession, h.HandleGetVideo)
 	router.Get("/videos/:video_id/stream_url", h.WithSession, h.HandleGetVideoStreamUrl)
 	router.Delete("/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideo)

@@ -85,6 +85,10 @@ const (
 	avatarsBucket            = "avatars"
 	presignedAvatarPutExpiry = 5 * time.Minute
 	presignedAvatarGetExpiry = 1 * time.Hour
+
+	thumbnailsBucket            = "thumbnails"
+	presignedThumbnailPutExpiry = 5 * time.Minute
+	presignedThumbnailGetExpiry = 1 * time.Hour
 )
 
 const videoUploadRedisPrefix = "media_service:video_upload:"
@@ -289,6 +293,7 @@ type AvatarPresignedUpload struct {
 }
 
 const avatarUploadRedisPrefix = "media_service:avatar_upload:"
+const thumbnailUploadRedisPrefix = "media_service:thumbnail_upload:"
 
 func avatarObjectKey(userId uuid.UUID) string {
 	return fmt.Sprintf("avatars/%s", userId)
@@ -456,6 +461,177 @@ func (me *Service) GetAvatarUrl(ctx context.Context, userId uuid.UUID) (string, 
 	return request.URL, nil
 }
 
+type ThumbnailPresignedUpload struct {
+	UploadUrl string
+	ObjectKey string
+}
+
+func thumbnailObjectKey(videoId uuid.UUID) string {
+	return fmt.Sprintf("thumbnails/%s", videoId)
+}
+
+func (me *Service) GeneratePresignedThumbnailUpload(
+	ctx context.Context,
+	videoId uuid.UUID,
+	contentType string,
+	fileSize int64,
+) (*ThumbnailPresignedUpload, error) {
+	objectKey := thumbnailObjectKey(videoId)
+
+	presigner := s3.NewPresignClient(me.s3)
+	request, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:        aws.String(thumbnailsBucket),
+		Key:           aws.String(objectKey),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(fileSize),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = presignedThumbnailPutExpiry
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to presign put url: %w", err)
+	}
+
+	if err := me.redis.Set(
+		ctx,
+		thumbnailUploadRedisPrefix+videoId.String(),
+		objectKey,
+		presignedThumbnailPutExpiry,
+	).Err(); err != nil {
+		return nil, fmt.Errorf("failed to store pending thumbnail upload: %w", err)
+	}
+
+	return &ThumbnailPresignedUpload{
+		UploadUrl: request.URL,
+		ObjectKey: objectKey,
+	}, nil
+}
+
+func (me *Service) ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID) (string, error) {
+	objectKey, err := me.redis.Get(ctx, thumbnailUploadRedisPrefix+videoId.String()).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", ErrNoPendingThumbnailUpload
+		}
+		return "", fmt.Errorf("failed to get pending thumbnail upload: %w", err)
+	}
+
+	if _, err := me.s3.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(thumbnailsBucket),
+		Key:    aws.String(objectKey),
+	}); err != nil {
+		return "", fmt.Errorf("failed to head thumbnail object: %w", err)
+	}
+
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if existingKey, err := qtx.GetThumbnailByVideoId(ctx, videoId); err == nil {
+		if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(thumbnailsBucket),
+			Key:    aws.String(existingKey),
+		}); err != nil {
+			return "", fmt.Errorf("failed to delete old thumbnail from s3: %w", err)
+		}
+
+		if err := qtx.DeleteThumbnailByVideoId(ctx, videoId); err != nil {
+			return "", fmt.Errorf("failed to delete old thumbnail from db: %w", err)
+		}
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("failed to get existing thumbnail: %w", err)
+	}
+
+	if err := qtx.InsertThumbnail(ctx, queries.InsertThumbnailParams{
+		VideoId:   videoId,
+		ObjectKey: objectKey,
+	}); err != nil {
+		return "", fmt.Errorf("failed to insert thumbnail: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	if err := me.redis.Del(ctx, thumbnailUploadRedisPrefix+videoId.String()).Err(); err != nil {
+		me.logger.Error("failed to delete pending thumbnail upload from redis", "error", err)
+	}
+
+	presigner := s3.NewPresignClient(me.s3)
+	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(thumbnailsBucket),
+		Key:                        aws.String(objectKey),
+		ResponseContentDisposition: aws.String("inline"),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = presignedThumbnailGetExpiry
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to presign get url: %w", err)
+	}
+
+	return request.URL, nil
+}
+
+func (me *Service) DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	objectKey, err := qtx.GetThumbnailByVideoId(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrThumbnailNotFound
+		}
+		return fmt.Errorf("failed to get thumbnail: %w", err)
+	}
+
+	if err := qtx.DeleteThumbnailByVideoId(ctx, videoId); err != nil {
+		return fmt.Errorf("failed to delete thumbnail from db: %w", err)
+	}
+
+	if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(thumbnailsBucket),
+		Key:    aws.String(objectKey),
+	}); err != nil {
+		return fmt.Errorf("failed to delete thumbnail from s3: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func (me *Service) GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
+	objectKey, err := me.queries.GetThumbnailByVideoId(ctx, videoId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrThumbnailNotFound
+		}
+		return "", fmt.Errorf("failed to get thumbnail: %w", err)
+	}
+
+	presigner := s3.NewPresignClient(me.s3)
+	request, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket:                     aws.String(thumbnailsBucket),
+		Key:                        aws.String(objectKey),
+		ResponseContentDisposition: aws.String("inline"),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = presignedThumbnailGetExpiry
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to presign get url: %w", err)
+	}
+
+	return request.URL, nil
+}
+
 func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.VideoDeletedEvent)
 	defer sub.Close()
@@ -494,6 +670,21 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 					Key:    aws.String(objectKey),
 				}); err != nil {
 					return fmt.Errorf("failed to delete S3 object: %w", err)
+				}
+
+				if thumbnailKey, err := qtx.GetThumbnailByVideoId(ctx, payload.VideoId); err == nil {
+					if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+						Bucket: aws.String(thumbnailsBucket),
+						Key:    aws.String(thumbnailKey),
+					}); err != nil {
+						me.logger.Error("failed to delete thumbnail from s3", "error", err)
+					}
+
+					if err := qtx.DeleteThumbnailByVideoId(ctx, payload.VideoId); err != nil {
+						me.logger.Error("failed to delete thumbnail from db", "error", err)
+					}
+				} else if !errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("failed to get thumbnail for video: %w", err)
 				}
 
 				if err := tx.Commit(); err != nil {

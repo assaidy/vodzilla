@@ -59,6 +59,7 @@ var (
 	errPlaylistVideoNotFound   = newApiError("PlaylistVideoNotFound", "Video not found in playlist.", fiber.StatusNotFound)
 	errCommentNotFound         = newApiError("CommentNotFound", "Comment not found.", fiber.StatusNotFound)
 	errFeelingNotFound         = newApiError("FeelingNotFound", "Feeling not found.", fiber.StatusNotFound)
+	errThumbnailNotFound       = newApiError("ThumbnailNotFound", "Thumbnail not found.", fiber.StatusNotFound)
 )
 
 // TEST:

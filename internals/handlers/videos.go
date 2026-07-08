@@ -63,7 +63,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	objectKey := fmt.Sprintf("%s/%s", currentUserId, videoId)
 	presignedUpload, err := me.mediaService.GenerateVideoPresignedPutUrls(
 		c.RequestCtx(),
-		*videoId,
+		videoId,
 		objectKey,
 		request.ContentType,
 		request.FileSize,
@@ -121,19 +121,119 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-// TODO: implement edit video thumbnail
 func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
-	return c.SendStatus(fiber.StatusNotImplemented)
+	var request struct {
+		VideoId     uuid.UUID `uri:"video_id"`
+		ContentType string    `json:"contentType"`
+		FileSize    int64     `json:"fileSize"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.ContentType = strings.TrimSpace(request.ContentType)
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.ContentType, validation.Required, validation.By(func(v any) error {
+			if !strings.HasPrefix(v.(string), "image/") {
+				return fmt.Errorf("must be an image type")
+			}
+			return nil
+		})),
+		validation.Field(&request.FileSize, validation.Required, validation.Max(5*utils.MegaByte)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	me.videoMutex.RLock(request.VideoId.String())
+	defer me.videoMutex.RUnlock(request.VideoId.String())
+
+	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
+		return err
+	} else if ownerId != currentUserId {
+		return errVideoNotFound
+	}
+
+	upload, err := me.mediaService.GeneratePresignedThumbnailUpload(
+		c.RequestCtx(),
+		request.VideoId,
+		request.ContentType,
+		request.FileSize,
+	)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"uploadUrl": upload.UploadUrl,
+		"objectKey": upload.ObjectKey,
+	})
 }
 
-// TODO: implement complete video thumbnail upload
 func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
-	return c.SendStatus(fiber.StatusNotImplemented)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	me.videoMutex.RLock(videoId.String())
+	defer me.videoMutex.RUnlock(videoId.String())
+
+	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
+		return err
+	} else if ownerId != currentUserId {
+		return errVideoNotFound
+	}
+
+	thumbnailUrl, err := me.mediaService.ConfirmThumbnailUpload(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, media_service.ErrNoPendingThumbnailUpload) {
+			return errThumbnailNotFound
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"thumbnailUrl": thumbnailUrl})
 }
 
-// TODO: implement delete video thumbnail
 func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
-	return c.SendStatus(fiber.StatusNotImplemented)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	me.videoMutex.RLock(videoId.String())
+	defer me.videoMutex.RUnlock(videoId.String())
+
+	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
+		return err
+	} else if ownerId != currentUserId {
+		return errVideoNotFound
+	}
+
+	if err := me.mediaService.DeleteThumbnail(c.RequestCtx(), videoId); err != nil {
+		if errors.Is(err, media_service.ErrThumbnailNotFound) {
+			return errThumbnailNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 type videoResponse struct {
@@ -142,6 +242,7 @@ type videoResponse struct {
 	Timestamp         time.Time `json:"timestamp"`
 	Title             string    `json:"title"`
 	Description       string    `json:"description"`
+	ThumbnailUrl      string    `json:"thumbnailUrl,omitempty"`
 	WatchlaterVideoId int64     `json:"watchlaterVideoId,omitempty"`
 	PlaylistVideoId   int64     `json:"playlistVideoId,omitempty"`
 }
@@ -160,12 +261,18 @@ func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 		return err
 	}
 
+	thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), videoId)
+	if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
+		return err
+	}
+
 	return c.JSON(videoResponse{
-		Id:          video.Id,
-		OwnerId:     video.OwnerId,
-		Timestamp:   video.Timestamp,
-		Title:       video.Title,
-		Description: video.Description,
+		Id:           video.Id,
+		OwnerId:      video.OwnerId,
+		Timestamp:    video.Timestamp,
+		Title:        video.Title,
+		Description:  video.Description,
+		ThumbnailUrl: thumbnailUrl,
 	})
 }
 
@@ -236,7 +343,7 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	videos, err := me.videoService.GetAllVideosForUser(
+	videos, err := me.videoService.GetVideosForUser(
 		c.RequestCtx(),
 		request.UserId,
 		request.LastVideoId,
@@ -248,12 +355,18 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 
 	response := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
+		thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), v.Id)
+		if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
+			return err
+		}
+
 		response = append(response, videoResponse{
-			Id:          v.Id,
-			OwnerId:     v.OwnerId,
-			Timestamp:   v.Timestamp,
-			Title:       v.Title,
-			Description: v.Description,
+			Id:           v.Id,
+			OwnerId:      v.OwnerId,
+			Timestamp:    v.Timestamp,
+			Title:        v.Title,
+			Description:  v.Description,
+			ThumbnailUrl: thumbnailUrl,
 		})
 	}
 
