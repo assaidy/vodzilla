@@ -16,7 +16,6 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/user/queries"
 	"github.com/assaidy/vodzilla/internals/utils"
-	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
@@ -31,12 +30,12 @@ type Service struct {
 	queries       *queries.Queries
 	redis         *redis.Client
 	s3            *s3.Client
-	mailer        *mailer.Mailer
+	mailer        *utils.Mailer
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *mailer.Mailer, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *utils.Mailer, logger *slog.Logger) *Service {
 	service := &Service{
 		db:            db,
 		queries:       queries.New(db),
@@ -107,7 +106,7 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 				return fmt.Errorf("failed to decode email verification queue payload: %w", err)
 			}
 
-			if err := me.mailer.SendEmail(ctx, mailer.Message{
+			if err := me.mailer.SendEmail(ctx, utils.MailerMessage{
 				From:        utils.MustGetEnv("EMAIL_FROM"),
 				To:          []string{payload.Email},
 				Subject:     "Verification email for Video Streaming App",

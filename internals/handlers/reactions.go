@@ -19,8 +19,10 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.videoMutex.RLock(videoId.String())
-	defer me.videoMutex.RUnlock(videoId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
@@ -52,8 +54,10 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return extractValidationError(err)
 	}
 
-	me.videoMutex.RLock(request.VideoId.String())
-	defer me.videoMutex.RUnlock(request.VideoId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
 		return err
@@ -104,8 +108,10 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 		return extractValidationError(err)
 	}
 
-	me.videoMutex.RLock(request.VideoId.String())
-	defer me.videoMutex.RUnlock(request.VideoId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
 		return err
@@ -288,8 +294,10 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.videoMutex.RLock(request.VideoId.String())
-	defer me.videoMutex.RUnlock(request.VideoId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
 		return err
@@ -317,8 +325,10 @@ func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.videoMutex.RLock(videoId.String())
-	defer me.videoMutex.RUnlock(videoId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err

@@ -17,8 +17,10 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		return errInvalidRequest.details(err)
 	}
 
-	me.userMutex.RLock(userId.String())
-	defer me.userMutex.RUnlock(userId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -47,8 +49,10 @@ func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 		return errInvalidRequest.details(err)
 	}
 
-	me.userMutex.RLock(userId.String())
-	defer me.userMutex.RUnlock(userId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -74,8 +78,10 @@ func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 		return errInvalidRequest.details(err)
 	}
 
-	me.userMutex.RLock(userId.String())
-	defer me.userMutex.RUnlock(userId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -114,8 +120,10 @@ func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
 		return extractValidationError(err)
 	}
 
-	me.userMutex.RLock(request.UserId.String())
-	defer me.userMutex.RUnlock(request.UserId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
 		return err
@@ -162,8 +170,10 @@ func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
 		return extractValidationError(err)
 	}
 
-	me.userMutex.RLock(request.UserId.String())
-	defer me.userMutex.RUnlock(request.UserId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
 		return err

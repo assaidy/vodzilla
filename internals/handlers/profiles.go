@@ -114,8 +114,10 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	me.userMutex.Lock(currentUserId.String())
-	defer me.userMutex.Unlock(currentUserId.String())
+	if err := me.lock.Lock(c.RequestCtx(), "user:"+currentUserId.String()); err != nil {
+		return err
+	}
+	defer me.lock.Unlock(c.RequestCtx(), "user:"+currentUserId.String())
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		return err

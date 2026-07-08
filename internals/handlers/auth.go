@@ -185,13 +185,15 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	c.Locals("user_id", session.OwnerId)
 
 	if c.Route().Name != "logout" {
-		// block session deletetion (logout) requests until other requests complete.
-		me.sessionMutex.RLock(session.Id.String())
-		defer me.sessionMutex.RUnlock(session.Id.String())
+		if err := me.lock.RLock(c.RequestCtx(), "session:"+session.Id.String()); err != nil {
+			return err
+		}
+		defer me.lock.RUnlock(c.RequestCtx(), "session:"+session.Id.String())
 	} else if c.Route().Name != "delete_profile" {
-		// block profile deletetion requests until other requests complete.
-		me.userMutex.RLock(session.OwnerId.String())
-		defer me.userMutex.RUnlock(session.OwnerId.String())
+		if err := me.lock.RLock(c.RequestCtx(), "user:"+session.OwnerId.String()); err != nil {
+			return err
+		}
+		defer me.lock.RUnlock(c.RequestCtx(), "user:"+session.OwnerId.String())
 	}
 
 	return c.Next()
@@ -209,8 +211,10 @@ func (me *Handler) HandleLogout(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 	currentSessionId := c.Locals("session_id").(uuid.UUID)
 
-	me.sessionMutex.Lock(currentSessionId.String())
-	defer me.sessionMutex.Unlock(currentSessionId.String())
+	if err := me.lock.Lock(c.RequestCtx(), "session:"+currentSessionId.String()); err != nil {
+		return err
+	}
+	defer me.lock.Unlock(c.RequestCtx(), "session:"+currentSessionId.String())
 
 	if err := me.userService.Logout(c.RequestCtx(), currentUserId, currentSessionId); err != nil {
 		if errors.Is(err, user_service.ErrSessionNotFound) {

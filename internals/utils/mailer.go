@@ -1,4 +1,4 @@
-package mailer
+package utils
 
 import (
 	"context"
@@ -16,7 +16,7 @@ type Mailer struct {
 	dialer   *gomail.Dialer
 }
 
-func New(host, port, username, password string) *Mailer {
+func NewMailer(host, port, username, password string) *Mailer {
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse port: %v", err))
@@ -25,7 +25,7 @@ func New(host, port, username, password string) *Mailer {
 	return &Mailer{host: host, port: portNumber, username: username, password: password}
 }
 
-func (me *Mailer) SendEmail(ctx context.Context, message Message) error {
+func (me *Mailer) SendEmail(ctx context.Context, message MailerMessage) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", message.From)
 	m.SetHeader("To", message.To...)
@@ -50,7 +50,7 @@ func (me *Mailer) SendEmail(ctx context.Context, message Message) error {
 	}
 }
 
-type Message struct {
+type MailerMessage struct {
 	From        string
 	To          []string
 	Subject     string

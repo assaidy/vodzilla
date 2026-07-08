@@ -19,7 +19,6 @@ import (
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/utils"
-	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/charmbracelet/log"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
@@ -41,7 +40,7 @@ func main() {
 		utils.MustGetEnv("RUSTFS_ACCESS_KEY"),
 		utils.MustGetEnv("RUSTFS_SECRET_KEY"),
 	)
-	mailer := mailer.New(
+	mailer := utils.NewMailer(
 		utils.MustGetEnv("PAPERCUT_HOST"),
 		utils.MustGetEnv("PAPERCUT_PORT"),
 		utils.MustGetEnv("PAPERCUT_USERNAME"),

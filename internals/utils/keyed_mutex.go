@@ -1,21 +1,21 @@
-package keyed_mutex
+package utils
 
 import (
 	"sync"
 	"time"
 )
 
-// TODO: this works only for a single-process setup.
-// impl a cross-process lock using a storage such as redis or postgres temp table.
-func New() *RWMutex {
-	km := &RWMutex{
+// NOTE: this works only for a single-process setup.
+// For distributed environments, use [DistributedLock] instead.
+func NewKeyedMutex() *KeyedRWMutex {
+	km := &KeyedRWMutex{
 		muMap: make(map[string]*mutex),
 	}
 
 	return km
 }
 
-type RWMutex struct {
+type KeyedRWMutex struct {
 	muMap map[string]*mutex
 	mu    sync.Mutex
 }
@@ -26,7 +26,7 @@ type mutex struct {
 	refs    int
 }
 
-func (me *RWMutex) Lock(key string) {
+func (me *KeyedRWMutex) Lock(key string) {
 	me.mu.Lock()
 	keyedMu, ok := me.muMap[key]
 	if !ok {
@@ -39,7 +39,7 @@ func (me *RWMutex) Lock(key string) {
 	keyedMu.mu.Lock()
 }
 
-func (me *RWMutex) Unlock(key string) {
+func (me *KeyedRWMutex) Unlock(key string) {
 	me.mu.Lock()
 	defer me.mu.Unlock()
 
@@ -54,7 +54,7 @@ func (me *RWMutex) Unlock(key string) {
 	}
 }
 
-func (me *RWMutex) RLock(key string) {
+func (me *KeyedRWMutex) RLock(key string) {
 	me.mu.Lock()
 	keyedMu, ok := me.muMap[key]
 	if !ok {
@@ -67,7 +67,7 @@ func (me *RWMutex) RLock(key string) {
 	keyedMu.mu.RLock()
 }
 
-func (me *RWMutex) RUnlock(key string) {
+func (me *KeyedRWMutex) RUnlock(key string) {
 	me.mu.Lock()
 	defer me.mu.Unlock()
 
@@ -82,7 +82,7 @@ func (me *RWMutex) RUnlock(key string) {
 	}
 }
 
-func (me *RWMutex) ClearUnused(threshold time.Duration) {
+func (me *KeyedRWMutex) ClearUnused(threshold time.Duration) {
 	me.mu.Lock()
 	defer me.mu.Unlock()
 

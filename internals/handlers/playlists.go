@@ -56,8 +56,10 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 		request.Limit = 15
 	}
 
-	me.userMutex.RLock(request.UserId.String())
-	defer me.userMutex.RUnlock(request.UserId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
 		return err
@@ -102,8 +104,10 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		request.Limit = 15
 	}
 
-	me.userMutex.RLock(request.UserId.String())
-	defer me.userMutex.RUnlock(request.UserId.String())
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
 		return err
