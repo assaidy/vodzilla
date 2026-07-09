@@ -25,7 +25,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: rethink all cleanup workers and deletion of data. we might need data.
 // TODO: add db indexes
 
 func main() {
@@ -119,7 +118,8 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 
 	// Profiles
 	router.Get("/profiles", h.WithSession, h.HandleGetProfile)
-	router.Get("/profiles/:username", h.WithSession, h.HandleGetProfileByUsername)
+	router.Get("/profiles/usernames/:username", h.WithSession, h.HandleGetProfileByUsername)
+	router.Get("/profiles/id/:user_id", h.WithSession, h.HandleGetProfileById)
 	router.Put("/profiles", h.WithSession, h.WithCsrfToken, h.HandleEditProfile)
 	router.Delete("/profiles", h.WithSession, h.WithCsrfToken, h.HandleDeleteProfile).Name("delete_profile")
 	router.Put("/profiles/avatar", h.WithSession, h.WithCsrfToken, h.HandleEditProfileAvatar)

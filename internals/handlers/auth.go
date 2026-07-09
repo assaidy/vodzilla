@@ -184,12 +184,15 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	c.Locals("csrf_token", session.CsrfToken)
 	c.Locals("user_id", session.OwnerId)
 
+	// Session lock: protects concurrent logout (DELETE session) on the same session row.
 	if c.Route().Name != "logout" {
 		if err := me.lock.RLock(c.RequestCtx(), "session:"+session.Id.String()); err != nil {
 			return err
 		}
 		defer me.lock.RUnlock(c.RequestCtx(), "session:"+session.Id.String())
-	} else if c.Route().Name != "delete_profile" {
+	}
+	// User lock: protects concurrent delete_profile (DELETE user) on the same user row.
+	if c.Route().Name != "delete_profile" {
 		if err := me.lock.RLock(c.RequestCtx(), "user:"+session.OwnerId.String()); err != nil {
 			return err
 		}
@@ -199,7 +202,7 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	return c.Next()
 }
 
-// must go through [WithSession] first
+// Request must go through [WithSession] first.
 func (me *Handler) WithCsrfToken(c fiber.Ctx) error {
 	if c.Locals("csrf_token").(string) != c.Get("X-CSRF-Token") {
 		return errUnauthorized.details("missing or invalid CSRF token")
@@ -217,9 +220,6 @@ func (me *Handler) HandleLogout(c fiber.Ctx) error {
 	defer me.lock.Unlock(c.RequestCtx(), "session:"+currentSessionId.String())
 
 	if err := me.userService.Logout(c.RequestCtx(), currentUserId, currentSessionId); err != nil {
-		if errors.Is(err, user_service.ErrSessionNotFound) {
-			return err
-		}
 		return err
 	}
 

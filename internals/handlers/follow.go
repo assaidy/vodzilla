@@ -146,7 +146,7 @@ func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
 		return err
 	}
 
-	// NOTE: client can send know if no more pages when the last request is empty.
+	// Client knows no pages are left when the last response is empty.
 	return c.JSON(response)
 }
 

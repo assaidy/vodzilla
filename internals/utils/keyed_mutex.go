@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// NOTE: this works only for a single-process setup.
+// This works only for a single-process setup.
 // For distributed environments, use [DistributedLock] instead.
 func NewKeyedMutex() *KeyedRWMutex {
 	km := &KeyedRWMutex{

@@ -139,6 +139,12 @@ func (me *Service) Register(ctx context.Context, email, password, name, username
 		return ErrUsernameConflict
 	}
 
+	if ok, err := qtx.CheckRetiredUsername(ctx, username); err != nil {
+		return fmt.Errorf("failed to check retired username: %w", err)
+	} else if ok {
+		return ErrUsernameConflict
+	}
+
 	userId := uuid.Must(uuid.NewV7())
 	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -320,11 +326,17 @@ func (me *Service) GetSession(ctx context.Context, sessionId uuid.UUID) (*Sessio
 }
 
 func (me *Service) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error {
+	if ok, err := me.queries.CheckUserId(ctx, userId); err != nil {
+		return fmt.Errorf("failed to check user id: %w", err)
+	} else if !ok {
+		return ErrUserNotFound
+	}
+
 	if nDeleted, err := me.queries.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
 		SessionId: sessionId,
 		UserId:    userId,
 	}); err != nil {
-		return fmt.Errorf("failed to soft delete session: %w", err)
+		return fmt.Errorf("failed to delete session: %w", err)
 	} else if nDeleted == 0 {
 		return ErrSessionNotFound
 	}
@@ -409,9 +421,20 @@ func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, user
 		return fmt.Errorf("failed to get user by id: %w", err)
 	}
 
-	if user.Username != username {
+	usernameChanged := user.Username != username
+
+	if usernameChanged {
 		if ok, err := qtx.CheckUsername(ctx, username); err != nil {
 			return fmt.Errorf("failed to check username: %w", err)
+		} else if ok {
+			return ErrUsernameConflict
+		}
+
+		if ok, err := qtx.CheckRetiredUsernameExcludingUser(ctx, queries.CheckRetiredUsernameExcludingUserParams{
+			Username: username,
+			UserId:   userId,
+		}); err != nil {
+			return fmt.Errorf("failed to check retired username: %w", err)
 		} else if ok {
 			return ErrUsernameConflict
 		}
@@ -424,6 +447,15 @@ func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, user
 		Bio:      sql.NullString{Valid: true, String: bio},
 	}); err != nil {
 		return fmt.Errorf("failed to update profile: %w", err)
+	}
+
+	if usernameChanged {
+		if err := qtx.InsertRetiredUsername(ctx, queries.InsertRetiredUsernameParams{
+			Username: user.Username,
+			UserId:   userId,
+		}); err != nil {
+			return fmt.Errorf("failed to retire old username: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -441,18 +473,23 @@ func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if n, err := qtx.SoftDeleteUserById(ctx, userId); err != nil {
-		return fmt.Errorf("failed to soft delete user by id: %w", err)
-	} else if n == 0 {
-		return ErrUserNotFound
+	user, err := qtx.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user by id: %w", err)
 	}
 
-	if err := qtx.DeleteAllSessionsForUser(ctx, userId); err != nil {
-		return fmt.Errorf("failed to soft delete all sessions for user: %w", err)
+	if err := qtx.InsertRetiredUsername(ctx, queries.InsertRetiredUsernameParams{
+		Username: user.Username,
+		UserId:   userId,
+	}); err != nil {
+		return fmt.Errorf("failed to retire username: %w", err)
 	}
 
-	if err := qtx.DeleteAllEmailVerificationTokensForUser(ctx, userId); err != nil {
-		return fmt.Errorf("failed to soft delete all email verification tokens for user: %w", err)
+	if err := qtx.DeleteUser(ctx, userId); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

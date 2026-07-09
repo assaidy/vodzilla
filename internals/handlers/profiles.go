@@ -71,6 +71,35 @@ func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
 	})
 }
 
+func (me *Handler) HandleGetProfileById(c fiber.Ctx) error {
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	user, err := me.userService.GetUserById(c.RequestCtx(), userId)
+	if err != nil {
+		if errors.Is(err, user_service.ErrUserNotFound) {
+			return errUserNotFound
+		}
+		return err
+	}
+
+	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
+	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
+		return err
+	}
+
+	return c.JSON(profileResponse{
+		Id:        user.Id,
+		Name:      user.Name,
+		Username:  user.Username,
+		Email:     user.Email,
+		Bio:       user.Bio,
+		AvatarUrl: avatarUrl,
+	})
+}
+
 func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 	var request struct {
 		Name     string `json:"name"`
