@@ -27,3 +27,15 @@ select object_key from media_service.thumbnails where video_id = $1;
 
 -- name: DeleteThumbnailByVideoId :exec
 delete from media_service.thumbnails where video_id = $1;
+
+-- name: InsertOrphanUpload :exec
+insert into media_service.orphan_uploads (object_key, user_id) values ($1, $2);
+
+-- name: CheckOrphanUpload :one
+select exists (select 1 from media_service.orphan_uploads where object_key = $1 for update);
+
+-- name: DeleteOrphanUpload :exec
+delete from media_service.orphan_uploads where object_key = $1;
+
+-- name: GetExpiredOrphanUploads :many
+select object_key from media_service.orphan_uploads where created_at < now() - '24 hours'::interval for update skip locked;

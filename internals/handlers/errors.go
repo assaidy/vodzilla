@@ -60,9 +60,10 @@ var (
 	errCommentNotFound         = newApiError("CommentNotFound", "Comment not found.", fiber.StatusNotFound)
 	errFeelingNotFound         = newApiError("FeelingNotFound", "Feeling not found.", fiber.StatusNotFound)
 	errThumbnailNotFound       = newApiError("ThumbnailNotFound", "Thumbnail not found.", fiber.StatusNotFound)
+	errObjectNotFound          = newApiError("ObjectNotFound", "Object not found.", fiber.StatusNotFound)
 )
 
-// TEST:
+// TEST: extractValidationError
 func extractValidationError(err error) error {
 	if err == nil {
 		return nil

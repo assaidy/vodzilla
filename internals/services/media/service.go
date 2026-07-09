@@ -61,6 +61,14 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) *S
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 		),
 	)
+	service.workerManager.RegisterWorker(
+		workers.NewWorker(
+			"orphan video uploads cleanup",
+			service.orphanVideoUploadsCleanupJob,
+			workers.WithTick(1*time.Hour),
+			workers.WithTimeout(10*time.Minute),
+		),
+	)
 
 	return service
 }
@@ -100,16 +108,19 @@ type VideoUploadChunk struct {
 }
 
 type VideoPresignedUpload struct {
-	UploadId string
-	Chunks   []VideoUploadChunk
+	UploadId  string
+	ObjectKey string
+	Chunks    []VideoUploadChunk
 }
 
 func (me *Service) GenerateVideoPresignedPutUrls(
 	ctx context.Context,
-	videoId uuid.UUID,
-	objectKey, contentType string,
+	userId uuid.UUID,
+	contentType string,
 	fileSize int64,
 ) (*VideoPresignedUpload, error) {
+	objectKey := uuid.Must(uuid.NewV7()).String()
+
 	createResult, err := me.s3.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 		Bucket:      aws.String(videosBucket),
 		Key:         aws.String(objectKey),
@@ -160,6 +171,7 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 	payload, err := json.Marshal(map[string]any{
 		"uploadId":  uploadId,
 		"objectKey": objectKey,
+		"userId":    userId.String(),
 	})
 	if err != nil {
 		me.abortVideoUploadWithErrorLogging(ctx, objectKey, uploadId)
@@ -168,7 +180,7 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 
 	if err := me.redis.Set(
 		ctx,
-		videoUploadRedisPrefix+videoId.String(),
+		videoUploadRedisPrefix+objectKey,
 		payload,
 		presignedVideoUploadExpiry,
 	).Err(); err != nil {
@@ -177,8 +189,9 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 	}
 
 	return &VideoPresignedUpload{
-		UploadId: uploadId,
-		Chunks:   chunks,
+		UploadId:  uploadId,
+		ObjectKey: objectKey,
+		Chunks:    chunks,
 	}, nil
 }
 
@@ -200,11 +213,10 @@ type CompleteVideoUploadPart struct {
 
 func (me *Service) ConfirmVideoUpload(
 	ctx context.Context,
-	videoId uuid.UUID,
-	uploadId string,
+	objectKey, uploadId string,
 	parts []CompleteVideoUploadPart,
 ) error {
-	result, err := me.redis.Get(ctx, videoUploadRedisPrefix+videoId.String()).Bytes()
+	result, err := me.redis.Get(ctx, videoUploadRedisPrefix+objectKey).Bytes()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return ErrNoPendingVideoUpload
@@ -215,6 +227,7 @@ func (me *Service) ConfirmVideoUpload(
 	var pending struct {
 		UploadId  string `json:"upload_id"`
 		ObjectKey string `json:"object_key"`
+		UserId    string `json:"user_id"`
 	}
 	if err := json.Unmarshal(result, &pending); err != nil {
 		return fmt.Errorf("failed to unmarshal pending video upload: %w", err)
@@ -241,7 +254,7 @@ func (me *Service) ConfirmVideoUpload(
 		ctx,
 		&s3.CompleteMultipartUploadInput{
 			Bucket:   aws.String(videosBucket),
-			Key:      aws.String(pending.ObjectKey),
+			Key:      aws.String(objectKey),
 			UploadId: aws.String(uploadId),
 			MultipartUpload: &types.CompletedMultipartUpload{
 				Parts: completedParts,
@@ -254,23 +267,61 @@ func (me *Service) ConfirmVideoUpload(
 		return fmt.Errorf("failed to complete multipart upload: %w", err)
 	}
 
-	if err := me.queries.InsertVideo(ctx, queries.InsertVideoParams{
+	userId, err := uuid.Parse(pending.UserId)
+	if err != nil {
+		return fmt.Errorf("failed to parse user id: %w", err)
+	}
+
+	if err := me.queries.InsertOrphanUpload(ctx, queries.InsertOrphanUploadParams{
+		ObjectKey: objectKey,
+		UserId:    userId,
+	}); err != nil {
+		return fmt.Errorf("failed to insert orphan upload: %w", err)
+	}
+
+	if err := me.redis.Del(ctx, videoUploadRedisPrefix+objectKey); err != nil {
+		me.logger.Error("failed to delete pending video upload from redis", "error", err)
+	}
+
+	return nil
+}
+
+func (me *Service) DeleteOrphanUpload(ctx context.Context, objectKey string) error {
+	if err := me.queries.DeleteOrphanUpload(ctx, objectKey); err != nil {
+		return fmt.Errorf("failed to delete orphan upload: %w", err)
+	}
+	return nil
+}
+
+func (me *Service) PostVideo(ctx context.Context, videoId uuid.UUID, objectKey string) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	ok, err := qtx.CheckOrphanUpload(ctx, objectKey)
+	if err != nil {
+		return fmt.Errorf("failed to check orphan upload: %w", err)
+	}
+	if !ok {
+		return ErrOrphanUploadNotFound
+	}
+
+	if err := qtx.InsertVideo(ctx, queries.InsertVideoParams{
 		Id:        videoId,
-		ObjectKey: pending.ObjectKey,
+		ObjectKey: objectKey,
 	}); err != nil {
 		return fmt.Errorf("failed to insert video: %w", err)
 	}
 
-	if err := me.redis.Del(ctx, videoUploadRedisPrefix+videoId.String()); err != nil {
-		me.logger.Error("failed to delete pending video upload from redis", "error", err)
+	if err := qtx.DeleteOrphanUpload(ctx, objectKey); err != nil {
+		return fmt.Errorf("failed to delete orphan upload: %w", err)
 	}
 
-	payload, err := json.Marshal(events.VideoIsReadyEventPayload{VideoId: videoId})
-	if err != nil {
-		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoIsReadyEvent, err)
-	}
-	if err := me.redis.Publish(ctx, events.VideoIsReadyEvent, payload).Err(); err != nil {
-		return fmt.Errorf("failed to publish %q event: %w", events.VideoIsReadyEvent, err)
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil
@@ -713,6 +764,28 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		}
 	}
+}
+
+func (me *Service) orphanVideoUploadsCleanupJob(ctx context.Context) error {
+	objectKeys, err := me.queries.GetExpiredOrphanUploads(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list expired orphan uploads: %w", err)
+	}
+
+	for _, key := range objectKeys {
+		if _, err := me.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+			Bucket: aws.String(videosBucket),
+			Key:    aws.String(key),
+		}); err != nil {
+			return fmt.Errorf("failed to delete expired orphan object: %w", err)
+		}
+
+		if err := me.queries.DeleteOrphanUpload(ctx, key); err != nil {
+			return fmt.Errorf("failed to delete expired orphan upload: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {

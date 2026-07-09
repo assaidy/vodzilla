@@ -7,34 +7,29 @@ insert into video_service.videos (id, owner_id, title, description) values ($1, 
 -- name: GetVideoById :one
 select * from video_service.videos where id = $1 for update;
 
--- name: MarkVideoAsPublished :exec
-update video_service.videos
-set is_published = true
-where id = $1;
-
--- name: GetPublishedVideosForUser :many
+-- name: GetVideosForUser :many
 select * from video_service.videos
-where owner_id = @user_id and is_published = true and (
+where owner_id = @user_id and (
     sqlc.narg(last_video_id)::uuid is null
     or id < sqlc.narg(last_video_id)::uuid
 )
 order by id desc
 limit $1;
 
--- name: GetPublishedVideosForMultipleUsers :many
+-- name: GetVideosForMultipleUsers :many
 select * from video_service.videos
-where owner_id = any (@user_ids::uuid[]) and is_published = true and (
+where owner_id = any (@user_ids::uuid[]) and (
     sqlc.narg(last_video_id)::uuid is null
     or id < sqlc.narg(last_video_id)::uuid
 )
 order by id desc
 limit $1;
 
--- name: GetPublishedVideosCountForUser :one
-select count(*) from video_service.videos where owner_id = $1 and is_published = true;
+-- name: GetVideosCountForUser :one
+select count(*) from video_service.videos where owner_id = $1;
 
 -- name: CheckVideo :one
-select exists (select 1 from video_service.videos where id = $1 and is_published = $2 for update);
+select exists (select 1 from video_service.videos where id = $1 for update);
 
 -- name: CheckVideoInWatchlaters :one
 select exists (select 1 from video_service.watchlaters where video_id = $1 and user_id = $2 for update);
@@ -126,7 +121,7 @@ delete from video_service.watchlaters where user_id= $1;
 delete from video_service.playlists where owner_id = $1;
 
 -- name: DeleteVideoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2 and is_published = $3;
+delete from video_service.videos where id = $1 and owner_id = $2;
 
 -- name: GetPlaylistsWithVideoStatusForUser :many
 select 
@@ -149,3 +144,18 @@ limit $1;
 
 -- name: DeleteVideoById :exec
 delete from video_service.videos where id = $1;
+
+-- name: InsertPendingVideo :exec
+insert into video_service.pending_videos (id, owner_id, title, description) values ($1, $2, $3, $4);
+
+-- name: GetPendingVideoById :one
+select * from video_service.pending_videos where id = $1 for update;
+
+-- name: DeletePendingVideoById :execrows
+delete from video_service.pending_videos where id = $1;
+
+-- name: DeleteExpiredPendingVideos :exec
+delete from video_service.pending_videos where created_at < now() - '24 hours'::interval;
+
+-- name: DeleteAllPendingVideosForUser :execrows
+delete from video_service.pending_videos where owner_id = $1;

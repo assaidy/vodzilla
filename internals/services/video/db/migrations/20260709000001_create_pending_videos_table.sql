@@ -1,5 +1,5 @@
 -- +goose Up
-create table video_service.videos (
+create table video_service.pending_videos (
   id           uuid         primary key,
   owner_id     uuid         not null,
   title        varchar(256) not null,
@@ -8,4 +8,4 @@ create table video_service.videos (
 );
 
 -- +goose Down
-drop table video_service.videos;
+drop table video_service.pending_videos;

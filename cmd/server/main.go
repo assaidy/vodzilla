@@ -134,8 +134,9 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Get("/follows/:user_id/followeds", h.WithSession, h.HandleGetFolloweds)
 
 	// Videos
+	router.Post("/videos/upload", h.WithSession, h.WithCsrfToken, h.HandleGenerateVideoUpload)
+	router.Put("/videos/upload/confirm", h.WithSession, h.WithCsrfToken, h.HandleConfirmVideoUpload)
 	router.Post("/videos", h.WithSession, h.WithCsrfToken, h.HandlePostVideo)
-	router.Put("/videos/:video_id/confirm_upload", h.WithSession, h.WithCsrfToken, h.HandleConfirmVideoUpload)
 	router.Put("/videos/:video_id/thumbnail", h.WithSession, h.WithCsrfToken, h.HandleEditVideoThumbnail)
 	router.Put("/videos/:video_id/thumbnail/confirm_upload", h.WithSession, h.WithCsrfToken, h.HandleConfirmVideoThumbnailUpload)
 	router.Delete("/videos/:video_id/thumbnail", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoThumbnail)
