@@ -63,7 +63,6 @@ var (
 	errObjectNotFound          = newApiError("ObjectNotFound", "Object not found.", fiber.StatusNotFound)
 )
 
-// TEST: extractValidationError
 func extractValidationError(err error) error {
 	if err == nil {
 		return nil
