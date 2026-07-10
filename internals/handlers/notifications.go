@@ -18,14 +18,27 @@ import (
 // publishing to the user's redis channel (so it works in a distributed
 // environment where clients may be connected to other instances).
 func (me *Handler) notify(ctx context.Context, userId uuid.UUID, payload notification_service.Payload) error {
+	if err := me.lock.RLock(ctx, "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(ctx, "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(ctx, userId); err != nil {
+		return err
+	} else if !ok {
+		return nil
+	}
+
 	if err := me.notificationService.AddNotification(ctx, userId, payload); err != nil {
 		return err
 	}
 
-	// TODO: create a websocket message type
-	message, err := json.Marshal(fiber.Map{
-		"kind":    payload.Kind(),
-		"payload": payload,
+	message, err := json.Marshal(websocketMessage{
+		Type: websocketMessageNotification,
+		Data: fiber.Map{
+			"kind":    payload.Kind(),
+			"payload": payload,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification message: %w", err)

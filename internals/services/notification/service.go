@@ -61,6 +61,7 @@ type notificationKind string
 
 const (
 	NotificationFollow         notificationKind = "follow"
+	NotificationNewVideo       notificationKind = "new_video"
 	NotificationVideoFeeling   notificationKind = "video_feeling"
 	NotificationCommentFeeling notificationKind = "comment_feeling"
 	NotificationVideoComment   notificationKind = "video_comment"
@@ -76,6 +77,13 @@ type FollowPayload struct {
 }
 
 func (FollowPayload) Kind() notificationKind { return NotificationFollow }
+
+type NewVideoPayload struct {
+	UserId  uuid.UUID `json:"user_id"`
+	VideoId uuid.UUID `json:"video_id"`
+}
+
+func (NewVideoPayload) Kind() notificationKind { return NotificationNewVideo }
 
 type VideoFeelingPayload struct {
 	UserId  uuid.UUID `json:"user_id"`

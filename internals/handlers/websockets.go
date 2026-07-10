@@ -9,6 +9,17 @@ import (
 	"github.com/google/uuid"
 )
 
+type websocketMessageType string
+
+const (
+	websocketMessageNotification websocketMessageType = "notification"
+)
+
+type websocketMessage struct {
+	Type websocketMessageType `json:"type"`
+	Data any                  `json:"data"`
+}
+
 func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
 	if !c.IsWebSocket() {
 		return errUpgradeRequired

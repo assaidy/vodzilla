@@ -26,6 +26,8 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
+// TODO: add monitoring
+// TODO: use a proper message queue for events (kafka/rmq)
 // TODO: add db indexes
 
 func main() {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/assaidy/vodzilla/internals/utils"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -145,6 +146,23 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 
 	if err := me.videoService.ActivateVideo(c.RequestCtx(), videoId); err != nil {
 		return err
+	}
+
+	followerIds, err := me.socialService.GetAllFollowerIds(c.RequestCtx(), currentUserId)
+	if err != nil {
+		return err
+	}
+	for _, followerId := range followerIds {
+		if err := me.notify(
+			c.RequestCtx(),
+			followerId,
+			notification_service.NewVideoPayload{
+				UserId:  currentUserId,
+				VideoId: videoId,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	return c.JSON(fiber.Map{"videoId": videoId})

@@ -39,5 +39,10 @@ select followed_id
 from social_service.follows
 where follower_id = @user_id;
 
+-- name: GetAllFollowerIds :many
+select follower_id
+from social_service.follows
+where followed_id = @user_id;
+
 -- name: DeleteFollowsForUser :exec
 delete from social_service.follows where follower_id = $1 or followed_id = $1;
