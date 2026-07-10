@@ -106,11 +106,10 @@ func main() {
 func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Use(h.WithLogging)
 	router.Use(h.WithErrorResolver)
-	router.Use(h.WithPassClientIdToLocals)
 
 	// Misc.
 	router.Get("/health", h.HandleCheckHealth)
-	router.Get("/ws/:client_id", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
+	router.Get("/ws", h.WithSession, h.WithWebsocketEssentials, websocket.New(h.HandleWebsocket))
 
 	// Auth
 	router.Post("/auth/register", h.HandleRegister)

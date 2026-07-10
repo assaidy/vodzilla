@@ -6,16 +6,8 @@ import (
 
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
-
-func (me *Handler) WithPassClientIdToLocals(c fiber.Ctx) error {
-	if clientId := c.Get("X-Client-ID"); clientId != "" {
-		c.Locals("client_id", clientId)
-	} else {
-		me.logger.Warn("request with no client id", "method", c.Method(), "path", c.Path())
-	}
-	return c.Next()
-}
 
 func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
 	if !c.IsWebSocket() {
@@ -25,9 +17,9 @@ func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleWebsocket(c *websocket.Conn) {
-	clientId := c.Params("client_id")
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	sub := me.redis.Subscribe(context.Background(), fmt.Sprintf("ws:%s", clientId))
+	sub := me.redis.Subscribe(context.Background(), fmt.Sprintf("ws:%s", currentUserId))
 	defer sub.Close()
 	subChan := sub.Channel()
 

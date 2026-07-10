@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -37,6 +38,16 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		if errors.Is(err, social_service.ErrAlreadyFollowing) {
 			return errAlreadyFollowing
 		}
+		return err
+	}
+
+	if err := me.notify(
+		c.RequestCtx(),
+		userId,
+		notification_service.FollowPayload{
+			UserId: currentUserId,
+		},
+	); err != nil {
 		return err
 	}
 

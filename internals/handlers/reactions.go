@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
@@ -77,6 +78,24 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return err
 	}
 
+	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId)
+	if err != nil {
+		return err
+	}
+	if ownerId != currentUserId {
+		if err := me.notify(
+			c.RequestCtx(),
+			ownerId,
+			notification_service.VideoCommentPayload{
+				UserId:    currentUserId,
+				VideoId:   request.VideoId,
+				CommentId: commentId,
+			},
+		); err != nil {
+			return err
+		}
+	}
+
 	return c.JSON(fiber.Map{"commentId": commentId})
 }
 
@@ -145,7 +164,7 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 
 func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	var request struct {
-		CommentId uuid.UUID `uri:"video_id"`
+		CommentId uuid.UUID `uri:"comment_id"`
 		Content   string    `json:"content"`
 	}
 	if err := c.Bind().All(&request); err != nil {
@@ -169,7 +188,31 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		request.Content,
 	)
 	if err != nil {
+		if errors.Is(err, reaction_service.ErrCommentNotFound) {
+			return errCommentNotFound
+		}
 		return err
+	}
+
+	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), request.CommentId)
+	if err != nil {
+		if errors.Is(err, reaction_service.ErrCommentNotFound) {
+			return errCommentNotFound
+		}
+		return err
+	}
+	if ownerId != currentUserId {
+		if err := me.notify(
+			c.RequestCtx(),
+			ownerId,
+			notification_service.CommentReplyPayload{
+				UserId:    currentUserId,
+				CommentId: request.CommentId,
+				ReplyId:   replyId,
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	return c.JSON(fiber.Map{"replyId": replyId})
@@ -314,6 +357,24 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 		return err
 	}
 
+	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId)
+	if err != nil {
+		return err
+	}
+	if ownerId != currentUserId {
+		if err := me.notify(
+			c.RequestCtx(),
+			ownerId,
+			notification_service.VideoFeelingPayload{
+				UserId:  currentUserId,
+				VideoId: request.VideoId,
+				Feeling: string(request.Kind),
+			},
+		); err != nil {
+			return err
+		}
+	}
+
 	return c.SendStatus(fiber.StatusOK)
 }
 
@@ -376,6 +437,27 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 			return errCommentNotFound
 		}
 		return err
+	}
+
+	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), request.CommentId)
+	if err != nil {
+		if errors.Is(err, reaction_service.ErrCommentNotFound) {
+			return errCommentNotFound
+		}
+		return err
+	}
+	if ownerId != currentUserId {
+		if err := me.notify(
+			c.RequestCtx(),
+			ownerId,
+			notification_service.CommentFeelingPayload{
+				UserId:    currentUserId,
+				CommentId: request.CommentId,
+				Feeling:   string(request.Kind),
+			},
+		); err != nil {
+			return err
+		}
 	}
 
 	return c.SendStatus(fiber.StatusOK)

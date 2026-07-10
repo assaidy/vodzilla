@@ -57,66 +57,68 @@ func (me *Service) Stop(ctx context.Context) error {
 	return nil
 }
 
-type NotificationKind string
+type notificationKind string
 
 const (
-	NotificationFollow  NotificationKind = "follow"
-	NotificationFeeling NotificationKind = "feeling"
-	NotificationComment NotificationKind = "comment"
+	NotificationFollow         notificationKind = "follow"
+	NotificationVideoFeeling   notificationKind = "video_feeling"
+	NotificationCommentFeeling notificationKind = "comment_feeling"
+	NotificationVideoComment   notificationKind = "video_comment"
+	NotificationCommentReply   notificationKind = "comment_reply"
 )
 
-func (k NotificationKind) isValid() bool {
-	return k == NotificationFollow || k == NotificationFeeling || k == NotificationComment
+type Payload interface {
+	Kind() notificationKind
 }
-
-type payload interface {
-	isPayload()
-}
-
-type payloadMaker struct{}
-
-func (me payloadMaker) isPayload() {}
 
 type FollowPayload struct {
-	payloadMaker
 	UserId uuid.UUID `json:"user_id"`
 }
 
-type FeelingPayload struct {
-	payloadMaker
+func (FollowPayload) Kind() notificationKind { return NotificationFollow }
+
+type VideoFeelingPayload struct {
 	UserId  uuid.UUID `json:"user_id"`
 	VideoId uuid.UUID `json:"video_id"`
 	Feeling string    `json:"feeling"`
 }
 
+func (VideoFeelingPayload) Kind() notificationKind { return NotificationVideoFeeling }
+
+type CommentFeelingPayload struct {
+	UserId    uuid.UUID `json:"user_id"`
+	CommentId uuid.UUID `json:"comment_id"`
+	Feeling   string    `json:"feeling"`
+}
+
+func (CommentFeelingPayload) Kind() notificationKind { return NotificationCommentFeeling }
+
 type VideoCommentPayload struct {
-	payloadMaker
 	UserId    uuid.UUID `json:"user_id"`
 	VideoId   uuid.UUID `json:"video_id"`
 	CommentId uuid.UUID `json:"comment_id"`
 }
 
+func (VideoCommentPayload) Kind() notificationKind { return NotificationVideoComment }
+
 type CommentReplyPayload struct {
-	payloadMaker
 	UserId    uuid.UUID `json:"user_id"`
 	CommentId uuid.UUID `json:"comment_id"`
 	ReplyId   uuid.UUID `json:"reply_id"`
 }
 
+func (CommentReplyPayload) Kind() notificationKind { return NotificationCommentReply }
+
 type Notification struct {
 	Id        uuid.UUID
 	UserId    uuid.UUID
-	Kind      NotificationKind
+	Kind      notificationKind
 	Payload   json.RawMessage
 	CreatedAt time.Time
 	IsRead    bool
 }
 
-func (me *Service) AddNotification(ctx context.Context, userId uuid.UUID, kind NotificationKind, payload payload) error {
-	if !kind.isValid() {
-		return fmt.Errorf("invalid notification kind: %q", kind)
-	}
-
+func (me *Service) AddNotification(ctx context.Context, userId uuid.UUID, payload Payload) error {
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification payload: %w", err)
@@ -125,7 +127,7 @@ func (me *Service) AddNotification(ctx context.Context, userId uuid.UUID, kind N
 	if err := me.queries.InsertNotification(ctx, queries.InsertNotificationParams{
 		Id:      uuid.Must(uuid.NewV7()),
 		UserId:  userId,
-		Kind:    string(kind),
+		Kind:    string(payload.Kind()),
 		Payload: encodedPayload,
 	}); err != nil {
 		return fmt.Errorf("failed to insert notification: %w", err)
@@ -162,7 +164,7 @@ func (me *Service) GetNotifications(ctx context.Context, userId, lastNotificatio
 		result = append(result, Notification{
 			Id:        n.Id,
 			UserId:    n.UserId,
-			Kind:      NotificationKind(n.Kind),
+			Kind:      notificationKind(n.Kind),
 			Payload:   json.RawMessage(n.Payload),
 			CreatedAt: n.CreatedAt,
 			IsRead:    n.IsRead,

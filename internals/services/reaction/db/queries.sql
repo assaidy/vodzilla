@@ -31,6 +31,9 @@ where for_id = $1 and user_id = $2;
 -- name: CheckComment :one
 select exists (select 1 from reaction_service.comments where id = $1 for update);
 
+-- name: GetCommentOwner :one
+select user_id from reaction_service.comments where id = $1;
+
 -- name: InsertComment :exec
 insert into reaction_service.comments (id, for_id, user_id, content) values ($1, $2, $3, $4);
 

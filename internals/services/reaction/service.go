@@ -234,6 +234,18 @@ func (me *Service) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) 
 	return FeelingKind(kind), nil
 }
 
+func (me *Service) GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error) {
+	ownerId, err := me.queries.GetCommentOwner(ctx, commentId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return uuid.Nil, ErrCommentNotFound
+		}
+		return uuid.Nil, fmt.Errorf("failed to get comment owner: %w", err)
+	}
+
+	return ownerId, nil
+}
+
 func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
 	commentId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertComment(ctx, queries.InsertCommentParams{
