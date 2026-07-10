@@ -13,6 +13,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
+	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
 	search_service "github.com/assaidy/vodzilla/internals/services/search"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
@@ -51,6 +52,7 @@ func main() {
 	mediaService := media_service.New(postgres, redis, s3, logger.WithGroup("media service"))
 	reactionService := reaction_service.New(postgres, redis, logger.WithGroup("reaction service"))
 	socialService := social_service.New(postgres, redis, logger.WithGroup("social service"))
+	notificationService := notification_service.New(postgres, redis, logger.WithGroup("notification service"))
 	_ = search_service.New()
 	_ = history_service.New()
 
@@ -61,6 +63,7 @@ func main() {
 		serviceManager.Add("media service", mediaService)
 		serviceManager.Add("reaction service", reactionService)
 		serviceManager.Add("social service", socialService)
+		serviceManager.Add("notification service", notificationService)
 	}
 	serviceManager.StartAll()
 	defer serviceManager.StopAll()
@@ -73,6 +76,7 @@ func main() {
 		mediaService,
 		reactionService,
 		socialService,
+		notificationService,
 	)
 	router := fiber.New(fiber.Config{AppName: "Vodzilla"})
 	registerRoutes(router, handler)
@@ -179,9 +183,9 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Get("/feed", h.WithSession, h.HandleGetFeed)
 
 	// Notifications
-	router.Post("/notifications/notifications/count", h.WithSession, h.HandleGetUnreadNotoficationsCount)
-	router.Post("/notifications/notifications", h.WithSession, h.HandleGetNotofications)
-	router.Post("/notifications/:notification_id/mark_read", h.WithSession, h.HandleMarkNotificationAsRead)
+	router.Get("/notifications/notifications", h.WithSession, h.HandleGetNotifications)
+	router.Get("/notifications/notifications/count", h.WithSession, h.HandleGetUnreadNotificationsCount)
+	router.Post("/notifications/:notification_id/mark_read", h.WithSession, h.WithCsrfToken, h.HandleMarkNotificationAsRead)
 
 	// TODO: search, recommendations, history
 }

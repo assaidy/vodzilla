@@ -106,12 +106,12 @@ const (
 	FeelingDislike FeelingKind = "dislike"
 )
 
-func (k FeelingKind) IsValid() bool {
+func (k FeelingKind) isValid() bool {
 	return k == FeelingLike || k == FeelingDislike
 }
 
 func (me *Service) AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error {
-	if !kind.IsValid() {
+	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
 	if err := me.queries.UpsertFeeling(ctx, queries.UpsertFeelingParams{
@@ -140,7 +140,7 @@ func (me *Service) DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.
 }
 
 func (me *Service) AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error {
-	if !kind.IsValid() {
+	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
 	tx, err := me.db.BeginTx(ctx, nil)

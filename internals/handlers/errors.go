@@ -61,6 +61,7 @@ var (
 	errFeelingNotFound         = newApiError("FeelingNotFound", "Feeling not found.", fiber.StatusNotFound)
 	errThumbnailNotFound       = newApiError("ThumbnailNotFound", "Thumbnail not found.", fiber.StatusNotFound)
 	errObjectNotFound          = newApiError("ObjectNotFound", "Object not found.", fiber.StatusNotFound)
+	errNotificationNotFound    = newApiError("NotificationNotFound", "Notification not found.", fiber.StatusNotFound)
 )
 
 func extractValidationError(err error) error {
