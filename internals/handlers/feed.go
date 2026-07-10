@@ -27,13 +27,17 @@ func (me *Handler) HandleGetFeed(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	// TODO: Find a better system for feeds.
 	ids, err := me.socialService.GetAllFollowedIds(c.RequestCtx(), currentUserId)
 	if err != nil {
 		return err
 	}
 
-	videos, err := me.videoService.GetVideosForMultipleUsers(c.RequestCtx(), ids, request.LastVideoId, request.Limit)
+	videos, err := me.videoService.GetVideosForMultipleUsers(
+		c.RequestCtx(),
+		ids,
+		request.LastVideoId,
+		request.Limit,
+	)
 	if err != nil {
 		return err
 	}

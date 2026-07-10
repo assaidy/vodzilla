@@ -21,8 +21,6 @@ func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
 	if !c.IsWebSocket() {
 		return errUpgradeRequired
 	}
-
-	c.Locals("fiber_app", c.App())
 	return c.Next()
 }
 

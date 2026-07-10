@@ -1,4 +1,6 @@
 -- +goose Up
+create schema social_service;
+
 create table social_service.follows (
   follower_id uuid        not null,
   followed_id uuid        not null,
@@ -9,3 +11,4 @@ create table social_service.follows (
 
 -- +goose Down
 drop table social_service.follows;
+drop schema social_service cascade;

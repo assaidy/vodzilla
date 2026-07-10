@@ -85,7 +85,12 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 		})
 	}
 
-	if err := me.mediaService.ConfirmVideoUpload(c.RequestCtx(), request.ObjectKey, request.UploadId, parts); err != nil {
+	if err := me.mediaService.ConfirmVideoUpload(
+		c.RequestCtx(),
+		request.ObjectKey,
+		request.UploadId,
+		parts,
+	); err != nil {
 		if errors.Is(err, media_service.ErrNoPendingVideoUpload) {
 			return fiber.NewError(fiber.StatusBadRequest, "no pending video upload")
 		}

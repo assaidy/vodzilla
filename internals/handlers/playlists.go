@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"strings"
 
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -16,6 +17,8 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	if err := c.Bind().All(&request); err != nil {
 		return errInvalidRequest.details(err)
 	}
+
+	request.Name = strings.TrimSpace(request.Name)
 
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
