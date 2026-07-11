@@ -26,9 +26,11 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: add monitoring
+// TODO: db indexes
 // TODO: use a proper message queue for events (kafka/rmq)
-// TODO: add db indexes
+// TODO: testing
+// TODO: transcoding
+// TODO: monitoring
 
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{
@@ -163,9 +165,10 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Get("/playlists/:playlist_id", h.WithSession, h.HandleGetPlaylist)
 	router.Get("/playlists/:playlist_id/videos", h.WithSession, h.HandleGetPlaylistVideos)
 	router.Delete("/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleDeletePlaylist)
+	router.Put("/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleRenamePlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoFromPlaylist)
-	// TODO: add playlist video index so users can reorder playlists.
+	// TODO: watchlaters/playlist video index so users can reorder them.
 
 	// Reactions
 	router.Post("/reactions/views/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleViewVideo)

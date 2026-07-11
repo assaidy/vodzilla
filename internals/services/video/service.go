@@ -136,7 +136,7 @@ type WatchlaterVideo struct {
 
 type PlaylistVideo struct {
 	Video
-	PlaylistVideoId int64
+	Index int
 }
 
 func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
@@ -386,6 +386,20 @@ func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.U
 	return nil
 }
 
+func (me *Service) RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error {
+	if n, err := me.queries.UpdatePlaylistName(ctx, queries.UpdatePlaylistNameParams{
+		Id:      playlistId,
+		Name:    name,
+		OwnerId: userId,
+	}); err != nil {
+		return fmt.Errorf("failed to rename playlist: %w", err)
+	} else if n == 0 {
+		return ErrPlaylistNotFound
+	}
+
+	return nil
+}
+
 func (me *Service) AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -560,10 +574,10 @@ func (me *Service) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Play
 	}, nil
 }
 
-func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
+func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastIndex int32, limit int) ([]PlaylistVideo, error) {
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
-		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},
+		LastIdx:    sql.NullInt32{Int32: lastIndex, Valid: lastIndex != 0},
 		Limit:      int32(limit),
 	})
 	if err != nil {
@@ -580,7 +594,7 @@ func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID
 				Title:       row.Title,
 				Description: row.Description.String,
 			},
-			PlaylistVideoId: row.PlaylistVideoId,
+			Index: int(row.Idx),
 		})
 	}
 

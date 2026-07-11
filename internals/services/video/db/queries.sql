@@ -60,11 +60,18 @@ insert into video_service.playlists (id, name, owner_id) values ($1, $2, $3);
 -- name: DeletePlaylist :execrows
 delete from video_service.playlists where id = $1 and owner_id = $2;
 
+-- name: UpdatePlaylistName :execrows
+update video_service.playlists set name = $2 where id = $1 and owner_id = $3;
+
 -- name: CheckPlaylist :one
 select exists (select 1 from video_service.playlists where id = $1 for update);
 
 -- name: InsertIntoPlaylist :exec
-insert into video_service.playlist_videos (playlist_id, video_id) values ($1, $2);
+with bump as (
+  update video_service.playlist_videos set idx = idx + 1 where playlist_id = $1
+)
+insert into video_service.playlist_videos (playlist_id, video_id)
+values ($1, $2);
 
 -- name: CheckPlaylistForUser :one
 select exists (select 1 from video_service.playlists where id = $1 and owner_id = $2 for update);
@@ -88,14 +95,14 @@ order by p.id desc
 limit $1;
 
 -- name: GetVideosInPlaylist :many
-select v.*, pv.id as playlist_video_id
+select v.*, pv.idx
 from video_service.playlist_videos pv
 join video_service.videos v on v.id = pv.video_id
 where pv.playlist_id = $1 and (
-  sqlc.narg(last_id)::bigint is null
-  or pv.id < sqlc.narg(last_id)::bigint
+  sqlc.narg(last_idx)::integer is null
+  or pv.idx > sqlc.narg(last_idx)::integer
 )
-order by pv.id desc
+order by pv.idx asc
 limit $2;
 
 -- name: CheckVideoInPlaylist :one

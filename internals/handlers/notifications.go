@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -82,22 +81,14 @@ func (me *Handler) HandleGetNotifications(c fiber.Ctx) error {
 		return err
 	}
 
-	type notificationResponse struct {
-		Id        uuid.UUID       `json:"id"`
-		Kind      string          `json:"kind"`
-		Payload   json.RawMessage `json:"payload"`
-		CreatedAt time.Time       `json:"createdAt"`
-		IsRead    bool            `json:"isRead"`
-	}
-
-	response := make([]notificationResponse, 0, len(notifications))
+	response := make([]fiber.Map, 0, len(notifications))
 	for _, n := range notifications {
-		response = append(response, notificationResponse{
-			Id:        n.Id,
-			Kind:      string(n.Kind),
-			Payload:   n.Payload,
-			CreatedAt: n.CreatedAt,
-			IsRead:    n.IsRead,
+		response = append(response, fiber.Map{
+			"id":        n.Id,
+			"kind":      n.Kind,
+			"payload":   n.Payload,
+			"createdAt": n.CreatedAt,
+			"isRead":    n.IsRead,
 		})
 	}
 

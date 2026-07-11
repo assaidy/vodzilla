@@ -134,20 +134,13 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 
 	// I cannot add HasVideo field with tag omitempty to [playlistResponse] and reused it;
 	// omitempty would drop HasVideo=false, but the this response must include it.
-	type playlistWithStatusResponse struct {
-		Id          uuid.UUID `json:"id"`
-		Name        string    `json:"name"`
-		VideosCount int       `json:"videosCount"`
-		HasVideo    bool      `json:"hasVideo"`
-	}
-
-	response := make([]playlistWithStatusResponse, 0, len(playlists))
+	response := make([]fiber.Map, 0, len(playlists))
 	for _, p := range playlists {
-		response = append(response, playlistWithStatusResponse{
-			Id:          p.Id,
-			Name:        p.Name,
-			VideosCount: p.VideosCount,
-			HasVideo:    p.HasVideo,
+		response = append(response, fiber.Map{
+			"id":          p.Id,
+			"name":        p.Name,
+			"videosCount": p.VideosCount,
+			"hasVideo":    p.HasVideo,
 		})
 	}
 
@@ -178,7 +171,7 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	var request struct {
 		PlaylistId uuid.UUID `uri:"playlist_id"`
-		LastId     int64     `query:"last_id"`
+		LastIndex  int32     `query:"last_idx"`
 		Limit      int       `query:"limit"`
 	}
 	if err := c.Bind().All(&request); err != nil {
@@ -198,7 +191,7 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	videos, err := me.videoService.GetVideosInPlaylist(
 		c.RequestCtx(),
 		request.PlaylistId,
-		request.LastId,
+		request.LastIndex,
 		request.Limit,
 	)
 	if err != nil {
@@ -211,16 +204,50 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	resposne := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
 		resposne = append(resposne, videoResponse{
-			Id:              v.Id,
-			OwnerId:         v.OwnerId,
-			Timestamp:       v.Timestamp,
-			Title:           v.Title,
-			Description:     v.Description,
-			PlaylistVideoId: v.PlaylistVideoId,
+			Id:          v.Id,
+			OwnerId:     v.OwnerId,
+			Timestamp:   v.Timestamp,
+			Title:       v.Title,
+			Description: v.Description,
+			Index:       v.Index,
 		})
 	}
 
 	return c.JSON(resposne)
+}
+
+func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
+	var request struct {
+		PlaylistId uuid.UUID `uri:"playlist_id"`
+		Name       string    `json:"name"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	request.Name = strings.TrimSpace(request.Name)
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if err := me.videoService.RenamePlaylist(
+		c.RequestCtx(),
+		currentUserId,
+		request.PlaylistId,
+		request.Name,
+	); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {

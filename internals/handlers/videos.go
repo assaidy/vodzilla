@@ -297,7 +297,7 @@ type videoResponse struct {
 	Description       string    `json:"description"`
 	ThumbnailUrl      string    `json:"thumbnailUrl,omitempty"`
 	WatchlaterVideoId int64     `json:"watchlaterVideoId,omitempty"`
-	PlaylistVideoId   int64     `json:"playlistVideoId,omitempty"`
+	Index             int       `json:"index,omitempty"`
 }
 
 func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
