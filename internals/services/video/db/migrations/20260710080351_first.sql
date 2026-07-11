@@ -26,13 +26,12 @@ create table video_service.playlists (
 );
 
 create table video_service.playlist_videos (
+  id          bigserial primary key,
   playlist_id uuid        not null references video_service.playlists (id) on delete cascade,
-  video_id    uuid        not null references video_service.videos (id)    on delete cascade,
-  idx         integer     not null default 1,
+  video_id    uuid        not null references video_service.videos (id) on delete cascade,
   added_at    timestamptz not null default now(),
 
-  primary key (playlist_id, video_id),
-  unique (playlist_id, idx)
+  unique (playlist_id, video_id)
 );
 
 create table video_service.pending_videos (

@@ -48,7 +48,7 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 			Timestamp:         v.Timestamp,
 			Title:             v.Title,
 			Description:       v.Description,
-			WatchlaterVideoId: v.WatchlaterId,
+			WatchlaterVideoId: v.WatchlaterVideoId,
 		})
 	}
 

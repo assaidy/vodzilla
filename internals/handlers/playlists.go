@@ -168,54 +168,6 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
-	var request struct {
-		PlaylistId uuid.UUID `uri:"playlist_id"`
-		LastIndex  int32     `query:"last_idx"`
-		Limit      int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
-	}
-
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
-	}
-
-	videos, err := me.videoService.GetVideosInPlaylist(
-		c.RequestCtx(),
-		request.PlaylistId,
-		request.LastIndex,
-		request.Limit,
-	)
-	if err != nil {
-		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return errPlaylistNotFound
-		}
-		return err
-	}
-
-	resposne := make([]videoResponse, 0, len(videos))
-	for _, v := range videos {
-		resposne = append(resposne, videoResponse{
-			Id:          v.Id,
-			OwnerId:     v.OwnerId,
-			Timestamp:   v.Timestamp,
-			Title:       v.Title,
-			Description: v.Description,
-			Index:       v.Index,
-		})
-	}
-
-	return c.JSON(resposne)
-}
-
 func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
 	var request struct {
 		PlaylistId uuid.UUID `uri:"playlist_id"`
@@ -330,4 +282,52 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
+	var request struct {
+		PlaylistId uuid.UUID `uri:"playlist_id"`
+		LastId     int64     `query:"last_id"`
+		Limit      int       `query:"limit"`
+	}
+	if err := c.Bind().All(&request); err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if request.Limit == 0 {
+		request.Limit = 15
+	}
+
+	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
+	); err != nil {
+		return extractValidationError(err)
+	}
+
+	videos, err := me.videoService.GetVideosInPlaylist(
+		c.RequestCtx(),
+		request.PlaylistId,
+		request.LastId,
+		request.Limit,
+	)
+	if err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	}
+
+	resposne := make([]videoResponse, 0, len(videos))
+	for _, v := range videos {
+		resposne = append(resposne, videoResponse{
+			Id:              v.Id,
+			OwnerId:         v.OwnerId,
+			Timestamp:       v.Timestamp,
+			Title:           v.Title,
+			Description:     v.Description,
+			PlaylistVideoId: v.PlaylistVideoId,
+		})
+	}
+
+	return c.JSON(resposne)
 }

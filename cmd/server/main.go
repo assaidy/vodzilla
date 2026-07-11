@@ -167,7 +167,6 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Put("/playlists/:playlist_id", h.WithSession, h.WithCsrfToken, h.HandleRenamePlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleDeleteVideoFromPlaylist)
-	// TODO: watchlaters/playlist video index so users can reorder them.
 
 	// Reactions
 	router.Post("/reactions/views/videos/:video_id", h.WithSession, h.WithCsrfToken, h.HandleViewVideo)

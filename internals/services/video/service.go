@@ -131,12 +131,12 @@ type Video struct {
 
 type WatchlaterVideo struct {
 	Video
-	WatchlaterId int64
+	WatchlaterVideoId int64
 }
 
 type PlaylistVideo struct {
 	Video
-	Index int
+	PlaylistVideoId int64
 }
 
 func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
@@ -321,7 +321,7 @@ func (me *Service) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, 
 				Title:       row.Title,
 				Description: row.Description.String,
 			},
-			WatchlaterId: row.WatchlaterId,
+			WatchlaterVideoId: row.WatchlaterId,
 		})
 	}
 
@@ -341,33 +341,13 @@ func (me *Service) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.U
 }
 
 func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error) {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckPlaylistByNameForUser(ctx, queries.CheckPlaylistByNameForUserParams{
-		Name:    playlistName,
-		OwnerId: userId,
-	}); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to check playlist by name for user: %w", err)
-	} else if ok {
-		return uuid.Nil, ErrPlaylistNameConflict
-	}
-
 	playlistId := uuid.Must(uuid.NewV7())
-	if err := qtx.InsertPlaylist(ctx, queries.InsertPlaylistParams{
+	if err := me.queries.InsertPlaylist(ctx, queries.InsertPlaylistParams{
 		Id:      playlistId,
 		Name:    playlistName,
 		OwnerId: userId,
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert playlist: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return playlistId, nil
@@ -414,7 +394,10 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, userId, videoId, play
 		return ErrVideoNotFound
 	}
 
-	if ok, err := qtx.CheckPlaylist(ctx, playlistId); err != nil {
+	if ok, err := qtx.CheckPlaylistForUser(ctx, queries.CheckPlaylistForUserParams{
+		Id:      playlistId,
+		OwnerId: userId,
+	}); err != nil {
 		return fmt.Errorf("failed to check playlist: %w", err)
 	} else if !ok {
 		return ErrPlaylistNotFound
@@ -574,10 +557,10 @@ func (me *Service) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Play
 	}, nil
 }
 
-func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastIndex int32, limit int) ([]PlaylistVideo, error) {
+func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
-		LastIdx:    sql.NullInt32{Int32: lastIndex, Valid: lastIndex != 0},
+		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},
 		Limit:      int32(limit),
 	})
 	if err != nil {
@@ -594,7 +577,7 @@ func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID
 				Title:       row.Title,
 				Description: row.Description.String,
 			},
-			Index: int(row.Idx),
+			PlaylistVideoId: row.PlaylistVideoId,
 		})
 	}
 
