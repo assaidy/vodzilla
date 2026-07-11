@@ -11,5 +11,4 @@ create table notification_service.notifications (
 );
 
 -- +goose Down
-drop table notification_service.notifications;
 drop schema notification_service cascade;

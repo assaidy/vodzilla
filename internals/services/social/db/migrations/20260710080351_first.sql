@@ -10,5 +10,4 @@ create table social_service.follows (
 );
 
 -- +goose Down
-drop table social_service.follows;
 drop schema social_service cascade;

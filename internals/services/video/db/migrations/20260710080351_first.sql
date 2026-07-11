@@ -22,9 +22,7 @@ create table video_service.playlists (
   id         uuid        primary key,
   name       varchar(50) not null,
   owner_id   uuid        not null,
-  created_at timestamptz not null default now(),
-
-  unique (name, owner_id)
+  created_at timestamptz not null default now()
 );
 
 create table video_service.playlist_videos (
@@ -46,9 +44,4 @@ create table video_service.pending_videos (
 );
 
 -- +goose Down
-drop table video_service.pending_videos;
-drop table video_service.playlist_videos;
-drop table video_service.playlists;
-drop table video_service.watchlaters;
-drop table video_service.videos;
 drop schema video_service cascade;

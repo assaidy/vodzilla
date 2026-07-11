@@ -27,7 +27,4 @@ create table reaction_service.comments (
 );
 
 -- +goose Down
-drop table reaction_service.comments;
-drop table reaction_service.feelings;
-drop table reaction_service.views;
 drop schema reaction_service cascade;

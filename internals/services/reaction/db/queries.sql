@@ -57,7 +57,7 @@ select
   count(r.id) as replies_count
 from reaction_service.comments c
 left join reaction_service.comments r on c.id = r.for_id
-where c.for_id = $1 is null and (
+where c.for_id = $1 and (
   sqlc.narg(last_comment_id)::uuid is null
   or c.id < sqlc.narg(last_comment_id)::uuid
 )

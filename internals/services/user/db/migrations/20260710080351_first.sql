@@ -36,8 +36,4 @@ create table user_service.sessions (
 );
 
 -- +goose Down
-drop table user_service.sessions;
-drop table user_service.email_verification_tokens;
-drop table user_service.retired_usernames;
-drop table user_service.users;
 drop schema user_service cascade;

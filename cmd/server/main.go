@@ -26,9 +26,8 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: db indexes
-// TODO: use a proper message queue for events (kafka/rmq)
 // TODO: testing
+// TODO: use a proper message queue for events (kafka/rmq)
 // TODO: transcoding
 // TODO: monitoring
 

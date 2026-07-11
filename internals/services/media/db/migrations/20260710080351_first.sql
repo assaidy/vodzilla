@@ -26,8 +26,4 @@ create table media_service.orphan_uploads (
 );
 
 -- +goose Down
-drop table media_service.orphan_uploads;
-drop table media_service.thumbnails;
-drop table media_service.avatars;
-drop table media_service.videos;
 drop schema media_service cascade;
