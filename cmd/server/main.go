@@ -26,7 +26,6 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// TODO: testing
 // TODO: use a proper message queue for events (kafka/rmq)
 // TODO: transcoding
 // TODO: monitoring
@@ -119,8 +118,8 @@ func registerRoutes(router *fiber.App, h *handlers.Handler) {
 	router.Post("/auth/login", h.HandleLogin)
 	router.Post("/auth/logout", h.WithSession, h.HandleLogout).Name("logout")
 	router.Post("/auth/verification_email", h.HandleSendVerificationEmail)
-	router.Post("/auth/verification_email/verify", h.HandleVerifyEmail)
-	router.Put("/auth/credentials", h.HandleEditCredentials)
+	router.Get("/auth/verification_email/verify", h.HandleVerifyEmail)
+	router.Put("/auth/credentials", h.WithSession, h.WithCsrfToken, h.HandleEditCredentials)
 
 	// Profiles
 	router.Get("/profiles", h.WithSession, h.HandleGetProfile)

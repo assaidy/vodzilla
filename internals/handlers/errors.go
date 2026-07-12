@@ -98,15 +98,19 @@ func (me *Handler) WithErrorResolver(c fiber.Ctx) error {
 		switch fe.Code {
 		case fiber.StatusNotFound:
 			apiErr = errInvalidEndpoint
+			err = errInvalidEndpoint
 		case fiber.StatusMethodNotAllowed:
 			apiErr = errMethodNotAllowed
+			err = errMethodNotAllowed
 		default:
 			me.logger.Warn("unhandled fiber error", "error", err)
 			apiErr = errInternalFailure
 		}
-	} else if _, ok := errors.AsType[apiError](err); !ok {
+	} else if ae, ok := errors.AsType[apiError](err); ok {
+		apiErr = ae
+	} else {
 		// Catch all unnamed errors; all internal errors are handled here.
-		// Notice I don't return internal error deatils to the client.
+		// Notice I don't return internal error details to the client.
 		apiErr = errInternalFailure
 	}
 
