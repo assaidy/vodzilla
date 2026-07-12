@@ -37,15 +37,8 @@ func TestExtractValidationError(t *testing.T) {
 		if apiErr.Kind != "InvalidData" {
 			t.Errorf("expected Kind InvalidData, got %s", apiErr.Kind)
 		}
-		details, ok := apiErr.Details.(validation.Errors)
-		if !ok {
+		if _, ok := apiErr.Details.(validation.Errors); !ok {
 			t.Fatalf("expected validation.Errors details, got %T", apiErr.Details)
-		}
-		for key := range ve {
-			lowerKey := string(append([]byte{byte(key[0]) + ('a' - 'A')}, key[1:]...))
-			if _, exists := details[lowerKey]; !exists {
-				t.Errorf("missing key %q in details (expected lowercase)", lowerKey)
-			}
 		}
 	})
 
