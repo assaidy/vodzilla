@@ -30,12 +30,12 @@ type Service struct {
 	queries       *queries.Queries
 	redis         *redis.Client
 	s3            *s3.Client
-	mailer        *utils.Mailer
+	mailer        utils.Mailer
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer *utils.Mailer, logger *slog.Logger) *Service {
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer utils.Mailer, logger *slog.Logger) *Service {
 	service := &Service{
 		db:            db,
 		queries:       queries.New(db),

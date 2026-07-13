@@ -8,7 +8,11 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-type Mailer struct {
+type Mailer interface {
+	SendEmail(ctx context.Context, message MailerMessage) error
+}
+
+type mailerImpl struct {
 	host     string
 	port     int
 	username string
@@ -16,16 +20,16 @@ type Mailer struct {
 	dialer   *gomail.Dialer
 }
 
-func NewMailer(host, port, username, password string) *Mailer {
+func NewMailer(host, port, username, password string) Mailer {
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse port: %v", err))
 	}
 
-	return &Mailer{host: host, port: portNumber, username: username, password: password}
+	return &mailerImpl{host: host, port: portNumber, username: username, password: password}
 }
 
-func (me *Mailer) SendEmail(ctx context.Context, message MailerMessage) error {
+func (me *mailerImpl) SendEmail(ctx context.Context, message MailerMessage) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", message.From)
 	m.SetHeader("To", message.To...)
