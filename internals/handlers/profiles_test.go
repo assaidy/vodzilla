@@ -8,7 +8,7 @@ import (
 )
 
 func TestHandleGetProfile(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "profown@example.com", "Password123", "Profile Own", "profown")
@@ -27,7 +27,7 @@ func TestHandleGetProfile(t *testing.T) {
 }
 
 func TestHandleGetProfileByUsername(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "profuser@example.com", "Password123", "Profile Username", "profuser")
@@ -52,7 +52,7 @@ func TestHandleGetProfileByUsername(t *testing.T) {
 }
 
 func TestHandleGetProfileById(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "profid@example.com", "Password123", "Profile ID", "profid")
@@ -82,7 +82,7 @@ func TestHandleGetProfileById(t *testing.T) {
 }
 
 func TestHandleEditProfile(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "profcrd@example.com", "Password123", "Profile Edit", "profcrd")
@@ -164,7 +164,7 @@ func TestHandleEditProfile(t *testing.T) {
 }
 
 func TestHandleDeleteProfile(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "profdell@example.com", "Password123", "Profile Del", "profdell")

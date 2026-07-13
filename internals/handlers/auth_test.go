@@ -8,7 +8,7 @@ import (
 )
 
 func TestHandleRegister(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	t.Run("empty body", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestHandleRegister(t *testing.T) {
 }
 
 func TestHandleSendVerificationEmail(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
@@ -208,7 +208,7 @@ func TestHandleSendVerificationEmail(t *testing.T) {
 }
 
 func TestHandleVerifyEmail(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
@@ -247,7 +247,7 @@ func TestHandleVerifyEmail(t *testing.T) {
 }
 
 func TestHandleLogin(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
@@ -306,7 +306,7 @@ func TestHandleLogin(t *testing.T) {
 }
 
 func TestHandleLogout(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "logout@example.com", "Password123", "Logout Tester", "logouttester")
@@ -331,7 +331,7 @@ func TestHandleLogout(t *testing.T) {
 }
 
 func TestHandleEditCredentials(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	session := createVerifiedUser(t, app, "editcred@example.com", "Password123", "Edit Cred", "editcred")

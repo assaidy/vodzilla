@@ -109,7 +109,7 @@ func (me *Handler) WithErrorResolver(c fiber.Ctx) error {
 	} else if ae, ok := errors.AsType[apiError](err); ok {
 		apiErr = ae
 	} else {
-		// Catch all unnamed errors; all internal errors are handled here.
+		// Catch all untyped errors; all internal errors are handled here.
 		// Notice I don't return internal error details to the client.
 		apiErr = errInternalFailure
 	}

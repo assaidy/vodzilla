@@ -1,3 +1,5 @@
+-- FIX: users who're not verified should not be visible to others.
+
 -- name: CheckEmail :one
 select exists (select 1 from user_service.users where email = $1 for update);
 

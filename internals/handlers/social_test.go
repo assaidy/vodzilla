@@ -8,7 +8,7 @@ import (
 )
 
 func TestHandleFollow(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "soca@example.com", "Password123", "Social A", "soca")
@@ -77,7 +77,7 @@ func TestHandleFollow(t *testing.T) {
 }
 
 func TestHandleIsFollowing(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "isfa@example.com", "Password123", "IsF A", "isfa")
@@ -138,7 +138,7 @@ func TestHandleIsFollowing(t *testing.T) {
 }
 
 func TestHandleGetFollowCounts(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "cnta@example.com", "Password123", "Count A", "cnta")
@@ -204,7 +204,7 @@ func TestHandleGetFollowCounts(t *testing.T) {
 }
 
 func TestHandleGetFollowers(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "flwra@example.com", "Password123", "Follower A", "flwra")
@@ -263,7 +263,7 @@ func TestHandleGetFollowers(t *testing.T) {
 }
 
 func TestHandleGetFolloweds(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "fldsa@example.com", "Password123", "Followeds A", "fldsa")
@@ -304,7 +304,7 @@ func TestHandleGetFolloweds(t *testing.T) {
 }
 
 func TestHandleUnfollow(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "unfa@example.com", "Password123", "Unfollow A", "unfa")
@@ -364,7 +364,7 @@ func TestHandleUnfollow(t *testing.T) {
 }
 
 func TestHandleFollowCountsAfterUnfollow(t *testing.T) {
-	cleanupDB(t)
+	defer resetDb(t)
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "afta@example.com", "Password123", "After A", "afta")
