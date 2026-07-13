@@ -16,6 +16,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/user/queries"
 	"github.com/assaidy/vodzilla/internals/utils"
+	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
@@ -23,20 +24,34 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	Register(ctx context.Context, email, password, name, username string) error
+	SendVerificationEmail(ctx context.Context, email, url string) error
+	VerifyEmail(ctx context.Context, verificationToken string) error
+	Login(ctx context.Context, email, password string) (*Session, error)
+	GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, error)
+	Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error
+	GetUserById(ctx context.Context, userId uuid.UUID) (*User, error)
+	GetUserByUsername(ctx context.Context, username string) (*User, error)
+	DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error)
+	EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error
+	DeleteUser(ctx context.Context, userId uuid.UUID) error
+	EditCredentials(ctx context.Context, userId uuid.UUID, email, password string) error
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
 	s3            *s3.Client
-	mailer        utils.Mailer
+	mailer        mailer.Mailer
 	logger        *slog.Logger
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer utils.Mailer, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer mailer.Mailer, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
@@ -76,17 +91,17 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer utils.Mailer, lo
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
 
-func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
+func (me *impl) verificationEmailSenderJob(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -106,7 +121,7 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 				return fmt.Errorf("failed to decode email verification queue payload: %w", err)
 			}
 
-			if err := me.mailer.SendEmail(ctx, utils.MailerMessage{
+			if err := me.mailer.Send(ctx, mailer.Message{
 				From:        utils.MustGetEnv("EMAIL_FROM"),
 				To:          []string{payload.Email},
 				Subject:     "Verification email for Video Streaming App",
@@ -119,7 +134,7 @@ func (me *Service) verificationEmailSenderJob(ctx context.Context) error {
 	}
 }
 
-func (me *Service) Register(ctx context.Context, email, password, name, username string) error {
+func (me *impl) Register(ctx context.Context, email, password, name, username string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -175,7 +190,7 @@ type EmailVerificationQueuePayload struct {
 	VerificationLink string
 }
 
-func (me *Service) SendVerificationEmail(ctx context.Context, email, url string) error {
+func (me *impl) SendVerificationEmail(ctx context.Context, email, url string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
 	tx, err := me.db.BeginTx(ctx, nil)
@@ -223,7 +238,7 @@ func (me *Service) SendVerificationEmail(ctx context.Context, email, url string)
 	return nil
 }
 
-func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) error {
+func (me *impl) VerifyEmail(ctx context.Context, verificationToken string) error {
 	if n, err := me.queries.VerifyEmailByToken(ctx, string(verificationToken)); err != nil {
 		return fmt.Errorf("failed to verify email: %w", err)
 	} else if n == 0 {
@@ -233,7 +248,7 @@ func (me *Service) VerifyEmail(ctx context.Context, verificationToken string) er
 	return nil
 }
 
-func (me *Service) emailVerificationTokensCleanupJob(ctx context.Context) error {
+func (me *impl) emailVerificationTokensCleanupJob(ctx context.Context) error {
 	if err := me.queries.BatchDeleteExpiredEmailVerificationTokens(ctx); err != nil {
 		return fmt.Errorf("failed to batch delete expired or deleted email verification tokens: %w", err)
 	}
@@ -249,7 +264,7 @@ type Session struct {
 	ExpiresAt    time.Time
 }
 
-func (me *Service) Login(ctx context.Context, email, password string) (*Session, error) {
+func (me *impl) Login(ctx context.Context, email, password string) (*Session, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -307,7 +322,7 @@ func generateCryptoRandomHex(nBytes uint) string {
 	return hex.EncodeToString(buf)
 }
 
-func (me *Service) GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, error) {
+func (me *impl) GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, error) {
 	session, err := me.queries.GetSessionById(ctx, sessionId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -325,7 +340,7 @@ func (me *Service) GetSession(ctx context.Context, sessionId uuid.UUID) (*Sessio
 	}, nil
 }
 
-func (me *Service) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error {
+func (me *impl) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error {
 	if ok, err := me.queries.CheckUserId(ctx, userId); err != nil {
 		return fmt.Errorf("failed to check user id: %w", err)
 	} else if !ok {
@@ -344,7 +359,7 @@ func (me *Service) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.
 	return nil
 }
 
-func (me *Service) sessionsCleanupJob(ctx context.Context) error {
+func (me *impl) sessionsCleanupJob(ctx context.Context) error {
 	if err := me.queries.BatchDeleteExpiredSessions(ctx); err != nil {
 		return fmt.Errorf("failed to batch delete expired sessions: %w", err)
 	}
@@ -360,7 +375,7 @@ type User struct {
 	Bio      string
 }
 
-func (me *Service) GetUserById(ctx context.Context, userId uuid.UUID) (*User, error) {
+func (me *impl) GetUserById(ctx context.Context, userId uuid.UUID) (*User, error) {
 	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -378,7 +393,7 @@ func (me *Service) GetUserById(ctx context.Context, userId uuid.UUID) (*User, er
 	}, nil
 }
 
-func (me *Service) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+func (me *impl) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	user, err := me.queries.GetUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -396,7 +411,7 @@ func (me *Service) GetUserByUsername(ctx context.Context, username string) (*Use
 	}, nil
 }
 
-func (me *Service) DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error) {
+func (me *impl) DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckUserId(ctx, userId)
 	if err != nil {
 		return false, fmt.Errorf("failed to check user id: %w", err)
@@ -405,7 +420,7 @@ func (me *Service) DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, e
 	return ok, nil
 }
 
-func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error {
+func (me *impl) EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -465,7 +480,7 @@ func (me *Service) EditProfile(ctx context.Context, userId uuid.UUID, name, user
 	return nil
 }
 
-func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {
+func (me *impl) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -507,7 +522,7 @@ func (me *Service) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	return nil
 }
 
-func (me *Service) EditCredentials(ctx context.Context, userId uuid.UUID, email, password string) error {
+func (me *impl) EditCredentials(ctx context.Context, userId uuid.UUID, email, password string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)

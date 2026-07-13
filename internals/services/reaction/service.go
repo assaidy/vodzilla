@@ -17,9 +17,28 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error
+	GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error)
+	IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
+	AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error
+	DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.UUID) error
+	AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error
+	DeleteCommentFeeling(ctx context.Context, userId, commentId uuid.UUID) error
+	GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*FeelingCounts, error)
+	GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (FeelingKind, error)
+	GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error)
+	CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error)
+	EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error
+	DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error
+	GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error)
+	GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, limit int) ([]Comment, error)
+	CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error)
+	GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error)
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
@@ -27,8 +46,8 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
@@ -56,17 +75,17 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
 
-func (me *Service) ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error {
+func (me *impl) ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error {
 	_, err := me.queries.InsertView(ctx, queries.InsertViewParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -78,7 +97,7 @@ func (me *Service) ViewVideo(ctx context.Context, videoId, userId uuid.UUID) err
 	return nil
 }
 
-func (me *Service) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
+func (me *impl) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
 	count, err := me.queries.GetViewsCount(ctx, videoId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get views count: %w", err)
@@ -87,7 +106,7 @@ func (me *Service) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (i
 	return int(count), nil
 }
 
-func (me *Service) IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
+func (me *impl) IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckVideoViewer(ctx, queries.CheckVideoViewerParams{
 		VideoId: videoId,
 		UserId:  userId,
@@ -110,7 +129,7 @@ func (k FeelingKind) isValid() bool {
 	return k == FeelingLike || k == FeelingDislike
 }
 
-func (me *Service) AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error {
+func (me *impl) AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error {
 	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
@@ -125,7 +144,7 @@ func (me *Service) AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUI
 	return nil
 }
 
-func (me *Service) DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.UUID) error {
+func (me *impl) DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.UUID) error {
 	n, err := me.queries.DeleteFeeling(ctx, queries.DeleteFeelingParams{
 		ForId:  videoId,
 		UserId: userId,
@@ -139,7 +158,7 @@ func (me *Service) DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.
 	return nil
 }
 
-func (me *Service) AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error {
+func (me *impl) AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error {
 	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
@@ -171,7 +190,7 @@ func (me *Service) AddCommentFeeling(ctx context.Context, userId, commentId uuid
 	return nil
 }
 
-func (me *Service) DeleteCommentFeeling(ctx context.Context, userId, commentId uuid.UUID) error {
+func (me *impl) DeleteCommentFeeling(ctx context.Context, userId, commentId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -207,7 +226,7 @@ type FeelingCounts struct {
 	Dislikes int
 }
 
-func (me *Service) GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*FeelingCounts, error) {
+func (me *impl) GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*FeelingCounts, error) {
 	counts, err := me.queries.GetFeelingCounts(ctx, forId)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get feeling counts: %w", err)
@@ -219,7 +238,7 @@ func (me *Service) GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*Feel
 	}, nil
 }
 
-func (me *Service) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (FeelingKind, error) {
+func (me *impl) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (FeelingKind, error) {
 	kind, err := me.queries.GetUserFeeling(ctx, queries.GetUserFeelingParams{
 		ForId:  forId,
 		UserId: userId,
@@ -234,7 +253,7 @@ func (me *Service) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) 
 	return FeelingKind(kind), nil
 }
 
-func (me *Service) GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error) {
+func (me *impl) GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error) {
 	ownerId, err := me.queries.GetCommentOwner(ctx, commentId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -246,7 +265,7 @@ func (me *Service) GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uu
 	return ownerId, nil
 }
 
-func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
+func (me *impl) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
 	commentId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertComment(ctx, queries.InsertCommentParams{
 		Id:      commentId,
@@ -260,7 +279,7 @@ func (me *Service) CreateVideoComment(ctx context.Context, userId, videoId uuid.
 	return commentId, nil
 }
 
-func (me *Service) EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error {
+func (me *impl) EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -291,7 +310,7 @@ func (me *Service) EditComment(ctx context.Context, userId, commentId uuid.UUID,
 	return nil
 }
 
-func (me *Service) DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error {
+func (me *impl) DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -308,14 +327,14 @@ func (me *Service) DeleteComment(ctx context.Context, userId, commentId uuid.UUI
 		return ErrCommentNotFound
 	}
 
-	if err := me.queries.DeleteComment(ctx, queries.DeleteCommentParams{
+	if err := qtx.DeleteComment(ctx, queries.DeleteCommentParams{
 		Id:     commentId,
 		UserId: userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete comment: %w", err)
 	}
 
-	if err := me.queries.DeleteAllCommentsFor(ctx, commentId); err != nil {
+	if err := qtx.DeleteAllCommentsFor(ctx, commentId); err != nil {
 		return err
 	}
 
@@ -334,7 +353,7 @@ type Comment struct {
 	RepliesCount int
 }
 
-func (me *Service) GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
+func (me *impl) GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
 	count, err := me.queries.GetCommentsCount(ctx, videoId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get comments count: %w", err)
@@ -342,7 +361,7 @@ func (me *Service) GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID)
 	return int(count), nil
 }
 
-func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
+func (me *impl) GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
 	dbComments, err := me.queries.GetComments(ctx, queries.GetCommentsParams{
 		ForId:         videoId,
 		LastCommentId: uuid.NullUUID{UUID: lastCommentId, Valid: lastCommentId != uuid.Nil},
@@ -366,7 +385,7 @@ func (me *Service) GetVideoComments(ctx context.Context, videoId, lastCommentId 
 	return result, nil
 }
 
-func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error) {
+func (me *impl) CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -384,7 +403,7 @@ func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uui
 	}
 
 	replyId := uuid.Must(uuid.NewV7())
-	if err := me.queries.InsertComment(ctx, queries.InsertCommentParams{
+	if err := qtx.InsertComment(ctx, queries.InsertCommentParams{
 		Id:      replyId,
 		ForId:   commentId,
 		UserId:  userId,
@@ -400,7 +419,7 @@ func (me *Service) CreateCommentReply(ctx context.Context, userId, commentId uui
 	return replyId, nil
 }
 
-func (me *Service) GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
+func (me *impl) GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -441,7 +460,7 @@ func (me *Service) GetCommentReplies(ctx context.Context, commentId uuid.UUID, l
 	return result, nil
 }
 
-func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()
@@ -489,7 +508,7 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 	}
 }
 
-func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.VideoDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()

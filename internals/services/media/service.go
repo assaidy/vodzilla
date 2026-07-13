@@ -24,9 +24,24 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	GenerateVideoPresignedPutUrls(ctx context.Context, userId uuid.UUID, contentType string, fileSize int64) (*VideoPresignedUpload, error)
+	ConfirmVideoUpload(ctx context.Context, objectKey, uploadId string, parts []CompleteVideoUploadPart) error
+	DeleteOrphanUpload(ctx context.Context, objectKey string) error
+	PostVideo(ctx context.Context, videoId uuid.UUID, objectKey string) error
+	GenerateVideoPresignedGetUrl(ctx context.Context, videoId uuid.UUID) (string, error)
+	GeneratePresignedAvatarUpload(ctx context.Context, userId uuid.UUID, contentType string, fileSize int64) (*AvatarPresignedUpload, error)
+	ConfirmAvatarUpload(ctx context.Context, userId uuid.UUID) (string, error)
+	DeleteAvatar(ctx context.Context, userId uuid.UUID) error
+	GetAvatarUrl(ctx context.Context, userId uuid.UUID) (string, error)
+	GeneratePresignedThumbnailUpload(ctx context.Context, videoId uuid.UUID, contentType string, fileSize int64) (*ThumbnailPresignedUpload, error)
+	ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID) (string, error)
+	DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error
+	GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (string, error)
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	s3            *s3.Client
@@ -35,8 +50,8 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		s3:            s3,
@@ -73,12 +88,12 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) *S
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
@@ -113,7 +128,7 @@ type VideoPresignedUpload struct {
 	Chunks    []VideoUploadChunk
 }
 
-func (me *Service) GenerateVideoPresignedPutUrls(
+func (me *impl) GenerateVideoPresignedPutUrls(
 	ctx context.Context,
 	userId uuid.UUID,
 	contentType string,
@@ -195,7 +210,7 @@ func (me *Service) GenerateVideoPresignedPutUrls(
 	}, nil
 }
 
-func (me *Service) abortVideoUploadWithErrorLogging(ctx context.Context, objectKey, uploadId string) {
+func (me *impl) abortVideoUploadWithErrorLogging(ctx context.Context, objectKey, uploadId string) {
 	if _, err := me.s3.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
 		Bucket:   aws.String(videosBucket),
 		Key:      aws.String(objectKey),
@@ -211,7 +226,7 @@ type CompleteVideoUploadPart struct {
 	PartNumber int
 }
 
-func (me *Service) ConfirmVideoUpload(
+func (me *impl) ConfirmVideoUpload(
 	ctx context.Context,
 	objectKey, uploadId string,
 	parts []CompleteVideoUploadPart,
@@ -286,14 +301,14 @@ func (me *Service) ConfirmVideoUpload(
 	return nil
 }
 
-func (me *Service) DeleteOrphanUpload(ctx context.Context, objectKey string) error {
+func (me *impl) DeleteOrphanUpload(ctx context.Context, objectKey string) error {
 	if err := me.queries.DeleteOrphanUpload(ctx, objectKey); err != nil {
 		return fmt.Errorf("failed to delete orphan upload: %w", err)
 	}
 	return nil
 }
 
-func (me *Service) PostVideo(ctx context.Context, videoId uuid.UUID, objectKey string) error {
+func (me *impl) PostVideo(ctx context.Context, videoId uuid.UUID, objectKey string) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -327,7 +342,7 @@ func (me *Service) PostVideo(ctx context.Context, videoId uuid.UUID, objectKey s
 	return nil
 }
 
-func (me *Service) GenerateVideoPresignedGetUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
+func (me *impl) GenerateVideoPresignedGetUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
 	objectKey, err := me.queries.GetObjectKeyForVideo(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -363,7 +378,7 @@ func avatarObjectKey(userId uuid.UUID) string {
 	return fmt.Sprintf("avatars/%s", userId)
 }
 
-func (me *Service) GeneratePresignedAvatarUpload(
+func (me *impl) GeneratePresignedAvatarUpload(
 	ctx context.Context,
 	userId uuid.UUID,
 	contentType string,
@@ -399,7 +414,7 @@ func (me *Service) GeneratePresignedAvatarUpload(
 	}, nil
 }
 
-func (me *Service) ConfirmAvatarUpload(ctx context.Context, userId uuid.UUID) (string, error) {
+func (me *impl) ConfirmAvatarUpload(ctx context.Context, userId uuid.UUID) (string, error) {
 	objectKey, err := me.redis.Get(ctx, avatarUploadRedisPrefix+userId.String()).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -467,7 +482,7 @@ func (me *Service) ConfirmAvatarUpload(ctx context.Context, userId uuid.UUID) (s
 	return request.URL, nil
 }
 
-func (me *Service) DeleteAvatar(ctx context.Context, userId uuid.UUID) error {
+func (me *impl) DeleteAvatar(ctx context.Context, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -501,7 +516,7 @@ func (me *Service) DeleteAvatar(ctx context.Context, userId uuid.UUID) error {
 	return nil
 }
 
-func (me *Service) GetAvatarUrl(ctx context.Context, userId uuid.UUID) (string, error) {
+func (me *impl) GetAvatarUrl(ctx context.Context, userId uuid.UUID) (string, error) {
 	objectKey, err := me.queries.GetAvatarByUserId(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -534,7 +549,7 @@ func thumbnailObjectKey(videoId uuid.UUID) string {
 	return fmt.Sprintf("thumbnails/%s", videoId)
 }
 
-func (me *Service) GeneratePresignedThumbnailUpload(
+func (me *impl) GeneratePresignedThumbnailUpload(
 	ctx context.Context,
 	videoId uuid.UUID,
 	contentType string,
@@ -570,7 +585,7 @@ func (me *Service) GeneratePresignedThumbnailUpload(
 	}, nil
 }
 
-func (me *Service) ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID) (string, error) {
+func (me *impl) ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID) (string, error) {
 	objectKey, err := me.redis.Get(ctx, thumbnailUploadRedisPrefix+videoId.String()).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
@@ -638,7 +653,7 @@ func (me *Service) ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID
 	return request.URL, nil
 }
 
-func (me *Service) DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error {
+func (me *impl) DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -672,7 +687,7 @@ func (me *Service) DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error
 	return nil
 }
 
-func (me *Service) GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
+func (me *impl) GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (string, error) {
 	objectKey, err := me.queries.GetThumbnailByVideoId(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -696,7 +711,7 @@ func (me *Service) GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (stri
 	return request.URL, nil
 }
 
-func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.VideoDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()
@@ -766,7 +781,7 @@ func (me *Service) videoDeletedEventConsumerJob(ctx context.Context) error {
 	}
 }
 
-func (me *Service) orphanVideoUploadsCleanupJob(ctx context.Context) error {
+func (me *impl) orphanVideoUploadsCleanupJob(ctx context.Context) error {
 	objectKeys, err := me.queries.GetExpiredOrphanUploads(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list expired orphan uploads: %w", err)
@@ -788,7 +803,7 @@ func (me *Service) orphanVideoUploadsCleanupJob(ctx context.Context) error {
 	return nil
 }
 
-func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()

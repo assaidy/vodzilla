@@ -1,4 +1,4 @@
-package utils
+package mailer
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 )
 
 type Mailer interface {
-	SendEmail(ctx context.Context, message MailerMessage) error
+	Send(ctx context.Context, message Message) error
 }
 
-type mailerImpl struct {
+type impl struct {
 	host     string
 	port     int
 	username string
@@ -20,16 +20,22 @@ type mailerImpl struct {
 	dialer   *gomail.Dialer
 }
 
-func NewMailer(host, port, username, password string) Mailer {
+func New(host, port, username, password string) Mailer {
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse port: %v", err))
 	}
 
-	return &mailerImpl{host: host, port: portNumber, username: username, password: password}
+	return &impl{
+		host:     host,
+		port:     portNumber,
+		username: username,
+		password: password,
+		dialer:   gomail.NewDialer(host, portNumber, username, password),
+	}
 }
 
-func (me *mailerImpl) SendEmail(ctx context.Context, message MailerMessage) error {
+func (me *impl) Send(ctx context.Context, message Message) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", message.From)
 	m.SetHeader("To", message.To...)
@@ -38,12 +44,7 @@ func (me *mailerImpl) SendEmail(ctx context.Context, message MailerMessage) erro
 
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- gomail.NewDialer(
-			me.host,
-			me.port,
-			me.username,
-			me.password,
-		).DialAndSend(m)
+		errChan <- me.dialer.DialAndSend(m)
 	}()
 
 	select {
@@ -54,7 +55,7 @@ func (me *mailerImpl) SendEmail(ctx context.Context, message MailerMessage) erro
 	}
 }
 
-type MailerMessage struct {
+type Message struct {
 	From        string
 	To          []string
 	Subject     string

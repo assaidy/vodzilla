@@ -3,9 +3,6 @@
 # Source this from workflow test scripts.
 # ==========================================================
 
-# TODO: testing: test other workflows: videos, playlists, watchalters, reactions, notifications, websockets, ...etc
-# TODO: testing: we need to use different docker containers for testing and reset them for each test
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 

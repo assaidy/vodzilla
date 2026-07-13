@@ -1,4 +1,4 @@
-package utils
+package distributed_lock
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type DistributedLock struct {
 	logger *slog.Logger
 }
 
-func NewDistributedLock(redis *redis.Client, logger *slog.Logger) *DistributedLock {
+func New(redis *redis.Client, logger *slog.Logger) *DistributedLock {
 	dl := &DistributedLock{
 		Id:     uuid.New().String(),
 		redis:  redis,

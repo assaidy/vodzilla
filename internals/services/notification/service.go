@@ -16,9 +16,15 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	AddNotification(ctx context.Context, userId uuid.UUID, payload Payload) error
+	MarkNotificationAsRead(ctx context.Context, userId, notificationId uuid.UUID) error
+	GetNotifications(ctx context.Context, userId, lastNotificationId uuid.UUID, limit int) ([]Notification, error)
+	GetUnreadNotificationsCount(ctx context.Context, userId uuid.UUID) (int, error)
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
@@ -26,8 +32,8 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
@@ -47,12 +53,12 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
@@ -126,7 +132,7 @@ type Notification struct {
 	IsRead    bool
 }
 
-func (me *Service) AddNotification(ctx context.Context, userId uuid.UUID, payload Payload) error {
+func (me *impl) AddNotification(ctx context.Context, userId uuid.UUID, payload Payload) error {
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal notification payload: %w", err)
@@ -144,7 +150,7 @@ func (me *Service) AddNotification(ctx context.Context, userId uuid.UUID, payloa
 	return nil
 }
 
-func (me *Service) MarkNotificationAsRead(ctx context.Context, userId, notificationId uuid.UUID) error {
+func (me *impl) MarkNotificationAsRead(ctx context.Context, userId, notificationId uuid.UUID) error {
 	if n, err := me.queries.MarkNotificationAsRead(ctx, queries.MarkNotificationAsReadParams{
 		Id:     notificationId,
 		UserId: userId,
@@ -157,7 +163,7 @@ func (me *Service) MarkNotificationAsRead(ctx context.Context, userId, notificat
 	return nil
 }
 
-func (me *Service) GetNotifications(ctx context.Context, userId, lastNotificationId uuid.UUID, limit int) ([]Notification, error) {
+func (me *impl) GetNotifications(ctx context.Context, userId, lastNotificationId uuid.UUID, limit int) ([]Notification, error) {
 	dbNotifications, err := me.queries.GetNotifications(ctx, queries.GetNotificationsParams{
 		UserId:             userId,
 		LastNotificationId: uuid.NullUUID{UUID: lastNotificationId, Valid: lastNotificationId != uuid.Nil},
@@ -182,7 +188,7 @@ func (me *Service) GetNotifications(ctx context.Context, userId, lastNotificatio
 	return result, nil
 }
 
-func (me *Service) GetUnreadNotificationsCount(ctx context.Context, userId uuid.UUID) (int, error) {
+func (me *impl) GetUnreadNotificationsCount(ctx context.Context, userId uuid.UUID) (int, error) {
 	count, err := me.queries.GetUnreadNotificationsCount(ctx, userId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get unread notifications count: %w", err)
@@ -191,7 +197,7 @@ func (me *Service) GetUnreadNotificationsCount(ctx context.Context, userId uuid.
 	return int(count), nil
 }
 
-func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()

@@ -1,4 +1,4 @@
-package utils
+package keyed_mutex
 
 import (
 	"sync"
@@ -6,8 +6,8 @@ import (
 )
 
 // This works only for a single-process setup.
-// For distributed environments, use [DistributedLock] instead.
-func NewKeyedMutex() *KeyedRWMutex {
+// For distributed environments, use [distributedlock] instead.
+func New() *KeyedRWMutex {
 	km := &KeyedRWMutex{
 		muMap: make(map[string]*mutex),
 	}

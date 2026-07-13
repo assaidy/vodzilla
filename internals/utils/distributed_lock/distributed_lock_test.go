@@ -1,4 +1,4 @@
-package utils
+package distributed_lock
 
 import (
 	"context"
@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 }
 
 func newDL() *DistributedLock {
-	return NewDistributedLock(testRedis, slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})))
+	return New(testRedis, slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError})))
 }
 
 func TestTryLockUnlock(t *testing.T) {

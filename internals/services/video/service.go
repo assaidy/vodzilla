@@ -17,9 +17,34 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error)
+	ActivateVideo(ctx context.Context, videoId uuid.UUID) error
+	GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error)
+	GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (int, error)
+	GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error)
+	GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error)
+	DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error)
+	IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
+	AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
+	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
+	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error)
+	GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error)
+	CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error)
+	DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error
+	RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error
+	AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
+	DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
+	GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error)
+	GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error)
+	GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error)
+	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error)
+	IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error)
+	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
@@ -27,8 +52,8 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
@@ -54,12 +79,12 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
@@ -70,7 +95,7 @@ type CreateVideoParams struct {
 	Description string
 }
 
-func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error) {
+func (me *impl) CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error) {
 	videoId := uuid.Must(uuid.NewV7())
 
 	if err := me.queries.InsertPendingVideo(ctx, queries.InsertPendingVideoParams{
@@ -85,7 +110,7 @@ func (me *Service) CreateVideo(ctx context.Context, params CreateVideoParams) (u
 	return videoId, nil
 }
 
-func (me *Service) ActivateVideo(ctx context.Context, videoId uuid.UUID) error {
+func (me *impl) ActivateVideo(ctx context.Context, videoId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -139,7 +164,7 @@ type PlaylistVideo struct {
 	PlaylistVideoId int64
 }
 
-func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
+func (me *impl) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
 	video, err := me.queries.GetVideoById(ctx, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -157,7 +182,7 @@ func (me *Service) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, erro
 	}, nil
 }
 
-func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (int, error) {
+func (me *impl) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (int, error) {
 	n, err := me.queries.GetVideosCountForUser(ctx, userId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get videos count for user: %w", err)
@@ -166,7 +191,7 @@ func (me *Service) GetVideosCountForUser(ctx context.Context, userId uuid.UUID) 
 	return int(n), nil
 }
 
-func (me *Service) GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error) {
+func (me *impl) GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error) {
 	videos, err := me.queries.GetVideosForUser(ctx, queries.GetVideosForUserParams{
 		UserId:      userId,
 		LastVideoId: uuid.NullUUID{UUID: lastVideoId, Valid: lastVideoId != uuid.Nil},
@@ -190,7 +215,7 @@ func (me *Service) GetVideosForUser(ctx context.Context, userId, lastVideoId uui
 	return result, nil
 }
 
-func (me *Service) GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error) {
+func (me *impl) GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error) {
 	if len(userIds) == 0 {
 		return nil, nil
 	}
@@ -218,7 +243,7 @@ func (me *Service) GetVideosForMultipleUsers(ctx context.Context, userIds []uuid
 	return result, nil
 }
 
-func (me *Service) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) {
+func (me *impl) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckVideo(ctx, id)
 	if err != nil {
 		return false, fmt.Errorf("failed to check video: %w", err)
@@ -227,14 +252,14 @@ func (me *Service) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, erro
 	return ok, nil
 }
 
-func (me *Service) IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
+func (me *impl) IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
 	return me.queries.CheckVideoInWatchlaters(ctx, queries.CheckVideoInWatchlatersParams{
 		VideoId: videoId,
 		UserId:  userId,
 	})
 }
 
-func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
+func (me *impl) AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -271,7 +296,7 @@ func (me *Service) AddVideoToWatchlater(ctx context.Context, videoId, userId uui
 	return nil
 }
 
-func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
+func (me *impl) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -301,7 +326,7 @@ func (me *Service) DeleteVideoFromWatchlater(ctx context.Context, videoId, userI
 	return nil
 }
 
-func (me *Service) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error) {
+func (me *impl) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error) {
 	rows, err := me.queries.GetVideosInWatchlaters(ctx, queries.GetVideosInWatchlatersParams{
 		UserId:           userId,
 		LastWatchlaterId: sql.NullInt64{Int64: lastId, Valid: lastId != 0},
@@ -328,7 +353,7 @@ func (me *Service) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, 
 	return result, nil
 }
 
-func (me *Service) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error) {
+func (me *impl) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error) {
 	ownerId, err := me.queries.GetVideoOwner(ctx, videoId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -340,7 +365,7 @@ func (me *Service) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.U
 	return ownerId, nil
 }
 
-func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error) {
+func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error) {
 	playlistId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertPlaylist(ctx, queries.InsertPlaylistParams{
 		Id:      playlistId,
@@ -353,7 +378,7 @@ func (me *Service) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlis
 	return playlistId, nil
 }
 
-func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error {
+func (me *impl) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error {
 	if n, err := me.queries.DeletePlaylist(ctx, queries.DeletePlaylistParams{
 		Id:      playlistId,
 		OwnerId: userId,
@@ -366,7 +391,7 @@ func (me *Service) DeletePlaylist(ctx context.Context, userId, playlistId uuid.U
 	return nil
 }
 
-func (me *Service) RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error {
+func (me *impl) RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error {
 	if n, err := me.queries.UpdatePlaylistName(ctx, queries.UpdatePlaylistNameParams{
 		Id:      playlistId,
 		Name:    name,
@@ -380,7 +405,7 @@ func (me *Service) RenamePlaylist(ctx context.Context, userId, playlistId uuid.U
 	return nil
 }
 
-func (me *Service) AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
+func (me *impl) AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -426,7 +451,7 @@ func (me *Service) AddVideoToPlaylist(ctx context.Context, userId, videoId, play
 	return nil
 }
 
-func (me *Service) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
+func (me *impl) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin tx: %w", err)
@@ -476,7 +501,7 @@ type PlaylistWithVideoStatus struct {
 	HasVideo bool
 }
 
-func (me *Service) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error) {
+func (me *impl) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error) {
 	playlists, err := me.queries.GetPlaylistsForUser(ctx, queries.GetPlaylistsForUserParams{
 		UserId:         userId,
 		LastPlaylistId: uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
@@ -498,7 +523,7 @@ func (me *Service) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid
 	return result, nil
 }
 
-func (me *Service) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error) {
+func (me *impl) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -541,7 +566,7 @@ func (me *Service) GetPlaylistsWithVideoStatus(ctx context.Context, userId, vide
 	return result, nil
 }
 
-func (me *Service) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error) {
+func (me *impl) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error) {
 	playlist, err := me.queries.GetPlaylist(ctx, playlistId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -557,7 +582,7 @@ func (me *Service) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Play
 	}, nil
 }
 
-func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
+func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
 		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},
@@ -584,14 +609,14 @@ func (me *Service) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID
 	return result, nil
 }
 
-func (me *Service) IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error) {
+func (me *impl) IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error) {
 	return me.queries.CheckVideoInPlaylist(ctx, queries.CheckVideoInPlaylistParams{
 		VideoId:    videoId,
 		PlaylistId: playlistId,
 	})
 }
 
-func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()
@@ -655,7 +680,7 @@ func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
 	}
 }
 
-func (me *Service) pendingVideosCleanupJob(ctx context.Context) error {
+func (me *impl) pendingVideosCleanupJob(ctx context.Context) error {
 	me.logger.Info("cleaning up expired pending videos")
 	if err := me.queries.DeleteExpiredPendingVideos(ctx); err != nil {
 		return fmt.Errorf("failed to delete expired pending videos: %w", err)
@@ -663,7 +688,7 @@ func (me *Service) pendingVideosCleanupJob(ctx context.Context) error {
 	return nil
 }
 
-func (me *Service) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error {
+func (me *impl) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error {
 	if n, err := me.queries.DeleteVideoByIdForUser(ctx, queries.DeleteVideoByIdForUserParams{
 		Id:      videoId,
 		OwnerId: userId,

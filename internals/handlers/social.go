@@ -83,6 +83,33 @@ func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
+func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errInvalidRequest.details(err)
+	}
+
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	ok, err := me.socialService.IsFollower(c.RequestCtx(), currentUserId, userId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"isFollowing": ok})
+}
+
 func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {

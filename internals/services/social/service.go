@@ -16,9 +16,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var _ services.Service = (*Service)(nil)
+type Service interface {
+	services.Service
+	Follow(ctx context.Context, followerId, followedId uuid.UUID) error
+	Unfollow(ctx context.Context, followerId, followedId uuid.UUID) error
+	GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error)
+	IsFollower(ctx context.Context, followerId, followedId uuid.UUID) (bool, error)
+	GetFollowerIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error)
+	GetFollowedIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error)
+	GetAllFollowedIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error)
+	GetAllFollowerIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error)
+}
 
-type Service struct {
+type impl struct {
 	db            *sql.DB
 	queries       *queries.Queries
 	redis         *redis.Client
@@ -26,8 +36,8 @@ type Service struct {
 	workerManager *workers.WorkerManager
 }
 
-func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
-	service := &Service{
+func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
+	service := &impl{
 		db:            db,
 		queries:       queries.New(db),
 		redis:         redis,
@@ -47,17 +57,17 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) *Service {
 	return service
 }
 
-func (me *Service) Start(ctx context.Context) error {
+func (me *impl) Start(ctx context.Context) error {
 	me.workerManager.Start()
 	return nil
 }
 
-func (me *Service) Stop(ctx context.Context) error {
+func (me *impl) Stop(ctx context.Context) error {
 	me.workerManager.Stop()
 	return nil
 }
 
-func (me *Service) Follow(ctx context.Context, followerId, followedId uuid.UUID) error {
+func (me *impl) Follow(ctx context.Context, followerId, followedId uuid.UUID) error {
 	if followerId == followedId {
 		return ErrSelfFollowNotAllowed
 	}
@@ -92,7 +102,7 @@ func (me *Service) Follow(ctx context.Context, followerId, followedId uuid.UUID)
 	return nil
 }
 
-func (me *Service) Unfollow(ctx context.Context, followerId, followedId uuid.UUID) error {
+func (me *impl) Unfollow(ctx context.Context, followerId, followedId uuid.UUID) error {
 	if n, err := me.queries.DeleteFollow(ctx, queries.DeleteFollowParams{
 		FollowerId: followerId,
 		FollowedId: followedId,
@@ -110,7 +120,7 @@ type FollowCounts struct {
 	Followeds int64
 }
 
-func (me *Service) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error) {
+func (me *impl) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error) {
 	result, err := me.queries.GetFollowCounts(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get followers count: %w", err)
@@ -122,7 +132,7 @@ func (me *Service) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*Foll
 	}, nil
 }
 
-func (me *Service) IsFollower(ctx context.Context, followerId, followedId uuid.UUID) (bool, error) {
+func (me *impl) IsFollower(ctx context.Context, followerId, followedId uuid.UUID) (bool, error) {
 	ok, err := me.queries.CheckFollow(ctx, queries.CheckFollowParams{
 		FollowerId: followerId,
 		FollowedId: followedId,
@@ -131,10 +141,10 @@ func (me *Service) IsFollower(ctx context.Context, followerId, followedId uuid.U
 		return false, fmt.Errorf("failed to check follow: %w", err)
 	}
 
-	return ok, err
+	return ok, nil
 }
 
-func (me *Service) GetFollowerIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
+func (me *impl) GetFollowerIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
 	ids, err := me.queries.GetFollowerIds(ctx, queries.GetFollowerIdsParams{
 		UserId:     userId,
 		LastUserId: uuid.NullUUID{UUID: lastUserId, Valid: lastUserId != uuid.Nil},
@@ -146,7 +156,7 @@ func (me *Service) GetFollowerIds(ctx context.Context, userId, lastUserId uuid.U
 	return ids, nil
 }
 
-func (me *Service) GetFollowedIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
+func (me *impl) GetFollowedIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error) {
 	ids, err := me.queries.GetFollowedIds(ctx, queries.GetFollowedIdsParams{
 		UserId:     userId,
 		LastUserId: uuid.NullUUID{UUID: lastUserId, Valid: lastUserId != uuid.Nil},
@@ -158,7 +168,7 @@ func (me *Service) GetFollowedIds(ctx context.Context, userId, lastUserId uuid.U
 	return ids, nil
 }
 
-func (me *Service) GetAllFollowedIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
+func (me *impl) GetAllFollowedIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
 	ids, err := me.queries.GetAllFollowedIds(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all followed ids for user: %w", err)
@@ -166,7 +176,7 @@ func (me *Service) GetAllFollowedIds(ctx context.Context, userId uuid.UUID) ([]u
 	return ids, nil
 }
 
-func (me *Service) GetAllFollowerIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
+func (me *impl) GetAllFollowerIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error) {
 	ids, err := me.queries.GetAllFollowerIds(ctx, userId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all follower ids for user: %w", err)
@@ -174,7 +184,7 @@ func (me *Service) GetAllFollowerIds(ctx context.Context, userId uuid.UUID) ([]u
 	return ids, nil
 }
 
-func (me *Service) userDeletedEventConsumerJob(ctx context.Context) error {
+func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
 	ch := sub.Channel()

@@ -6,13 +6,15 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 )
 
-var _ services.Service = (*Service)(nil)
-
-type Service struct{}
-
-func New() *Service {
-	return &Service{}
+type Service interface {
+	services.Service
 }
 
-func (me *Service) Start(ctx context.Context) error { return nil }
-func (me *Service) Stop(ctx context.Context) error  { return nil }
+type impl struct{}
+
+func New() Service {
+	return &impl{}
+}
+
+func (me *impl) Start(ctx context.Context) error { return nil }
+func (me *impl) Stop(ctx context.Context) error  { return nil }
