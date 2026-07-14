@@ -266,6 +266,19 @@ func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, use
 	}
 }
 
+func uploadToPresignedURL(t *testing.T, url, contentType string, data []byte) {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(data))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 func createVerifiedVideo(t *testing.T, ownerID uuid.UUID, title, description string) uuid.UUID {
 	t.Helper()
 

@@ -184,9 +184,9 @@ func (me *impl) GenerateVideoPresignedPutUrls(
 	}
 
 	payload, err := json.Marshal(map[string]any{
-		"upload_id":  uploadId,
-		"object_key": objectKey,
-		"user_id":    userId.String(),
+		"uploadId":  uploadId,
+		"objectKey": objectKey,
+		"userId":    userId.String(),
 	})
 	if err != nil {
 		me.abortVideoUploadWithErrorLogging(ctx, objectKey, uploadId)
@@ -240,9 +240,9 @@ func (me *impl) ConfirmVideoUpload(
 	}
 
 	var pending struct {
-		UploadId  string `json:"upload_id"`
-		ObjectKey string `json:"object_key"`
-		UserId    string `json:"user_id"`
+		UploadId  string `json:"uploadId"`
+		ObjectKey string `json:"objectKey"`
+		UserId    string `json:"userId"`
 	}
 	if err := json.Unmarshal(result, &pending); err != nil {
 		return fmt.Errorf("failed to unmarshal pending video upload: %w", err)

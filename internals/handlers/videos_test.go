@@ -435,3 +435,231 @@ func TestHandleGetVideosCountForUser(t *testing.T) {
 		}
 	})
 }
+
+func TestHandleEditVideoThumbnail(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "thmbedit@example.com", "Password123", "Thumb Edit", "thmbedit")
+	otherUser := createVerifiedUser(t, app, "thmbother@example.com", "Password123", "Thumb Other", "thmbother")
+	videoID := createVerifiedVideo(t, user.ID, "Thumbnail Test", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"fileSize": 100,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "video/mp4",
+			"fileSize":    100,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    5*1024*1024 + 1,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/00000000-0000-0000-0000-000000000000/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("not owner", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, otherUser.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+		require.NotEmpty(t, uploadURL)
+	})
+}
+
+func TestHandleConfirmVideoThumbnailUpload(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "thmbconf@example.com", "Password123", "Thumb Confirm", "thmbconf")
+	otherUser := createVerifiedUser(t, app, "thmbconfother@example.com", "Password123", "Thumb Conf Other", "thmbconfother")
+	videoID := createVerifiedVideo(t, user.ID, "Confirm Thumbnail", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/00000000-0000-0000-0000-000000000000/thumbnail/confirm_upload", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("not owner", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, otherUser.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("no pending upload", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "ThumbnailNotFound")
+	})
+
+	t.Run("full flow and verify in video response", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+		require.NotEmpty(t, uploadURL)
+
+		uploadToPresignedURL(t, uploadURL, "image/jpeg", make([]byte, 100))
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		thumbnailURL, _ := data["thumbnailUrl"].(string)
+		require.NotEmpty(t, thumbnailURL)
+
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		respThumbnailURL, _ := data["thumbnailUrl"].(string)
+		if respThumbnailURL == "" {
+			t.Error("expected non-empty thumbnailUrl in video response")
+		}
+	})
+}
+
+func TestHandleDeleteVideoThumbnail(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "thmbdel@example.com", "Password123", "Thumb Del", "thmbdel")
+	otherUser := createVerifiedUser(t, app, "thmbdelother@example.com", "Password123", "Thumb Del Other", "thmbdelother")
+	videoID := createVerifiedVideo(t, user.ID, "Delete Thumbnail", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/videos/00000000-0000-0000-0000-000000000000/thumbnail", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("not owner", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, otherUser.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("no thumbnail", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "ThumbnailNotFound")
+	})
+
+	t.Run("full flow", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+
+		uploadToPresignedURL(t, uploadURL, "image/jpeg", make([]byte, 100))
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		respThumbnailURL, _ := data["thumbnailUrl"].(string)
+		if respThumbnailURL == "" {
+			t.Error("expected non-empty thumbnailUrl before deletion")
+		}
+
+		resp = testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		if _, ok := data["thumbnailUrl"]; ok {
+			t.Error("expected thumbnailUrl to be absent after deletion")
+		}
+	})
+
+	t.Run("delete again", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "ThumbnailNotFound")
+	})
+}

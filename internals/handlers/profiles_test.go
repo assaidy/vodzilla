@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleGetProfile(t *testing.T) {
@@ -194,13 +195,174 @@ func TestHandleDeleteProfile(t *testing.T) {
 }
 
 func TestHandleEditProfileAvatar(t *testing.T) {
-	t.Skip("TODO: implement test for HandleEditProfileAvatar")
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "avataredit@example.com", "Password123", "Avatar Edit", "avataredit")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    100,
+		}, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    100,
+		}, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"fileSize": 100,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "video/mp4",
+			"fileSize":    100,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+
+		resp = testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    2*1024*1024 + 1,
+		}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+		require.NotEmpty(t, uploadURL)
+	})
 }
 
 func TestHandleConfirmProfileAvatarUpload(t *testing.T) {
-	t.Skip("TODO: implement test for HandleConfirmProfileAvatarUpload")
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "avatarconf@example.com", "Password123", "Avatar Confirm", "avatarconf")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar/confirm_upload", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar/confirm_upload", nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no pending upload", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar/confirm_upload", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "AvatarNotFound")
+	})
+
+	t.Run("full flow and verify in profile", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+		require.NotEmpty(t, uploadURL)
+
+		uploadToPresignedURL(t, uploadURL, "image/png", make([]byte, 100))
+
+		resp = testRequest(t, app, http.MethodPut, "/profiles/avatar/confirm_upload", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		avatarURL, _ := data["avatarUrl"].(string)
+		require.NotEmpty(t, avatarURL)
+
+		resp = testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		profileAvatarURL, _ := data["avatarUrl"].(string)
+		if profileAvatarURL == "" {
+			t.Error("expected non-empty avatarUrl in profile response")
+		}
+	})
 }
 
 func TestHandleDeleteProfileAvatar(t *testing.T) {
-	t.Skip("TODO: implement test for HandleDeleteProfileAvatar")
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "avatardel@example.com", "Password123", "Avatar Del", "avatardel")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/profiles/avatar", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodDelete, "/profiles/avatar", nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no avatar", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/profiles/avatar", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "AvatarNotFound")
+	})
+
+	t.Run("full flow", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/profiles/avatar", fiber.Map{
+			"contentType": "image/png",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+
+		uploadToPresignedURL(t, uploadURL, "image/png", make([]byte, 100))
+
+		resp = testRequest(t, app, http.MethodPut, "/profiles/avatar/confirm_upload", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+
+		resp = testRequest(t, app, http.MethodDelete, "/profiles/avatar", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+
+		resp = testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		avatarURL, _ := data["avatarUrl"].(string)
+		if avatarURL != "" {
+			t.Errorf("expected empty avatarUrl after deletion, got %q", avatarURL)
+		}
+	})
+
+	t.Run("delete again", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/profiles/avatar", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "AvatarNotFound")
+	})
 }

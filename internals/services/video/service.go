@@ -583,6 +583,12 @@ func (me *impl) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlis
 }
 
 func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
+	if ok, err := me.queries.CheckPlaylist(ctx, playlistId); err != nil {
+		return nil, fmt.Errorf("failed to check playlist: %w", err)
+	} else if !ok {
+		return nil, ErrPlaylistNotFound
+	}
+
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
 		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},

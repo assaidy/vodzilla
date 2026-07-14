@@ -30,9 +30,6 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 
 	playlistId, err := me.videoService.CreatePlaylist(c.RequestCtx(), currentUserId, request.Name)
 	if err != nil {
-		if errors.Is(err, video_service.ErrPlaylistNameConflict) {
-			return errPlaylistNameConflict
-		}
 		return err
 	}
 
@@ -94,8 +91,8 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 
 func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	var request struct {
-		UserId         uuid.UUID `uri:"userId"`
-		VideoId        uuid.UUID `uri:"videoId"`
+		UserId         uuid.UUID `uri:"user_id"`
+		VideoId        uuid.UUID `uri:"video_id"`
 		LastPlaylistId uuid.UUID `query:"last_playlist_id"`
 		Limit          int       `query:"limit"`
 	}
@@ -127,7 +124,7 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	)
 	if err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
-			return errVideoNotFound //
+			return errVideoNotFound
 		}
 		return err
 	}
@@ -148,7 +145,7 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
-	playlistId, err := uuid.Parse(c.Params("user_id"))
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errInvalidRequest.details(err)
 	}
