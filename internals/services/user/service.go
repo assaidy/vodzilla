@@ -341,10 +341,16 @@ func (me *impl) GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, 
 }
 
 func (me *impl) Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error {
-	if ok, err := me.queries.CheckUserId(ctx, userId); err != nil {
-		return fmt.Errorf("failed to check user id: %w", err)
-	} else if !ok {
-		return ErrUserNotFound
+	user, err := me.queries.GetUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if !user.IsVerified {
+		return ErrUnverified
 	}
 
 	if nDeleted, err := me.queries.DeleteSessionForUser(ctx, queries.DeleteSessionForUserParams{
@@ -384,6 +390,10 @@ func (me *impl) GetUserById(ctx context.Context, userId uuid.UUID) (*User, error
 		return nil, fmt.Errorf("failed to get user by id: %w", err)
 	}
 
+	if !user.IsVerified {
+		return nil, ErrUserNotFound
+	}
+
 	return &User{
 		Id:       user.Id,
 		Name:     user.Name,
@@ -402,6 +412,10 @@ func (me *impl) GetUserByUsername(ctx context.Context, username string) (*User, 
 		return nil, fmt.Errorf("failed to get user by id: %w", err)
 	}
 
+	if !user.IsVerified {
+		return nil, ErrUserNotFound
+	}
+
 	return &User{
 		Id:       user.Id,
 		Name:     user.Name,
@@ -412,12 +426,15 @@ func (me *impl) GetUserByUsername(ctx context.Context, username string) (*User, 
 }
 
 func (me *impl) DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error) {
-	ok, err := me.queries.CheckUserId(ctx, userId)
+	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
-		return false, fmt.Errorf("failed to check user id: %w", err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get user by id: %w", err)
 	}
 
-	return ok, nil
+	return user.IsVerified, nil
 }
 
 func (me *impl) EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error {
@@ -434,6 +451,10 @@ func (me *impl) EditProfile(ctx context.Context, userId uuid.UUID, name, usernam
 			return ErrUserNotFound
 		}
 		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if !user.IsVerified {
+		return ErrUnverified
 	}
 
 	usernameChanged := user.Username != username
@@ -496,6 +517,10 @@ func (me *impl) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 		return fmt.Errorf("failed to get user by id: %w", err)
 	}
 
+	if !user.IsVerified {
+		return ErrUnverified
+	}
+
 	if err := qtx.InsertRetiredUsername(ctx, queries.InsertRetiredUsernameParams{
 		Username: user.Username,
 		UserId:   userId,
@@ -536,6 +561,10 @@ func (me *impl) EditCredentials(ctx context.Context, userId uuid.UUID, email, pa
 			return ErrUserNotFound
 		}
 		return fmt.Errorf("failed to get user by id: %w", err)
+	}
+
+	if !user.IsVerified {
+		return ErrUnverified
 	}
 
 	if user.Email != email {

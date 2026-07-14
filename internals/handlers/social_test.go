@@ -3,8 +3,6 @@ package handlers
 import (
 	"net/http"
 	"testing"
-
-	"github.com/gofiber/fiber/v3"
 )
 
 func TestHandleFollow(t *testing.T) {
@@ -12,17 +10,9 @@ func TestHandleFollow(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "soca@example.com", "Password123", "Social A", "soca")
+	createVerifiedUser(t, app, "socb@example.com", "Password123", "Social B", "socb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "socb@example.com",
-		"password": "Password123",
-		"name":     "Social B",
-		"username": "socb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/socb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/socb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -81,17 +71,9 @@ func TestHandleIsFollowing(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "isfa@example.com", "Password123", "IsF A", "isfa")
+	createVerifiedUser(t, app, "isfb@example.com", "Password123", "IsF B", "isfb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "isfb@example.com",
-		"password": "Password123",
-		"name":     "IsF B",
-		"username": "isfb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/isfb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/isfb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -142,17 +124,9 @@ func TestHandleGetFollowCounts(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "cnta@example.com", "Password123", "Count A", "cnta")
+	createVerifiedUser(t, app, "cntb@example.com", "Password123", "Count B", "cntb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "cntb@example.com",
-		"password": "Password123",
-		"name":     "Count B",
-		"username": "cntb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/cntb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/cntb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -208,17 +182,9 @@ func TestHandleGetFollowers(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "flwra@example.com", "Password123", "Follower A", "flwra")
+	createVerifiedUser(t, app, "flwrb@example.com", "Password123", "Follower B", "flwrb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "flwrb@example.com",
-		"password": "Password123",
-		"name":     "Follower B",
-		"username": "flwrb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/flwrb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/flwrb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -267,17 +233,9 @@ func TestHandleGetFolloweds(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "fldsa@example.com", "Password123", "Followeds A", "fldsa")
+	createVerifiedUser(t, app, "fldsb@example.com", "Password123", "Followeds B", "fldsb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "fldsb@example.com",
-		"password": "Password123",
-		"name":     "Followeds B",
-		"username": "fldsb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/fldsb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/fldsb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -308,17 +266,9 @@ func TestHandleUnfollow(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "unfa@example.com", "Password123", "Unfollow A", "unfa")
+	createVerifiedUser(t, app, "unfb@example.com", "Password123", "Unfollow B", "unfb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "unfb@example.com",
-		"password": "Password123",
-		"name":     "Unfollow B",
-		"username": "unfb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/unfb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/unfb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)
@@ -368,17 +318,9 @@ func TestHandleFollowCountsAfterUnfollow(t *testing.T) {
 	app := newTestApp(t)
 
 	sessionA := createVerifiedUser(t, app, "afta@example.com", "Password123", "After A", "afta")
+	createVerifiedUser(t, app, "aftb@example.com", "Password123", "After B", "aftb")
 
-	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
-		"email":    "aftb@example.com",
-		"password": "Password123",
-		"name":     "After B",
-		"username": "aftb",
-	}, nil)
-	status, _ := parseResponse(t, resp)
-	_ = status
-
-	resp = testRequest(t, app, http.MethodGet, "/profiles/usernames/aftb", nil, sessionA)
+	resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/aftb", nil, sessionA)
 	status, data := parseResponse(t, resp)
 	_ = status
 	bId, _ := data["id"].(string)

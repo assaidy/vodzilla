@@ -204,6 +204,8 @@ func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, use
 	status, _ := parseResponse(t, resp)
 	require.Equal(t, 200, status, "register failed")
 
+	testMailer.Clear()
+
 	resp = testRequest(t, app, http.MethodPost, "/auth/verification_email", fiber.Map{
 		"email":   email,
 		"baseUrl": "http://localhost/auth/verification_email/verify",
