@@ -309,7 +309,7 @@ func TestHandleLogout(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "logout@example.com", "Password123", "Logout Tester", "logouttester")
+	user := createVerifiedUser(t, app, "logout@example.com", "Password123", "Logout Tester", "logouttester")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPost, "/auth/logout", nil, nil)
@@ -318,13 +318,13 @@ func TestHandleLogout(t *testing.T) {
 	})
 
 	t.Run("valid logout", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/auth/logout", nil, session)
+		resp := testRequest(t, app, http.MethodPost, "/auth/logout", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
 
 	t.Run("logout again (dead session)", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/auth/logout", nil, session)
+		resp := testRequest(t, app, http.MethodPost, "/auth/logout", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
@@ -334,7 +334,7 @@ func TestHandleEditCredentials(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "editcred@example.com", "Password123", "Edit Cred", "editcred")
+	user := createVerifiedUser(t, app, "editcred@example.com", "Password123", "Edit Cred", "editcred")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{}, nil)
@@ -343,14 +343,14 @@ func TestHandleEditCredentials(t *testing.T) {
 	})
 
 	t.Run("no CSRF", func(t *testing.T) {
-		noCsrf := &testSession{Cookies: session.Cookies}
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{}, noCsrf)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
 
 	t.Run("empty body", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{}, session)
+		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -359,7 +359,7 @@ func TestHandleEditCredentials(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
 			"email":    "bad",
 			"password": "NewPassword123",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -368,7 +368,7 @@ func TestHandleEditCredentials(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
 			"email":    "editcred@example.com",
 			"password": "",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -377,7 +377,7 @@ func TestHandleEditCredentials(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
 			"email":    "new_editcred@example.com",
 			"password": "NewPassword456",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})

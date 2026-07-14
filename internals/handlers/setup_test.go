@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/pressly/goose/v3"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
@@ -80,6 +81,12 @@ func (m *mockMailer) Clear() {
 type testSession struct {
 	Cookies   []*http.Cookie
 	CsrfToken string
+}
+
+type testUser struct {
+	ID       uuid.UUID
+	Username string
+	Session  *testSession
 }
 
 func newTestApp(t *testing.T) *fiber.App {
@@ -140,6 +147,21 @@ func parseResponse(t *testing.T, resp *http.Response) (int, fiber.Map) {
 	return resp.StatusCode, data
 }
 
+func parseArrayResponse(t *testing.T, resp *http.Response) (int, []any) {
+	t.Helper()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	var data []any
+	if err := json.Unmarshal(body, &data); err != nil {
+		return resp.StatusCode, nil
+	}
+
+	return resp.StatusCode, data
+}
+
 func extractSession(resp *http.Response) *testSession {
 	session := &testSession{}
 	for _, c := range resp.Cookies() {
@@ -192,7 +214,7 @@ func assertKind(t *testing.T, status int, data fiber.Map, expectedStatus int, ex
 	return true
 }
 
-func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, username string) *testSession {
+func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, username string) *testUser {
 	t.Helper()
 
 	resp := testRequest(t, app, http.MethodPost, "/auth/register", fiber.Map{
@@ -227,7 +249,41 @@ func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, use
 	status, _ = parseResponse(t, resp)
 	require.Equal(t, 200, status, "login failed")
 
-	return extractSession(resp)
+	session := extractSession(resp)
+
+	resp = testRequest(t, app, http.MethodGet, "/profiles", nil, session)
+	status, data := parseResponse(t, resp)
+	require.Equal(t, 200, status, "get profile failed")
+
+	idStr, _ := data["id"].(string)
+	userID, err := uuid.Parse(idStr)
+	require.NoError(t, err, "parse user id failed")
+
+	return &testUser{
+		ID:       userID,
+		Username: username,
+		Session:  session,
+	}
+}
+
+func createVerifiedVideo(t *testing.T, ownerID uuid.UUID, title, description string) uuid.UUID {
+	t.Helper()
+
+	videoID := uuid.Must(uuid.NewV7())
+	_, err := testDb.Exec(`
+		INSERT INTO video_service.videos (id, owner_id, title, description, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`, videoID, ownerID, title, description)
+	require.NoError(t, err)
+
+	objectKey := uuid.Must(uuid.NewV7()).String()
+	_, err = testDb.Exec(`
+		INSERT INTO media_service.videos (id, object_key)
+		VALUES ($1, $2)
+	`, videoID, objectKey)
+	require.NoError(t, err)
+
+	return videoID
 }
 
 func resetDb(t *testing.T) {

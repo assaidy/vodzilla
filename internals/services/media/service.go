@@ -101,7 +101,7 @@ func (me *impl) Stop(ctx context.Context) error {
 const (
 	videosBucket               = "videos"
 	maxVideoPartCount          = 10_000
-	minVideoPartSize           = 5 * utils.MegaByte
+	minVideoPartSize           = 5 * utils.MegaByte // TODO: what if file size is < 5 MB
 	presignedVideoUploadExpiry = 24 * time.Hour
 	presignedVideoGetExpiry    = 1 * time.Hour
 
@@ -184,9 +184,9 @@ func (me *impl) GenerateVideoPresignedPutUrls(
 	}
 
 	payload, err := json.Marshal(map[string]any{
-		"uploadId":  uploadId,
-		"objectKey": objectKey,
-		"userId":    userId.String(),
+		"upload_id":  uploadId,
+		"object_key": objectKey,
+		"user_id":    userId.String(),
 	})
 	if err != nil {
 		me.abortVideoUploadWithErrorLogging(ctx, objectKey, uploadId)

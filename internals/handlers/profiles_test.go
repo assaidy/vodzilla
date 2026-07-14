@@ -11,7 +11,7 @@ func TestHandleGetProfile(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "profown@example.com", "Password123", "Profile Own", "profown")
+	user := createVerifiedUser(t, app, "profown@example.com", "Password123", "Profile Own", "profown")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, nil)
@@ -20,7 +20,7 @@ func TestHandleGetProfile(t *testing.T) {
 	})
 
 	t.Run("own profile", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
@@ -30,7 +30,7 @@ func TestHandleGetProfileByUsername(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "profuser@example.com", "Password123", "Profile Username", "profuser")
+	user := createVerifiedUser(t, app, "profuser@example.com", "Password123", "Profile Username", "profuser")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/profuser", nil, nil)
@@ -39,13 +39,13 @@ func TestHandleGetProfileByUsername(t *testing.T) {
 	})
 
 	t.Run("by username", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/profuser", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/profuser", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
 
 	t.Run("non-existent username", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/nonexistent_user", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/usernames/nonexistent_user", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 404, "UserNotFound")
 	})
@@ -55,27 +55,22 @@ func TestHandleGetProfileById(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "profid@example.com", "Password123", "Profile ID", "profid")
-
-	resp := testRequest(t, app, http.MethodGet, "/profiles", nil, session)
-	status, data := parseResponse(t, resp)
-	_ = status
-	myId, _ := data["id"].(string)
+	user := createVerifiedUser(t, app, "profid@example.com", "Password123", "Profile ID", "profid")
 
 	t.Run("invalid UUID", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles/id/not-a-uuid", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/id/not-a-uuid", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidRequest")
 	})
 
 	t.Run("non-existent ID", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles/id/00000000-0000-0000-0000-000000000000", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/id/00000000-0000-0000-0000-000000000000", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("by ID", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles/id/"+myId, nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/id/"+user.ID.String(), nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
@@ -85,7 +80,7 @@ func TestHandleEditProfile(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "profcrd@example.com", "Password123", "Profile Edit", "profcrd")
+	user := createVerifiedUser(t, app, "profcrd@example.com", "Password123", "Profile Edit", "profcrd")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
@@ -96,7 +91,7 @@ func TestHandleEditProfile(t *testing.T) {
 	})
 
 	t.Run("no CSRF", func(t *testing.T) {
-		noCsrf := &testSession{Cookies: session.Cookies}
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "x", "username": "y",
 		}, noCsrf)
@@ -105,7 +100,7 @@ func TestHandleEditProfile(t *testing.T) {
 	})
 
 	t.Run("empty body", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{}, session)
+		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -113,7 +108,7 @@ func TestHandleEditProfile(t *testing.T) {
 	t.Run("empty name", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "", "username": "newname", "bio": "",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -121,7 +116,7 @@ func TestHandleEditProfile(t *testing.T) {
 	t.Run("empty username", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "New Name", "username": "", "bio": "",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -129,7 +124,7 @@ func TestHandleEditProfile(t *testing.T) {
 	t.Run("invalid username chars", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "New Name", "username": "bad user!", "bio": "",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
@@ -137,13 +132,13 @@ func TestHandleEditProfile(t *testing.T) {
 	t.Run("valid edit", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "Updated Profile", "username": "profupdated", "bio": "This is my bio",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
 
 	t.Run("verify edited profile", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		_ = status
 		name, _ := data["name"].(string)
@@ -157,7 +152,7 @@ func TestHandleEditProfile(t *testing.T) {
 	t.Run("duplicate username", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "Updated Profile", "username": "seconduser", "bio": "",
-		}, session)
+		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 409, "UsernameConflict")
 	})
@@ -167,7 +162,7 @@ func TestHandleDeleteProfile(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 
-	session := createVerifiedUser(t, app, "profdell@example.com", "Password123", "Profile Del", "profdell")
+	user := createVerifiedUser(t, app, "profdell@example.com", "Password123", "Profile Del", "profdell")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodDelete, "/profiles", nil, nil)
@@ -176,14 +171,14 @@ func TestHandleDeleteProfile(t *testing.T) {
 	})
 
 	t.Run("no CSRF", func(t *testing.T) {
-		noCsrf := &testSession{Cookies: session.Cookies}
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
 		resp := testRequest(t, app, http.MethodDelete, "/profiles", nil, noCsrf)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
 
 	t.Run("delete profile", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodDelete, "/profiles", nil, session)
+		resp := testRequest(t, app, http.MethodDelete, "/profiles", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
