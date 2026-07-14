@@ -230,7 +230,7 @@ func TestHandleVerifyEmail(t *testing.T) {
 	t.Run("missing token query", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/auth/verification_email/verify", nil, nil)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 400, "InvalidRequestBody")
 	})
 
 	t.Run("invalid token", func(t *testing.T) {

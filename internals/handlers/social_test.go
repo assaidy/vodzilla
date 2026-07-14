@@ -28,7 +28,7 @@ func TestHandleFollow(t *testing.T) {
 	t.Run("invalid user_id", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPost, "/follows/not-a-uuid", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestHandleIsFollowing(t *testing.T) {
 	t.Run("invalid UUID", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/not-a-uuid/is_following", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestHandleGetFollowCounts(t *testing.T) {
 	t.Run("invalid UUID", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/not-a-uuid/counts", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestHandleGetFollowers(t *testing.T) {
 	t.Run("invalid UUID", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/not-a-uuid/followers", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -188,13 +188,13 @@ func TestHandleGetFollowers(t *testing.T) {
 	t.Run("limit too small", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/"+userB.ID.String()+"/followers?limit=5", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("limit too large", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/"+userB.ID.String()+"/followers?limit=200", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 }
 
@@ -210,7 +210,7 @@ func TestHandleGetFolloweds(t *testing.T) {
 	t.Run("invalid UUID", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/follows/not-a-uuid/followeds", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {
@@ -251,7 +251,7 @@ func TestHandleUnfollow(t *testing.T) {
 	t.Run("invalid user_id", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodDelete, "/follows/not-a-uuid", nil, userA.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent user", func(t *testing.T) {

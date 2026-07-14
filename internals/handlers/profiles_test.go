@@ -61,7 +61,7 @@ func TestHandleGetProfileById(t *testing.T) {
 	t.Run("invalid UUID", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/profiles/id/not-a-uuid", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "UserNotFound")
 	})
 
 	t.Run("non-existent ID", func(t *testing.T) {

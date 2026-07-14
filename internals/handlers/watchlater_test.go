@@ -21,20 +21,21 @@ func TestHandleGetWatchlaters(t *testing.T) {
 	t.Run("validation limit too low", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/watchlaters?limit=1", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("validation limit too high", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/watchlaters?limit=200", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("empty list", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/watchlaters", nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, data)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("success with one video", func(t *testing.T) {
@@ -44,10 +45,11 @@ func TestHandleGetWatchlaters(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/watchlaters", nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, data, 1)
-		item, _ := data[0].(map[string]any)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item, _ := items[0].(map[string]any)
 		require.NotEmpty(t, item["watchlaterVideoId"])
 		require.Equal(t, videoID.String(), item["id"])
 	})
@@ -60,9 +62,10 @@ func TestHandleGetWatchlaters(t *testing.T) {
 			resp.Body.Close()
 		}
 		resp := testRequest(t, app, http.MethodGet, "/watchlaters?limit=15", nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, data, 15)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 15)
 	})
 }
 
@@ -94,7 +97,7 @@ func TestHandleAddToWatchLaters(t *testing.T) {
 	t.Run("invalid video id", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPost, "/watchlaters/videos/not-a-uuid", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "VideoNotFound")
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -138,7 +141,7 @@ func TestHandleDeleteFromWatchLaters(t *testing.T) {
 	t.Run("invalid video id", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodDelete, "/watchlaters/videos/not-a-uuid", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidRequest")
+		assertKind(t, status, data, 404, "VideoNotFound")
 	})
 
 	t.Run("video not in watchlater", func(t *testing.T) {
@@ -157,9 +160,10 @@ func TestHandleDeleteFromWatchLaters(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/watchlaters", nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, data)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("delete again", func(t *testing.T) {

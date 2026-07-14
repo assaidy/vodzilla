@@ -81,9 +81,10 @@ func TestHandleGetPlaylists(t *testing.T) {
 
 	t.Run("empty list", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String(), nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, data)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("success with playlists", func(t *testing.T) {
@@ -98,11 +99,12 @@ func TestHandleGetPlaylists(t *testing.T) {
 		pl2, _ := data["playlistId"].(string)
 
 		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String(), nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data = parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, dataArr, 2)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 2)
 		ids := make(map[string]bool)
-		for _, item := range dataArr {
+		for _, item := range items {
 			m := item.(map[string]any)
 			ids[m["id"].(string)] = true
 		}
@@ -112,9 +114,10 @@ func TestHandleGetPlaylists(t *testing.T) {
 
 	t.Run("other user has no playlists", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+otherUser.ID.String(), nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, data)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 }
 
@@ -144,9 +147,10 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 
 	t.Run("empty list", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/"+videoID.String(), nil, user.Session)
-		status, data := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, data)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("success with hasVideo", func(t *testing.T) {
@@ -160,10 +164,11 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/"+videoID.String(), nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data = parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, dataArr, 1)
-		item := dataArr[0].(map[string]any)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
 		require.Equal(t, plID, item["id"])
 		require.Equal(t, true, item["hasVideo"])
 	})
@@ -239,10 +244,11 @@ func TestHandleRenamePlaylist(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String(), nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, dataArr, 1)
-		item := dataArr[0].(map[string]any)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
 		require.Equal(t, "New Name", item["name"])
 	})
 }
@@ -281,9 +287,10 @@ func TestHandleDeletePlaylist(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String(), nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, dataArr)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("delete again", func(t *testing.T) {
@@ -396,9 +403,10 @@ func TestHandleDeleteVideoFromPlaylist(t *testing.T) {
 		resp.Body.Close()
 
 		resp = testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos", nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Empty(t, dataArr)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
 	})
 
 	t.Run("delete again", func(t *testing.T) {
@@ -438,21 +446,22 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 	t.Run("validation limit too low", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos?limit=1", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("validation limit too high", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos?limit=200", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("success", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos", nil, user.Session)
-		status, dataArr := parseArrayResponse(t, resp)
+		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
-		require.Len(t, dataArr, 1)
-		item := dataArr[0].(map[string]any)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
 		require.NotEmpty(t, item["playlistVideoId"])
 		require.Equal(t, videoID.String(), item["id"])
 	})

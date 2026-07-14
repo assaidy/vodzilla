@@ -22,8 +22,8 @@ func (me *Handler) HandleRegister(c fiber.Ctx) error {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
@@ -36,7 +36,7 @@ func (me *Handler) HandleRegister(c fiber.Ctx) error {
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 256)),
 		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	if err := me.userService.Register(
@@ -63,8 +63,8 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 		Email   string `json:"email"`
 		BaseUrl string `json:"baseUrl"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
@@ -74,7 +74,7 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.BaseUrl, validation.Required, is.URL),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	if err := me.userService.SendVerificationEmail(c.RequestCtx(), request.Email, request.BaseUrl); err != nil {
@@ -90,7 +90,7 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 func (me *Handler) HandleVerifyEmail(c fiber.Ctx) error {
 	token := strings.TrimSpace(c.Query("token"))
 	if token == "" {
-		return errInvalidRequest.details("missing token query")
+		return errInvalidRequestBody.details("missing token query")
 	}
 
 	if err := me.userService.VerifyEmail(c.RequestCtx(), token); err != nil {
@@ -108,8 +108,8 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
@@ -118,7 +118,7 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	session, err := me.userService.Login(c.RequestCtx(), request.Email, request.Password)
@@ -153,22 +153,20 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-type WithSessionRequest struct {
-	SessionId    uuid.UUID `cookie:"session_id"`
-	SessionToken string    `cookie:"session_token"`
-}
-
 func (me *Handler) WithSession(c fiber.Ctx) error {
-	var request WithSessionRequest
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details("malformed cookies")
+	sessionIdStr := c.Cookies("session_id")
+	sessionToken := c.Cookies("session_token")
+
+	sessionId, err := uuid.Parse(sessionIdStr)
+	if err != nil {
+		return errUnauthorized.details("missing or invalid auth cookies")
 	}
 
-	if request.SessionId == uuid.Nil || request.SessionToken == "" {
+	if sessionToken == "" {
 		return errUnauthorized.details("missing auth cookies")
 	}
 
-	session, err := me.userService.GetSession(c.RequestCtx(), request.SessionId)
+	session, err := me.userService.GetSession(c.RequestCtx(), sessionId)
 	if err != nil {
 		if errors.Is(err, user_service.ErrSessionNotFound) {
 			return errUnauthorized.details("invalid cookies")
@@ -231,8 +229,8 @@ func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
@@ -241,7 +239,7 @@ func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

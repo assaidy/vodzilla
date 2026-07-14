@@ -1,28 +1,14 @@
 package handlers
 
 import (
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
 func (me *Handler) HandleGetFeed(c fiber.Ctx) error {
-	var request struct {
-		LastVideoId uuid.UUID `query:"last_video_id"`
-		Limit       int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
-	}
-
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -35,22 +21,27 @@ func (me *Handler) HandleGetFeed(c fiber.Ctx) error {
 	videos, err := me.videoService.GetVideosForMultipleUsers(
 		c.RequestCtx(),
 		ids,
-		request.LastVideoId,
-		request.Limit,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]videoResponse, 0, len(videos))
+	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
-		response = append(response, videoResponse{
+		items = append(items, videoResponse{
 			Id:          v.Id,
 			OwnerId:     v.OwnerId,
 			Timestamp:   v.Timestamp,
 			Title:       v.Title,
 			Description: v.Description,
 		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(videos[len(videos)-1].Id)
 	}
 
 	return c.JSON(response)

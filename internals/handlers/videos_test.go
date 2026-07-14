@@ -378,31 +378,33 @@ func TestHandleGetVideosForUser(t *testing.T) {
 	t.Run("limit too small", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+user.ID.String()+"?limit=5", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("limit too large", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+user.ID.String()+"?limit=200", nil, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 400, "InvalidData")
+		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
 	t.Run("success", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+user.ID.String()+"?limit=15", nil, user.Session)
-		status, videos := parseArrayResponse(t, resp)
-		assertKind(t, status, nil, 200, "")
-		if len(videos) != 2 {
-			t.Errorf("expected 2 videos, got %d", len(videos))
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		if len(items) != 2 {
+			t.Errorf("expected 2 videos, got %d", len(items))
 		}
 	})
 
 	t.Run("empty user (no videos)", func(t *testing.T) {
 		other := createVerifiedUser(t, app, "empty@example.com", "Password123", "Empty", "emptyuser")
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+other.ID.String()+"?limit=15", nil, user.Session)
-		status, videos := parseArrayResponse(t, resp)
-		assertKind(t, status, nil, 200, "")
-		if len(videos) != 0 {
-			t.Errorf("expected 0 videos, got %d", len(videos))
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		if len(items) != 0 {
+			t.Errorf("expected 0 videos, got %d", len(items))
 		}
 	})
 }

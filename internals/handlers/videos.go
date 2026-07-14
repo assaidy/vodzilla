@@ -20,8 +20,8 @@ func (me *Handler) HandleGenerateVideoUpload(c fiber.Ctx) error {
 		ContentType string `json:"contentType"`
 		FileSize    int64  `json:"fileSize"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.ContentType = strings.TrimSpace(request.ContentType)
@@ -35,7 +35,7 @@ func (me *Handler) HandleGenerateVideoUpload(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(32*utils.GigaByte)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -66,8 +66,8 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 			PartNumber int    `json:"partNumber"`
 		} `json:"parts"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	if err := validation.ValidateStruct(&request,
@@ -75,7 +75,7 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 		validation.Field(&request.UploadId, validation.Required),
 		validation.Field(&request.Parts, validation.Required),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	parts := make([]media_service.CompleteVideoUploadPart, 0, len(request.Parts))
@@ -110,8 +110,8 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		Description string `json:"description"`
 		ObjectKey   string `json:"objectKey"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Title = strings.TrimSpace(request.Title)
@@ -123,7 +123,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		validation.Field(&request.Description, validation.Length(0, 500)),
 		validation.Field(&request.ObjectKey, validation.Required),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -169,13 +169,17 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
-	var request struct {
-		VideoId     uuid.UUID `uri:"video_id"`
-		ContentType string    `json:"contentType"`
-		FileSize    int64     `json:"fileSize"`
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		ContentType string `json:"contentType"`
+		FileSize    int64  `json:"fileSize"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.ContentType = strings.TrimSpace(request.ContentType)
@@ -189,17 +193,17 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(5*utils.MegaByte)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
 
-	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId); err != nil {
+	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return errVideoNotFound
 		}
@@ -210,7 +214,7 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 
 	upload, err := me.mediaService.GeneratePresignedThumbnailUpload(
 		c.RequestCtx(),
-		request.VideoId,
+		videoId,
 		request.ContentType,
 		request.FileSize,
 	)
@@ -227,7 +231,7 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -260,7 +264,7 @@ func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -303,7 +307,7 @@ type videoResponse struct {
 func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	video, err := me.videoService.GetVideoById(c.RequestCtx(), videoId)
@@ -332,7 +336,7 @@ func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	url, err := me.mediaService.GenerateVideoPresignedGetUrl(c.RequestCtx(), videoId)
@@ -349,7 +353,7 @@ func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -370,31 +374,22 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
-	var request struct {
-		UserId      uuid.UUID `uri:"user_id"`
-		LastVideoId uuid.UUID `query:"last_video_id"`
-		Limit       int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return errUserNotFound
@@ -402,22 +397,22 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 
 	videos, err := me.videoService.GetVideosForUser(
 		c.RequestCtx(),
-		request.UserId,
-		request.LastVideoId,
-		request.Limit,
+		userId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]videoResponse, 0, len(videos))
+	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
 		thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), v.Id)
 		if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
 			return err
 		}
 
-		response = append(response, videoResponse{
+		items = append(items, videoResponse{
 			Id:           v.Id,
 			OwnerId:      v.OwnerId,
 			Timestamp:    v.Timestamp,
@@ -427,13 +422,18 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 		})
 	}
 
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(videos[len(videos)-1].Id)
+	}
+
 	return c.JSON(response)
 }
 
 func (me *Handler) HandleGetVideosCountForUser(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {

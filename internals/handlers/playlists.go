@@ -14,8 +14,8 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	var request struct {
 		Name string `json:"name"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Name = strings.TrimSpace(request.Name)
@@ -23,7 +23,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -43,25 +43,22 @@ type playlistResponse struct {
 }
 
 func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
-	var request struct {
-		UserId         uuid.UUID `uri:"user_id"`
-		LastPlaylistId uuid.UUID `query:"last_playlist_id"`
-		Limit          int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return errUserNotFound
@@ -69,47 +66,52 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 
 	playlists, err := me.videoService.GetPlaylists(
 		c.RequestCtx(),
-		request.UserId,
-		request.LastPlaylistId,
-		request.Limit,
+		userId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]playlistResponse, 0, len(playlists))
+	items := make([]playlistResponse, 0, len(playlists))
 	for _, p := range playlists {
-		response = append(response, playlistResponse{
+		items = append(items, playlistResponse{
 			Id:          p.Id,
 			Name:        p.Name,
 			VideosCount: p.VideosCount,
 		})
 	}
 
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(playlists[len(playlists)-1].Id)
+	}
+
 	return c.JSON(response)
 }
 
 func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
-	var request struct {
-		UserId         uuid.UUID `uri:"user_id"`
-		VideoId        uuid.UUID `uri:"video_id"`
-		LastPlaylistId uuid.UUID `query:"last_playlist_id"`
-		Limit          int       `query:"limit"`
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
-	}
-
-	if request.Limit == 0 {
-		request.Limit = 15
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return errUserNotFound
@@ -117,10 +119,10 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 
 	playlists, err := me.videoService.GetPlaylistsWithVideoStatus(
 		c.RequestCtx(),
-		request.UserId,
-		request.VideoId,
-		request.LastPlaylistId,
-		request.Limit,
+		userId,
+		videoId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -131,14 +133,19 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 
 	// I cannot add HasVideo field with tag omitempty to [playlistResponse] and reused it;
 	// omitempty would drop HasVideo=false, but the this response must include it.
-	response := make([]fiber.Map, 0, len(playlists))
+	items := make([]fiber.Map, 0, len(playlists))
 	for _, p := range playlists {
-		response = append(response, fiber.Map{
+		items = append(items, fiber.Map{
 			"id":          p.Id,
 			"name":        p.Name,
 			"videosCount": p.VideosCount,
 			"hasVideo":    p.HasVideo,
 		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(playlists[len(playlists)-1].Id)
 	}
 
 	return c.JSON(response)
@@ -147,7 +154,7 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errPlaylistNotFound
 	}
 
 	playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId)
@@ -166,12 +173,16 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
-	var request struct {
-		PlaylistId uuid.UUID `uri:"playlist_id"`
-		Name       string    `json:"name"`
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Name string `json:"name"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Name = strings.TrimSpace(request.Name)
@@ -179,7 +190,7 @@ func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -187,7 +198,7 @@ func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
 	if err := me.videoService.RenamePlaylist(
 		c.RequestCtx(),
 		currentUserId,
-		request.PlaylistId,
+		playlistId,
 		request.Name,
 	); err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
@@ -202,7 +213,7 @@ func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
 func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errPlaylistNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -218,12 +229,13 @@ func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
-	var request struct {
-		VideoId    uuid.UUID `uri:"video_id"`
-		PlaylistId uuid.UUID `uri:"playlist_id"`
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -231,8 +243,8 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 	if err := me.videoService.AddVideoToPlaylist(
 		c.RequestCtx(),
 		currentUserId,
-		request.VideoId,
-		request.PlaylistId,
+		videoId,
+		playlistId,
 	); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return errVideoNotFound
@@ -250,12 +262,13 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
-	var request struct {
-		VideoId    uuid.UUID `uri:"video_id"`
-		PlaylistId uuid.UUID `uri:"playlist_id"`
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -263,8 +276,8 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	if err := me.videoService.DeleteVideoFromPlaylist(
 		c.RequestCtx(),
 		currentUserId,
-		request.VideoId,
-		request.PlaylistId,
+		videoId,
+		playlistId,
 	); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return errVideoNotFound
@@ -282,30 +295,21 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
-	var request struct {
-		PlaylistId uuid.UUID `uri:"playlist_id"`
-		LastId     int64     `query:"last_id"`
-		Limit      int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
+	pr, err := parsePaginatedRequest[int64](c)
+	if err != nil {
+		return err
 	}
 
 	videos, err := me.videoService.GetVideosInPlaylist(
 		c.RequestCtx(),
-		request.PlaylistId,
-		request.LastId,
-		request.Limit,
+		playlistId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
@@ -314,9 +318,9 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 		return err
 	}
 
-	resposne := make([]videoResponse, 0, len(videos))
+	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
-		resposne = append(resposne, videoResponse{
+		items = append(items, videoResponse{
 			Id:              v.Id,
 			OwnerId:         v.OwnerId,
 			Timestamp:       v.Timestamp,
@@ -326,5 +330,10 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(resposne)
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(videos[len(videos)-1].PlaylistVideoId)
+	}
+
+	return c.JSON(response)
 }

@@ -15,7 +15,7 @@ import (
 func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -39,12 +39,16 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
-	var request struct {
-		VideoId uuid.UUID `uri:"video_id"`
-		Content string    `json:"content"`
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Content string `json:"content"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Content = strings.TrimSpace(request.Content)
@@ -52,15 +56,15 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return extractValidationError(err)
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
 
-	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
 	} else if !ok {
 		return errVideoNotFound
@@ -71,14 +75,14 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 	commentId, err := me.reactionService.CreateVideoComment(
 		c.RequestCtx(),
 		currentUserId,
-		request.VideoId,
+		videoId,
 		request.Content,
 	)
 	if err != nil {
 		return err
 	}
 
-	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId)
+	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
@@ -88,7 +92,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 			ownerId,
 			notification_service.VideoCommentPayload{
 				UserId:    currentUserId,
-				VideoId:   request.VideoId,
+				VideoId:   videoId,
 				CommentId: commentId,
 			},
 		); err != nil {
@@ -108,31 +112,22 @@ type commentResponse struct {
 }
 
 func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
-	var request struct {
-		VideoId       uuid.UUID `uri:"video_id"`
-		LastCommentId uuid.UUID `query:"last_comment_id"`
-		Limit         int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
 
-	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
 	} else if !ok {
 		return errVideoNotFound
@@ -140,17 +135,17 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 
 	comments, err := me.reactionService.GetVideoComments(
 		c.RequestCtx(),
-		request.VideoId,
-		request.LastCommentId,
-		request.Limit,
+		videoId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]commentResponse, 0, len(comments))
+	items := make([]commentResponse, 0, len(comments))
 	for _, c := range comments {
-		response = append(response, commentResponse{
+		items = append(items, commentResponse{
 			Id:           c.Id,
 			OwnerId:      c.UserId,
 			Content:      c.Content,
@@ -159,16 +154,25 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 		})
 	}
 
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(comments[len(comments)-1].Id)
+	}
+
 	return c.JSON(response)
 }
 
 func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
-	var request struct {
-		CommentId uuid.UUID `uri:"comment_id"`
-		Content   string    `json:"content"`
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Content string `json:"content"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Content = strings.TrimSpace(request.Content)
@@ -176,7 +180,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -184,7 +188,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	replyId, err := me.reactionService.CreateCommentReply(
 		c.RequestCtx(),
 		currentUserId,
-		request.CommentId,
+		commentId,
 		request.Content,
 	)
 	if err != nil {
@@ -194,7 +198,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		return err
 	}
 
-	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), request.CommentId)
+	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return errCommentNotFound
@@ -207,7 +211,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 			ownerId,
 			notification_service.CommentReplyPayload{
 				UserId:    currentUserId,
-				CommentId: request.CommentId,
+				CommentId: commentId,
 				ReplyId:   replyId,
 			},
 		); err != nil {
@@ -219,30 +223,21 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
-	var request struct {
-		CommentId     uuid.UUID `uri:"comment_id"`
-		LastCommentId uuid.UUID `query:"last_comment_id"`
-		Limit         int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
+		return err
 	}
 
 	replies, err := me.reactionService.GetCommentReplies(
 		c.RequestCtx(),
-		request.CommentId,
-		request.LastCommentId,
-		request.Limit,
+		commentId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
@@ -251,9 +246,9 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 		return err
 	}
 
-	resposne := make([]commentResponse, 0, len(replies))
+	items := make([]commentResponse, 0, len(replies))
 	for _, r := range replies {
-		resposne = append(resposne, commentResponse{
+		items = append(items, commentResponse{
 			Id:           r.Id,
 			OwnerId:      r.UserId,
 			Content:      r.Content,
@@ -262,13 +257,18 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(resposne)
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(replies[len(replies)-1].Id)
+	}
+
+	return c.JSON(response)
 }
 
 func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errCommentNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -284,12 +284,16 @@ func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleEditComment(c fiber.Ctx) error {
-	var request struct {
-		CommentId uuid.UUID `uri:"comment_id"`
-		Content   string    `json:"content"`
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Content string `json:"content"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Content = strings.TrimSpace(request.Content)
@@ -297,7 +301,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -305,7 +309,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	if err := me.reactionService.EditComment(
 		c.RequestCtx(),
 		currentUserId,
-		request.CommentId,
+		commentId,
 		request.Content,
 	); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
@@ -318,12 +322,16 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
-	var request struct {
-		VideoId uuid.UUID                    `uri:"video_id"`
-		Kind    reaction_service.FeelingKind `json:"kind"`
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Kind reaction_service.FeelingKind `json:"kind"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	if err := validation.ValidateStruct(&request,
@@ -332,17 +340,17 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 			reaction_service.FeelingDislike,
 		)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.lock.RLock(c.RequestCtx(), "video:"+request.VideoId.String()); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "video:"+request.VideoId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), "video:"+videoId.String())
 
-	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), request.VideoId); err != nil {
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err
 	} else if !ok {
 		return errVideoNotFound
@@ -351,13 +359,13 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 	if err := me.reactionService.AddVideoFeeling(
 		c.RequestCtx(),
 		currentUserId,
-		request.VideoId,
+		videoId,
 		request.Kind,
 	); err != nil {
 		return err
 	}
 
-	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), request.VideoId)
+	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
@@ -367,7 +375,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 			ownerId,
 			notification_service.VideoFeelingPayload{
 				UserId:  currentUserId,
-				VideoId: request.VideoId,
+				VideoId: videoId,
 				Feeling: string(request.Kind),
 			},
 		); err != nil {
@@ -381,7 +389,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -408,12 +416,16 @@ func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
-	var request struct {
-		CommentId uuid.UUID                    `uri:"comment_id"`
-		Kind      reaction_service.FeelingKind `json:"kind"`
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+
+	var request struct {
+		Kind reaction_service.FeelingKind `json:"kind"`
+	}
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	if err := validation.ValidateStruct(&request,
@@ -422,7 +434,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 			reaction_service.FeelingDislike,
 		)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -430,7 +442,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 	if err := me.reactionService.AddCommentFeeling(
 		c.RequestCtx(),
 		currentUserId,
-		request.CommentId,
+		commentId,
 		request.Kind,
 	); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
@@ -439,7 +451,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 		return err
 	}
 
-	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), request.CommentId)
+	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return errCommentNotFound
@@ -452,7 +464,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 			ownerId,
 			notification_service.CommentFeelingPayload{
 				UserId:    currentUserId,
-				CommentId: request.CommentId,
+				CommentId: commentId,
 				Feeling:   string(request.Kind),
 			},
 		); err != nil {
@@ -466,7 +478,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteCommentFeeling(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errCommentNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

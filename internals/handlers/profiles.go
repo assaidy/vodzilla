@@ -74,7 +74,7 @@ func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
 func (me *Handler) HandleGetProfileById(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	user, err := me.userService.GetUserById(c.RequestCtx(), userId)
@@ -106,8 +106,8 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 		Username string `json:"username"`
 		Bio      string `json:"bio"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.Name = strings.TrimSpace(request.Name)
@@ -119,7 +119,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
 		validation.Field(&request.Bio, validation.Length(0, 500)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -160,8 +160,8 @@ func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
 		ContentType string `json:"contentType"`
 		FileSize    int64  `json:"fileSize"`
 	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	if err := c.Bind().Body(&request); err != nil {
+		return errInvalidRequestBody.details(err)
 	}
 
 	request.ContentType = strings.TrimSpace(request.ContentType)
@@ -175,7 +175,7 @@ func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(2*utils.MegaByte)),
 	); err != nil {
-		return extractValidationError(err)
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

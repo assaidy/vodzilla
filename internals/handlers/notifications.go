@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -51,22 +50,9 @@ func (me *Handler) notify(ctx context.Context, userId uuid.UUID, payload notific
 }
 
 func (me *Handler) HandleGetNotifications(c fiber.Ctx) error {
-	var request struct {
-		LastNotificationId uuid.UUID `query:"last_notification_id"`
-		Limit              int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
-	}
-
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -74,22 +60,27 @@ func (me *Handler) HandleGetNotifications(c fiber.Ctx) error {
 	notifications, err := me.notificationService.GetNotifications(
 		c.RequestCtx(),
 		currentUserId,
-		request.LastNotificationId,
-		request.Limit,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]fiber.Map, 0, len(notifications))
+	items := make([]fiber.Map, 0, len(notifications))
 	for _, n := range notifications {
-		response = append(response, fiber.Map{
+		items = append(items, fiber.Map{
 			"id":        n.Id,
 			"kind":      n.Kind,
 			"payload":   n.Payload,
 			"createdAt": n.CreatedAt,
 			"isRead":    n.IsRead,
 		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(notifications[len(notifications)-1].Id)
 	}
 
 	return c.JSON(response)
@@ -109,7 +100,7 @@ func (me *Handler) HandleGetUnreadNotificationsCount(c fiber.Ctx) error {
 func (me *Handler) HandleMarkNotificationAsRead(c fiber.Ctx) error {
 	notificationId, err := uuid.Parse(c.Params("notification_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errNotificationNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

@@ -4,28 +4,14 @@ import (
 	"errors"
 
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
 func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
-	var request struct {
-		LastId int64 `query:"last_id"`
-		Limit  int   `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
-	}
-
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
+	pr, err := parsePaginatedRequest[int64](c)
+	if err != nil {
+		return err
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -33,16 +19,16 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 	videos, err := me.videoService.GetVideosInWatchlater(
 		c.RequestCtx(),
 		currentUserId,
-		request.LastId,
-		request.Limit,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response := make([]videoResponse, 0, len(videos))
+	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
-		response = append(response, videoResponse{
+		items = append(items, videoResponse{
 			Id:                v.Id,
 			OwnerId:           v.OwnerId,
 			Timestamp:         v.Timestamp,
@@ -52,17 +38,22 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 		})
 	}
 
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(videos[len(videos)-1].WatchlaterVideoId)
+	}
+
 	return c.JSON(response)
 }
 
 func (me *Handler) HandleAddToWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
-	userId := c.Locals("user_id").(uuid.UUID)
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, userId); err != nil {
+	if err := me.videoService.AddVideoToWatchlater(c.RequestCtx(), videoId, currentUserId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return errVideoNotFound
 		}
@@ -78,11 +69,11 @@ func (me *Handler) HandleAddToWatchLaters(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteFromWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errVideoNotFound
 	}
-	userId := c.Locals("user_id").(uuid.UUID)
+	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, userId); err != nil {
+	if err := me.videoService.DeleteVideoFromWatchlater(c.RequestCtx(), videoId, currentUserId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
 			return errVideoNotFound
 		}

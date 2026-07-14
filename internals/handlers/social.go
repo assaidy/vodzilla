@@ -7,7 +7,6 @@ import (
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -15,7 +14,7 @@ import (
 func (me *Handler) HandleFollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
@@ -57,7 +56,7 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
@@ -86,7 +85,7 @@ func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
@@ -113,7 +112,7 @@ func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
 func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
-		return errInvalidRequest.details(err)
+		return errUserNotFound
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
@@ -139,31 +138,22 @@ func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
-	var request struct {
-		UserId     uuid.UUID `uri:"user_id"`
-		LastUserId uuid.UUID `query:"last_user_id"`
-		Limit      int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return errUserNotFound
@@ -171,49 +161,44 @@ func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
 
 	ids, err := me.socialService.GetFollowerIds(
 		c.RequestCtx(),
-		request.UserId,
-		request.LastUserId,
-		request.Limit,
+		userId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response, err := me.getProfilesByIds(c, ids)
+	items, err := me.getProfilesByIds(c, ids)
 	if err != nil {
 		return err
 	}
 
-	// Client knows no pages are left when the last response is empty.
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(ids[len(ids)-1])
+	}
+
 	return c.JSON(response)
 }
 
 func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
-	var request struct {
-		UserId     uuid.UUID `uri:"user_id"`
-		LastUserId uuid.UUID `query:"last_user_id"`
-		Limit      int       `query:"limit"`
-	}
-	if err := c.Bind().All(&request); err != nil {
-		return errInvalidRequest.details(err)
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
 	}
 
-	if request.Limit == 0 {
-		request.Limit = 15
-	}
-
-	if err := validation.ValidateStruct(&request,
-		validation.Field(&request.Limit, validation.Min(15), validation.Max(100)),
-	); err != nil {
-		return extractValidationError(err)
-	}
-
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+request.UserId.String()); err != nil {
+	pr, err := parsePaginatedRequest[uuid.UUID](c)
+	if err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+request.UserId.String())
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), request.UserId); err != nil {
+	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
 	} else if !ok {
 		return errUserNotFound
@@ -221,17 +206,22 @@ func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
 
 	ids, err := me.socialService.GetFollowedIds(
 		c.RequestCtx(),
-		request.UserId,
-		request.LastUserId,
-		request.Limit,
+		userId,
+		pr.Cursor,
+		pr.Limit,
 	)
 	if err != nil {
 		return err
 	}
 
-	response, err := me.getProfilesByIds(c, ids)
+	items, err := me.getProfilesByIds(c, ids)
 	if err != nil {
 		return err
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(ids[len(ids)-1])
 	}
 
 	return c.JSON(response)
