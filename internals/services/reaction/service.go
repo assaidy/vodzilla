@@ -393,10 +393,7 @@ func (me *impl) CreateCommentReply(ctx context.Context, userId, commentId uuid.U
 	defer tx.Rollback()
 	qtx := me.queries.WithTx(tx)
 
-	if ok, err := qtx.CheckCommentForUser(ctx, queries.CheckCommentForUserParams{
-		Id:     commentId,
-		UserId: userId,
-	}); err != nil {
+	if ok, err := qtx.CheckComment(ctx, commentId); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check comment: %w", err)
 	} else if !ok {
 		return uuid.Nil, ErrCommentNotFound

@@ -55,16 +55,32 @@ func TestHandleGetNotifications(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 
+		// userB comments on userA's video → video_comment for userA
 		resp = testRequest(t, app, http.MethodPost, "/reactions/comments/videos/"+videoA.String(), fiber.Map{"content": "B's comment on A's video"}, userB.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
-		commentID := data["commentId"].(string)
+		commentB := data["commentId"].(string)
 
+		// userA comments on userB's video → video_comment for userB; this comment is owned by userA
+		resp = testRequest(t, app, http.MethodPost, "/reactions/comments/videos/"+videoB.String(), fiber.Map{"content": "A's comment on B's video"}, userA.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		commentA := data["commentId"].(string)
+
+		// userA feelings on videoB → video_feeling for userB
 		resp = testRequest(t, app, http.MethodPost, "/reactions/feelings/videos/"+videoB.String(), fiber.Map{"kind": "like"}, userA.Session)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 
-		resp = testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentID, fiber.Map{"kind": "dislike"}, userA.Session)
+		// userB replies to userA's comment → comment_reply for userA
+		resp = testRequest(t, app, http.MethodPost, "/reactions/comments/"+commentA+"/replies", fiber.Map{"content": "B's reply"}, userB.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		replyID := data["replyId"].(string)
+		require.NotEmpty(t, replyID)
+
+		// userA feels userB's comment → comment_feeling for userB
+		resp = testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentB, fiber.Map{"kind": "dislike"}, userA.Session)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 
@@ -76,6 +92,7 @@ func TestHandleGetNotifications(t *testing.T) {
 			userAKinds[item.(map[string]any)["kind"].(string)] = true
 		}
 		require.True(t, userAKinds["video_comment"], "expected video_comment for userA")
+		require.True(t, userAKinds["comment_reply"], "expected comment_reply for userA")
 
 		resp = testRequest(t, app, http.MethodGet, "/notifications/notifications?limit=100", nil, userB.Session)
 		status, data = parseResponse(t, resp)
@@ -85,6 +102,7 @@ func TestHandleGetNotifications(t *testing.T) {
 			userBKinds[item.(map[string]any)["kind"].(string)] = true
 		}
 		require.True(t, userBKinds["follow"], "expected follow for userB")
+		require.True(t, userBKinds["video_comment"], "expected video_comment for userB")
 		require.True(t, userBKinds["video_feeling"], "expected video_feeling for userB")
 		require.True(t, userBKinds["comment_feeling"], "expected comment_feeling for userB")
 	})
