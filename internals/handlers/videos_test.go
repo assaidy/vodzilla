@@ -360,8 +360,8 @@ func TestHandleGetVideosForUser(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 	user := createVerifiedUser(t, app, "vidsuser@example.com", "Password123", "Vids User", "vidsuser")
-	_ = createVerifiedVideo(t, user.ID, "Video 1", "First video")
-	_ = createVerifiedVideo(t, user.ID, "Video 2", "Second video")
+	createVerifiedVideo(t, user.ID, "Video 1", "First video")
+	createVerifiedVideo(t, user.ID, "Video 2", "Second video")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+user.ID.String(), nil, nil)
@@ -413,7 +413,7 @@ func TestHandleGetVideosCountForUser(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 	user := createVerifiedUser(t, app, "vidcnt@example.com", "Password123", "Vid Count", "vidcnt")
-	_ = createVerifiedVideo(t, user.ID, "Only Video", "")
+	createVerifiedVideo(t, user.ID, "Only Video", "")
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/videos/users/"+user.ID.String()+"/count", nil, nil)

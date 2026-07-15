@@ -147,21 +147,6 @@ func parseResponse(t *testing.T, resp *http.Response) (int, fiber.Map) {
 	return resp.StatusCode, data
 }
 
-func parseArrayResponse(t *testing.T, resp *http.Response) (int, []any) {
-	t.Helper()
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	var data []any
-	if err := json.Unmarshal(body, &data); err != nil {
-		return resp.StatusCode, nil
-	}
-
-	return resp.StatusCode, data
-}
-
 func extractSession(resp *http.Response) *testSession {
 	session := &testSession{}
 	for _, c := range resp.Cookies() {
