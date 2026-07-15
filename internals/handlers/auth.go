@@ -36,7 +36,7 @@ func (me *Handler) HandleRegister(c fiber.Ctx) error {
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 256)),
 		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	if err := me.userService.Register(
@@ -74,7 +74,7 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.BaseUrl, validation.Required, is.URL),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	if err := me.userService.SendVerificationEmail(c.RequestCtx(), request.Email, request.BaseUrl); err != nil {
@@ -90,7 +90,7 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 func (me *Handler) HandleVerifyEmail(c fiber.Ctx) error {
 	token := strings.TrimSpace(c.Query("token"))
 	if token == "" {
-		return errInvalidRequestBody.details("missing token query")
+		return errTokenNotFound
 	}
 
 	if err := me.userService.VerifyEmail(c.RequestCtx(), token); err != nil {
@@ -118,7 +118,7 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	session, err := me.userService.Login(c.RequestCtx(), request.Email, request.Password)
@@ -239,7 +239,7 @@ func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

@@ -23,7 +23,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -190,7 +190,7 @@ func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

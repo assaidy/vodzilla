@@ -119,7 +119,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 		validation.Field(&request.Username, validation.Required, validation.Length(1, 32), usernameLettersRule),
 		validation.Field(&request.Bio, validation.Length(0, 500)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -175,7 +175,7 @@ func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(2*utils.MegaByte)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

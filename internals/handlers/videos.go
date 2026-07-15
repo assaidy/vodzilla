@@ -35,7 +35,7 @@ func (me *Handler) HandleGenerateVideoUpload(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(32*utils.GigaByte)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -75,7 +75,7 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 		validation.Field(&request.UploadId, validation.Required),
 		validation.Field(&request.Parts, validation.Required),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	parts := make([]media_service.CompleteVideoUploadPart, 0, len(request.Parts))
@@ -93,10 +93,10 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 		parts,
 	); err != nil {
 		if errors.Is(err, media_service.ErrNoPendingVideoUpload) {
-			return fiber.NewError(fiber.StatusBadRequest, "no pending video upload")
+			return errNoPendingVideoUpload
 		}
 		if errors.Is(err, media_service.ErrInvalidConfirmVideoUploadData) {
-			return fiber.NewError(fiber.StatusUnprocessableEntity, "invalid complete upload data")
+			return errInvalidConfirmVideoUploadData
 		}
 		return err
 	}
@@ -123,7 +123,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		validation.Field(&request.Description, validation.Length(0, 500)),
 		validation.Field(&request.ObjectKey, validation.Required),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -193,7 +193,7 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 		})),
 		validation.Field(&request.FileSize, validation.Required, validation.Max(5*utils.MegaByte)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)

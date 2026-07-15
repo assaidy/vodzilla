@@ -140,7 +140,7 @@ func TestVideoUploadFlow(t *testing.T) {
 			"parts":     []fiber.Map{{"etag": "x", "partNumber": 1}},
 		}, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 500, "InternalFailure")
+		assertKind(t, status, data, 400, "NoPendingVideoUpload")
 	})
 
 	t.Run("confirm wrong uploadId", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestVideoUploadFlow(t *testing.T) {
 			"parts":     []fiber.Map{{"etag": "x", "partNumber": 1}},
 		}, user.Session)
 		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 500, "InternalFailure")
+		assertKind(t, status, data, 422, "InvalidConfirmVideoUploadData")
 	})
 
 	var etag string

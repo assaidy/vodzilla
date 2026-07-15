@@ -56,7 +56,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	if err := me.lock.RLock(c.RequestCtx(), "video:"+videoId.String()); err != nil {
@@ -180,7 +180,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -301,7 +301,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Content, validation.Required, validation.Length(1, 500)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -340,7 +340,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 			reaction_service.FeelingDislike,
 		)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -434,7 +434,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 			reaction_service.FeelingDislike,
 		)),
 	); err != nil {
-		return err
+		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
