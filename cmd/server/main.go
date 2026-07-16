@@ -11,6 +11,7 @@ import (
 
 	"github.com/assaidy/vodzilla/internals/handlers"
 	"github.com/assaidy/vodzilla/internals/services"
+	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
@@ -54,6 +55,7 @@ func main() {
 	reactionService := reaction_service.New(postgres, redis, logger.WithGroup("reaction service"))
 	socialService := social_service.New(postgres, redis, logger.WithGroup("social service"))
 	notificationService := notification_service.New(postgres, redis, logger.WithGroup("notification service"))
+	historyService := history_service.New(postgres, redis, logger.WithGroup("history service"))
 
 	serviceManager := services.NewManager(logger.WithGroup("service manager"))
 	{
@@ -63,6 +65,7 @@ func main() {
 		serviceManager.Add("reaction service", reactionService)
 		serviceManager.Add("social service", socialService)
 		serviceManager.Add("notification service", notificationService)
+		serviceManager.Add("history service", historyService)
 	}
 	serviceManager.StartAll()
 	defer serviceManager.StopAll()
@@ -76,6 +79,7 @@ func main() {
 		reactionService,
 		socialService,
 		notificationService,
+		historyService,
 	)
 	router := fiber.New(fiber.Config{AppName: "Vodzilla"})
 	handler.RegisterRoutes(router)

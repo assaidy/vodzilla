@@ -29,7 +29,7 @@ type Service interface {
 	IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
 	AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
 	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
-	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error)
+	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchlaterVideo, error)
 	GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error)
 	CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error)
 	DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error
@@ -39,7 +39,7 @@ type Service interface {
 	GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error)
 	GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error)
 	GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error)
-	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error)
+	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error)
 	IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error)
 	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
 }
@@ -156,12 +156,12 @@ type Video struct {
 
 type WatchlaterVideo struct {
 	Video
-	WatchlaterVideoId int64
+	WatchlaterVideoId int
 }
 
 type PlaylistVideo struct {
 	Video
-	PlaylistVideoId int64
+	PlaylistVideoId int
 }
 
 func (me *impl) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) {
@@ -326,10 +326,10 @@ func (me *impl) DeleteVideoFromWatchlater(ctx context.Context, videoId, userId u
 	return nil
 }
 
-func (me *impl) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int64, limit int) ([]WatchlaterVideo, error) {
+func (me *impl) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchlaterVideo, error) {
 	rows, err := me.queries.GetVideosInWatchlaters(ctx, queries.GetVideosInWatchlatersParams{
 		UserId:           userId,
-		LastWatchlaterId: sql.NullInt64{Int64: lastId, Valid: lastId != 0},
+		LastWatchlaterId: sql.NullInt64{Int64: int64(lastId), Valid: lastId != 0},
 		Limit:            int32(limit),
 	})
 	if err != nil {
@@ -346,7 +346,7 @@ func (me *impl) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, las
 				Title:       row.Title,
 				Description: row.Description.String,
 			},
-			WatchlaterVideoId: row.WatchlaterId,
+			WatchlaterVideoId: int(row.WatchlaterId),
 		})
 	}
 
@@ -582,7 +582,7 @@ func (me *impl) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlis
 	}, nil
 }
 
-func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int64, limit int) ([]PlaylistVideo, error) {
+func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error) {
 	if ok, err := me.queries.CheckPlaylist(ctx, playlistId); err != nil {
 		return nil, fmt.Errorf("failed to check playlist: %w", err)
 	} else if !ok {
@@ -591,7 +591,7 @@ func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, l
 
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
-		LastId:     sql.NullInt64{Int64: lastId, Valid: lastId != 0},
+		LastId:     sql.NullInt64{Int64: int64(lastId), Valid: lastId != 0},
 		Limit:      int32(limit),
 	})
 	if err != nil {
@@ -608,7 +608,7 @@ func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, l
 				Title:       row.Title,
 				Description: row.Description.String,
 			},
-			PlaylistVideoId: row.PlaylistVideoId,
+			PlaylistVideoId: int(row.PlaylistVideoId),
 		})
 	}
 

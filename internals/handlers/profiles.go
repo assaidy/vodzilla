@@ -19,7 +19,7 @@ type profileResponse struct {
 	Username  string    `json:"username"`
 	Email     string    `json:"email"`
 	Bio       string    `json:"bio"`
-	AvatarUrl string    `json:"avatarUrl"`
+	AvatarUrl string    `json:"avatarUrl,omitempty"`
 }
 
 func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
@@ -143,10 +143,11 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.lock.Lock(c.RequestCtx(), "user:"+currentUserId.String()); err != nil {
+	lockKey := "user:" + currentUserId.String()
+	if err := me.lock.Lock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.Unlock(c.RequestCtx(), "user:"+currentUserId.String())
+	defer me.lock.Unlock(c.RequestCtx(), lockKey)
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		return err

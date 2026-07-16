@@ -116,8 +116,8 @@ func (me *impl) Unfollow(ctx context.Context, followerId, followedId uuid.UUID) 
 }
 
 type FollowCounts struct {
-	Followers int64
-	Followeds int64
+	Followers int
+	Followeds int
 }
 
 func (me *impl) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error) {
@@ -127,8 +127,8 @@ func (me *impl) GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowC
 	}
 
 	return &FollowCounts{
-		Followers: result.FollowersCount,
-		Followeds: result.FollowedsCount,
+		Followers: int(result.FollowersCount),
+		Followeds: int(result.FollowedsCount),
 	}, nil
 }
 

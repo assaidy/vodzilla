@@ -3,6 +3,7 @@ package handlers
 import (
 	"log/slog"
 
+	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
@@ -22,6 +23,7 @@ type Handler struct {
 	reactionService     reaction_service.Service
 	socialService       social_service.Service
 	notificationService notification_service.Service
+	historyService      history_service.Service
 	lock                *distributed_lock.DistributedLock
 }
 
@@ -34,6 +36,7 @@ func New(
 	reactionService reaction_service.Service,
 	socialService social_service.Service,
 	notificationService notification_service.Service,
+	historyService history_service.Service,
 ) *Handler {
 	return &Handler{
 		logger:              logger,
@@ -44,6 +47,7 @@ func New(
 		reactionService:     reactionService,
 		socialService:       socialService,
 		notificationService: notificationService,
+		historyService:      historyService,
 		lock:                distributed_lock.New(redis, logger),
 	}
 }

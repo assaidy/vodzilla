@@ -89,5 +89,11 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Get("/notifications/notifications/count", me.WithSession, me.HandleGetUnreadNotificationsCount)
 	router.Post("/notifications/:notification_id/mark_read", me.WithSession, me.WithCsrfToken, me.HandleMarkNotificationAsRead)
 
-	// TODO: search, recommendations, history
+	// History
+	router.Get("/history", me.WithSession, me.HandleGetWatchHistory)
+	router.Post("/history/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleAddToWatchHistory)
+	router.Delete("/history/:entry_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteWatchHistoryEntry)
+	router.Delete("/history", me.WithSession, me.WithCsrfToken, me.HandleClearWatchHistory)
+
+	// TODO: search, recommendations
 }

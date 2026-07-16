@@ -51,3 +51,11 @@ sql:
       go:
         <<: *go-base
         out: "./internals/services/notification/queries/"
+
+  - engine: "postgresql"
+    schema: "./internals/services/history/db/migrations/"
+    queries: "./internals/services/history/db/queries.sql"
+    gen:
+      go:
+        <<: *go-base
+        out: "./internals/services/history/queries/"

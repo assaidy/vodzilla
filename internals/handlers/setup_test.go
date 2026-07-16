@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/assaidy/vodzilla/internals/services"
+	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
@@ -291,7 +292,7 @@ func resetDb(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	svcs := []string{"user", "video", "media", "reaction", "social", "notification"}
+	svcs := []string{"user", "video", "media", "reaction", "social", "notification", "history"}
 	for _, svc := range svcs {
 		dir := "../services/" + svc + "/db/migrations"
 		tableName := svc + "_goose_db_version"
@@ -349,7 +350,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	svcs := []string{"user", "video", "media", "reaction", "social", "notification"}
+	svcs := []string{"user", "video", "media", "reaction", "social", "notification", "history"}
 	for _, svc := range svcs {
 		dir := "../services/" + svc + "/db/migrations"
 		goose.SetTableName(svc + "_goose_db_version")
@@ -436,6 +437,7 @@ func TestMain(m *testing.M) {
 	reactionService := reaction_service.New(testDb, testRedis, logger.WithGroup("reaction service"))
 	socialService := social_service.New(testDb, testRedis, logger.WithGroup("social service"))
 	notificationService := notification_service.New(testDb, testRedis, logger.WithGroup("notification service"))
+	historyService := history_service.New(testDb, testRedis, logger.WithGroup("history service"))
 
 	testServices = services.NewManager(logger.WithGroup("service manager"))
 	testServices.Add("user service", userService)
@@ -444,6 +446,7 @@ func TestMain(m *testing.M) {
 	testServices.Add("reaction service", reactionService)
 	testServices.Add("social service", socialService)
 	testServices.Add("notification service", notificationService)
+	testServices.Add("history service", historyService)
 
 	testServices.StartAll()
 
@@ -456,6 +459,7 @@ func TestMain(m *testing.M) {
 		reactionService,
 		socialService,
 		notificationService,
+		historyService,
 	)
 
 	code := m.Run()

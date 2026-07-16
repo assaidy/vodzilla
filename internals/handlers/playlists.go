@@ -53,10 +53,11 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -106,10 +107,11 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -300,7 +302,7 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 		return errPlaylistNotFound
 	}
 
-	pr, err := parsePaginatedRequest[int64](c)
+	pr, err := parsePaginatedRequest[int](c)
 	if err != nil {
 		return err
 	}

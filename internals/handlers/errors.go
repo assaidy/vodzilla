@@ -60,6 +60,7 @@ var (
 	errCommentNotFound               = newApiError("CommentNotFound", "Comment not found.", fiber.StatusNotFound)
 	errFeelingNotFound               = newApiError("FeelingNotFound", "Feeling not found.", fiber.StatusNotFound)
 	errThumbnailNotFound             = newApiError("ThumbnailNotFound", "Thumbnail not found.", fiber.StatusNotFound)
+	errWatchHistoryEntryNotFound     = newApiError("WatchHistoryEntryNotFound", "Watch history entry not found.", fiber.StatusNotFound)
 	errObjectNotFound                = newApiError("ObjectNotFound", "Object not found.", fiber.StatusNotFound)
 	errNotificationNotFound          = newApiError("NotificationNotFound", "Notification not found.", fiber.StatusNotFound)
 	errNoPendingVideoUpload          = newApiError("NoPendingVideoUpload", "No pending video upload.", fiber.StatusBadRequest)

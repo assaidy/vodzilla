@@ -17,10 +17,11 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -57,10 +58,11 @@ func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -86,10 +88,11 @@ func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -113,10 +116,11 @@ func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -146,10 +150,11 @@ func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -191,10 +196,11 @@ func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := me.lock.RLock(c.RequestCtx(), "user:"+userId.String()); err != nil {
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), "user:"+userId.String())
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err

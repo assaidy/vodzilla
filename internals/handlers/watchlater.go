@@ -9,7 +9,7 @@ import (
 )
 
 func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
-	pr, err := parsePaginatedRequest[int64](c)
+	pr, err := parsePaginatedRequest[int](c)
 	if err != nil {
 		return err
 	}
