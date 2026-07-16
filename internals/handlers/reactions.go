@@ -87,7 +87,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return err
 	}
 	if ownerId != currentUserId {
-		if err := me.notify(
+		me.notify(
 			c.RequestCtx(),
 			ownerId,
 			notification_service.VideoCommentPayload{
@@ -95,9 +95,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 				VideoId:   videoId,
 				CommentId: commentId,
 			},
-		); err != nil {
-			return err
-		}
+		)
 	}
 
 	return c.JSON(fiber.Map{"commentId": commentId})
@@ -206,7 +204,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		return err
 	}
 	if ownerId != currentUserId {
-		if err := me.notify(
+		me.notify(
 			c.RequestCtx(),
 			ownerId,
 			notification_service.CommentReplyPayload{
@@ -214,9 +212,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 				CommentId: commentId,
 				ReplyId:   replyId,
 			},
-		); err != nil {
-			return err
-		}
+		)
 	}
 
 	return c.JSON(fiber.Map{"replyId": replyId})
@@ -370,7 +366,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 		return err
 	}
 	if ownerId != currentUserId {
-		if err := me.notify(
+		me.notify(
 			c.RequestCtx(),
 			ownerId,
 			notification_service.VideoFeelingPayload{
@@ -378,9 +374,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 				VideoId: videoId,
 				Feeling: string(request.Kind),
 			},
-		); err != nil {
-			return err
-		}
+		)
 	}
 
 	return c.SendStatus(fiber.StatusOK)
@@ -459,7 +453,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 		return err
 	}
 	if ownerId != currentUserId {
-		if err := me.notify(
+		me.notify(
 			c.RequestCtx(),
 			ownerId,
 			notification_service.CommentFeelingPayload{
@@ -467,9 +461,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 				CommentId: commentId,
 				Feeling:   string(request.Kind),
 			},
-		); err != nil {
-			return err
-		}
+		)
 	}
 
 	return c.SendStatus(fiber.StatusOK)

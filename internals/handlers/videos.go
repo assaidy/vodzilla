@@ -153,16 +153,14 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 		return err
 	}
 	for _, followerId := range followerIds {
-		if err := me.notify(
+		me.notify(
 			c.RequestCtx(),
 			followerId,
 			notification_service.NewVideoPayload{
 				UserId:  currentUserId,
 				VideoId: videoId,
 			},
-		); err != nil {
-			return err
-		}
+		)
 	}
 
 	return c.JSON(fiber.Map{"videoId": videoId})

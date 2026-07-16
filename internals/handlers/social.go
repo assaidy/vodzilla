@@ -40,15 +40,13 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := me.notify(
+	me.notify(
 		c.RequestCtx(),
 		userId,
 		notification_service.FollowPayload{
 			UserId: currentUserId,
 		},
-	); err != nil {
-		return err
-	}
+	)
 
 	return c.SendStatus(fiber.StatusOK)
 }
