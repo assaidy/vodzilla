@@ -300,7 +300,6 @@ type videoResponse struct {
 	Timestamp         time.Time `json:"timestamp"`
 	Title             string    `json:"title"`
 	Description       string    `json:"description"`
-	ThumbnailUrl      string    `json:"thumbnailUrl,omitempty"`
 	WatchlaterVideoId int       `json:"watchlaterVideoId,omitempty"`
 	PlaylistVideoId   int       `json:"playlistVideoId,omitempty"`
 }
@@ -319,18 +318,12 @@ func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 		return err
 	}
 
-	thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), videoId)
-	if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
-		return err
-	}
-
 	return c.JSON(videoResponse{
-		Id:           video.Id,
-		OwnerId:      video.OwnerId,
-		Timestamp:    video.Timestamp,
-		Title:        video.Title,
-		Description:  video.Description,
-		ThumbnailUrl: thumbnailUrl,
+		Id:          video.Id,
+		OwnerId:     video.OwnerId,
+		Timestamp:   video.Timestamp,
+		Title:       video.Title,
+		Description: video.Description,
 	})
 }
 
@@ -410,18 +403,12 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 
 	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
-		thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), v.Id)
-		if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
-			return err
-		}
-
 		items = append(items, videoResponse{
-			Id:           v.Id,
-			OwnerId:      v.OwnerId,
-			Timestamp:    v.Timestamp,
-			Title:        v.Title,
-			Description:  v.Description,
-			ThumbnailUrl: thumbnailUrl,
+			Id:          v.Id,
+			OwnerId:     v.OwnerId,
+			Timestamp:   v.Timestamp,
+			Title:       v.Title,
+			Description: v.Description,
 		})
 	}
 
@@ -457,4 +444,33 @@ func (me *Handler) HandleGetVideosCountForUser(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"count": count})
+}
+
+func (me *Handler) HandleGetVideoThumbnailUrl(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
+	}
+
+	lockKey := "video:" + videoId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return errVideoNotFound
+	}
+
+	thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, media_service.ErrThumbnailNotFound) {
+			return errThumbnailNotFound
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"thumbnailUrl": thumbnailUrl})
 }

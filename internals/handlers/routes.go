@@ -30,6 +30,7 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Put("/profiles/avatar", me.WithSession, me.WithCsrfToken, me.HandleEditProfileAvatar)
 	router.Put("/profiles/avatar/confirm_upload", me.WithSession, me.WithCsrfToken, me.HandleConfirmProfileAvatarUpload)
 	router.Delete("/profiles/avatar", me.WithSession, me.WithCsrfToken, me.HandleDeleteProfileAvatar)
+	router.Get("/profiles/:user_id/avatar", me.WithSession, me.HandleGetProfileAvatarUrl)
 
 	// Social
 	router.Post("/follows/:user_id", me.WithSession, me.WithCsrfToken, me.HandleFollow)
@@ -46,6 +47,7 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Put("/videos/:video_id/thumbnail", me.WithSession, me.WithCsrfToken, me.HandleEditVideoThumbnail)
 	router.Put("/videos/:video_id/thumbnail/confirm_upload", me.WithSession, me.WithCsrfToken, me.HandleConfirmVideoThumbnailUpload)
 	router.Delete("/videos/:video_id/thumbnail", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideoThumbnail)
+	router.Get("/videos/:video_id/thumbnail", me.WithSession, me.HandleGetVideoThumbnailUrl)
 	router.Get("/videos/:video_id", me.WithSession, me.HandleGetVideo)
 	router.Get("/videos/:video_id/stream_url", me.WithSession, me.HandleGetVideoStreamUrl)
 	router.Delete("/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideo)

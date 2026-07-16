@@ -14,12 +14,11 @@ import (
 )
 
 type profileResponse struct {
-	Id        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	Bio       string    `json:"bio"`
-	AvatarUrl string    `json:"avatarUrl,omitempty"`
+	Id       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	Bio      string    `json:"bio"`
 }
 
 func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
@@ -30,18 +29,12 @@ func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
 		return err
 	}
 
-	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), currentUserId)
-	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
-		return err
-	}
-
 	return c.JSON(profileResponse{
-		Id:        user.Id,
-		Name:      user.Name,
-		Username:  user.Username,
-		Email:     user.Email,
-		Bio:       user.Bio,
-		AvatarUrl: avatarUrl,
+		Id:       user.Id,
+		Name:     user.Name,
+		Username: user.Username,
+		Email:    user.Email,
+		Bio:      user.Bio,
 	})
 }
 
@@ -56,18 +49,12 @@ func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
 		return err
 	}
 
-	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
-	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
-		return err
-	}
-
 	return c.JSON(profileResponse{
-		Id:        user.Id,
-		Name:      user.Name,
-		Username:  user.Username,
-		Email:     user.Email,
-		Bio:       user.Bio,
-		AvatarUrl: avatarUrl,
+		Id:       user.Id,
+		Name:     user.Name,
+		Username: user.Username,
+		Email:    user.Email,
+		Bio:      user.Bio,
 	})
 }
 
@@ -85,18 +72,12 @@ func (me *Handler) HandleGetProfileById(c fiber.Ctx) error {
 		return err
 	}
 
-	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
-	if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
-		return err
-	}
-
 	return c.JSON(profileResponse{
-		Id:        user.Id,
-		Name:      user.Name,
-		Username:  user.Username,
-		Email:     user.Email,
-		Bio:       user.Bio,
-		AvatarUrl: avatarUrl,
+		Id:       user.Id,
+		Name:     user.Name,
+		Username: user.Username,
+		Email:    user.Email,
+		Bio:      user.Bio,
 	})
 }
 
@@ -222,4 +203,33 @@ func (me *Handler) HandleDeleteProfileAvatar(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleGetProfileAvatarUrl(c fiber.Ctx) error {
+	userId, err := uuid.Parse(c.Params("user_id"))
+	if err != nil {
+		return errUserNotFound
+	}
+
+	lockKey := "user:" + userId.String()
+	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+		return err
+	}
+	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+
+	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
+		return err
+	} else if !ok {
+		return errUserNotFound
+	}
+
+	avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), userId)
+	if err != nil {
+		if errors.Is(err, media_service.ErrAvatarNotFound) {
+			return errAvatarNotFound
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"avatarUrl": avatarUrl})
 }

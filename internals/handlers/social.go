@@ -3,7 +3,6 @@ package handlers
 import (
 	"errors"
 
-	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
@@ -243,18 +242,12 @@ func (me *Handler) getProfilesByIds(c fiber.Ctx, ids []uuid.UUID) ([]profileResp
 			return nil, err
 		}
 
-		avatarUrl, err := me.mediaService.GetAvatarUrl(c.RequestCtx(), user.Id)
-		if err != nil && !errors.Is(err, media_service.ErrAvatarNotFound) {
-			return nil, err
-		}
-
 		profiles = append(profiles, profileResponse{
-			Id:        user.Id,
-			Name:      user.Name,
-			Username:  user.Username,
-			Email:     user.Email,
-			Bio:       user.Bio,
-			AvatarUrl: avatarUrl,
+			Id:       user.Id,
+			Name:     user.Name,
+			Username: user.Username,
+			Email:    user.Email,
+			Bio:      user.Bio,
 		})
 	}
 

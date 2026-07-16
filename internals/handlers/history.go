@@ -5,20 +5,18 @@ import (
 	"time"
 
 	history_service "github.com/assaidy/vodzilla/internals/services/history"
-	media_service "github.com/assaidy/vodzilla/internals/services/media"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
 type watchHistoryResponse struct {
-	EntryId      int       `json:"entryId"`
-	VideoId      uuid.UUID `json:"videoId"`
-	OwnerId      uuid.UUID `json:"ownerId"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	ThumbnailUrl string    `json:"thumbnailUrl,omitempty"`
-	WatchedAt    time.Time `json:"watchedAt"`
+	EntryId     int       `json:"entryId"`
+	VideoId     uuid.UUID `json:"videoId"`
+	OwnerId     uuid.UUID `json:"ownerId"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	WatchedAt   time.Time `json:"watchedAt"`
 }
 
 func (me *Handler) HandleGetWatchHistory(c fiber.Ctx) error {
@@ -49,19 +47,13 @@ func (me *Handler) HandleGetWatchHistory(c fiber.Ctx) error {
 			return err
 		}
 
-		thumbnailUrl, err := me.mediaService.GetThumbnailUrl(c.RequestCtx(), e.VideoId)
-		if err != nil && !errors.Is(err, media_service.ErrThumbnailNotFound) {
-			return err
-		}
-
 		items = append(items, watchHistoryResponse{
-			EntryId:      e.Id,
-			VideoId:      e.VideoId,
-			OwnerId:      video.OwnerId,
-			Title:        video.Title,
-			Description:  video.Description,
-			ThumbnailUrl: thumbnailUrl,
-			WatchedAt:    e.WatchedAt,
+			EntryId:     e.Id,
+			VideoId:     e.VideoId,
+			OwnerId:     video.OwnerId,
+			Title:       video.Title,
+			Description: video.Description,
+			WatchedAt:   e.WatchedAt,
 		})
 	}
 

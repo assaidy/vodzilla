@@ -576,12 +576,12 @@ func TestHandleConfirmVideoThumbnailUpload(t *testing.T) {
 		thumbnailURL, _ := data["thumbnailUrl"].(string)
 		require.NotEmpty(t, thumbnailURL)
 
-		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
 		status, data = parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 		respThumbnailURL, _ := data["thumbnailUrl"].(string)
 		if respThumbnailURL == "" {
-			t.Error("expected non-empty thumbnailUrl in video response")
+			t.Error("expected non-empty thumbnailUrl from thumbnail endpoint")
 		}
 	})
 }
@@ -639,7 +639,7 @@ func TestHandleDeleteVideoThumbnail(t *testing.T) {
 		status, data = parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 
-		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
 		status, data = parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 		respThumbnailURL, _ := data["thumbnailUrl"].(string)
@@ -651,17 +651,65 @@ func TestHandleDeleteVideoThumbnail(t *testing.T) {
 		status, data = parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 
-		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String(), nil, user.Session)
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
 		status, data = parseResponse(t, resp)
-		assertKind(t, status, data, 200, "")
-		if _, ok := data["thumbnailUrl"]; ok {
-			t.Error("expected thumbnailUrl to be absent after deletion")
-		}
+		assertKind(t, status, data, 404, "ThumbnailNotFound")
 	})
 
 	t.Run("delete again", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodDelete, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 404, "ThumbnailNotFound")
+	})
+}
+
+func TestHandleGetVideoThumbnailUrl(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "thumbget@example.com", "Password123", "Thumb Get", "thumbget")
+	videoID := createVerifiedVideo(t, user.ID, "Get Thumbnail", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/00000000-0000-0000-0000-000000000000/thumbnail", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("no thumbnail", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "ThumbnailNotFound")
+	})
+
+	t.Run("thumbnail exists", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail", fiber.Map{
+			"contentType": "image/jpeg",
+			"fileSize":    100,
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		uploadURL, _ := data["uploadUrl"].(string)
+		require.NotEmpty(t, uploadURL)
+
+		uploadToPresignedURL(t, uploadURL, "image/jpeg", make([]byte, 100))
+
+		resp = testRequest(t, app, http.MethodPut, "/videos/"+videoID.String()+"/thumbnail/confirm_upload", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		require.NotEmpty(t, data["thumbnailUrl"])
+
+		resp = testRequest(t, app, http.MethodGet, "/videos/"+videoID.String()+"/thumbnail", nil, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		thumbnailURL, _ := data["thumbnailUrl"].(string)
+		if thumbnailURL == "" {
+			t.Error("expected non-empty thumbnailUrl")
+		}
 	})
 }
