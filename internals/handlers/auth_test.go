@@ -277,25 +277,7 @@ func TestHandleLogin(t *testing.T) {
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
 
-	t.Run("unverified", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/auth/login", fiber.Map{
-			"email":    "login@example.com",
-			"password": "Password123",
-		}, nil)
-		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 403, "EmailNotVerified")
-	})
-
-	testRequest(t, app, http.MethodPost, "/auth/verification_email", fiber.Map{
-		"email":   "login@example.com",
-		"baseUrl": "http://localhost/auth/verification_email/verify",
-	}, nil)
-
-	token := extractVerificationToken()
-
-	testRequest(t, app, http.MethodGet, "/auth/verification_email/verify?token="+token, nil, nil)
-
-	t.Run("verified success", func(t *testing.T) {
+	t.Run("unverified but can login", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPost, "/auth/login", fiber.Map{
 			"email":    "login@example.com",
 			"password": "Password123",
@@ -355,10 +337,20 @@ func TestHandleEditCredentials(t *testing.T) {
 		assertKind(t, status, data, 400, "InvalidData")
 	})
 
+	t.Run("missing currentPassword", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
+			"email":    "editcred@example.com",
+			"password": "NewPassword456",
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
 	t.Run("invalid email", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
-			"email":    "bad",
-			"password": "NewPassword123",
+			"currentPassword": "Password123",
+			"email":           "bad",
+			"password":        "NewPassword456",
 		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
@@ -366,20 +358,42 @@ func TestHandleEditCredentials(t *testing.T) {
 
 	t.Run("empty password", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
-			"email":    "editcred@example.com",
-			"password": "",
+			"currentPassword": "Password123",
+			"email":           "editcred@example.com",
+			"password":        "",
 		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 400, "InvalidData")
 	})
 
+	t.Run("wrong currentPassword", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
+			"currentPassword": "WrongPassword123",
+			"email":           "editcred@example.com",
+			"password":        "NewPassword456",
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "InvalidPassword")
+	})
+
 	t.Run("valid edit", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
-			"email":    "new_editcred@example.com",
-			"password": "NewPassword456",
+			"currentPassword": "Password123",
+			"email":           "new_editcred@example.com",
+			"password":        "NewPassword456",
 		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
+	})
+
+	t.Run("unverified cannot edit credentials", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/auth/credentials", fiber.Map{
+			"currentPassword": "NewPassword456",
+			"email":           "another@example.com",
+			"password":        "AnotherPassword789",
+		}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 403, "EmailNotVerified")
 	})
 
 	t.Run("login with new credentials", func(t *testing.T) {

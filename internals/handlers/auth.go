@@ -126,9 +126,6 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 		if errors.Is(err, user_service.ErrUnauthorized) {
 			return errUnauthorized
 		}
-		if errors.Is(err, user_service.ErrUnverified) {
-			return errEmailNotVerified
-		}
 		return err
 	}
 
@@ -226,8 +223,9 @@ func (me *Handler) HandleLogout(c fiber.Ctx) error {
 
 func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 	var request struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		CurrentPassword string `json:"currentPassword"`
+		Email           string `json:"email"`
+		Password        string `json:"password"`
 	}
 	if err := c.Bind().Body(&request); err != nil {
 		return errInvalidRequestBody.details(err)
@@ -236,6 +234,7 @@ func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 	request.Email = strings.ToLower(strings.TrimSpace(request.Email))
 
 	if err := validation.ValidateStruct(&request,
+		validation.Field(&request.CurrentPassword, validation.Required, validation.Length(8, 50)),
 		validation.Field(&request.Email, validation.Required, is.Email),
 		validation.Field(&request.Password, validation.Required, validation.Length(8, 50)),
 	); err != nil {
@@ -247,11 +246,18 @@ func (me *Handler) HandleEditCredentials(c fiber.Ctx) error {
 	if err := me.userService.EditCredentials(
 		c.RequestCtx(),
 		currentUserId,
+		request.CurrentPassword,
 		request.Email,
 		request.Password,
 	); err != nil {
 		if errors.Is(err, user_service.ErrEmailConflict) {
 			return errEmailConflict
+		}
+		if errors.Is(err, user_service.ErrUnauthorized) {
+			return errInvalidPassword
+		}
+		if errors.Is(err, user_service.ErrEmailNotVerified) {
+			return errEmailNotVerified
 		}
 		return err
 	}

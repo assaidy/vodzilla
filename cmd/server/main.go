@@ -27,6 +27,7 @@ import (
 // TODO: use a proper message queue for events (kafka/rmq)
 // TODO: transcoding
 // TODO: monitoring
+// TODO: rate limiting
 
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{

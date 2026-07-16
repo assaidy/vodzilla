@@ -45,6 +45,7 @@ var (
 	errEmailConflict                 = newApiError("EmailConflict", "Email already exists.", fiber.StatusConflict)
 	errInternalFailure               = newApiError("InternalFailure", "An unexpected internal error occurred while processing the request.", fiber.StatusInternalServerError)
 	errUnauthorized                  = newApiError("Unauthorized", "Authentication is required or the provided credentials are invalid.", fiber.StatusUnauthorized)
+	errInvalidPassword               = newApiError("InvalidPassword", "The password is incorrect.", fiber.StatusUnauthorized)
 	errEmailNotVerified              = newApiError("EmailNotVerified", "Email address has not been verified.", fiber.StatusForbidden)
 	errInvalidCursor                 = newApiError("InvalidCursor", "The provided pagination cursor is malformed or invalid.", fiber.StatusBadRequest)
 	errInvalidLimit                  = newApiError("InvalidLimit", "The provided limit is invalid.", fiber.StatusBadRequest)

@@ -9,7 +9,7 @@ create table user_service.users (
   username      varchar(32)   not null unique,
   bio           varchar(500), 
   created_at    timestamptz   not null default now(),
-  is_verified   bool          not null default false
+  is_email_verified   bool          not null default false
 );
 
 create table user_service.retired_usernames (

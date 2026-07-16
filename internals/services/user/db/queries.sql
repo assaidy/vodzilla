@@ -39,7 +39,7 @@ values ($1, $2, $3, $4);
 
 -- name: VerifyEmailByToken :execrows
 update user_service.users
-set is_verified = true
+set is_email_verified = true
 where id in (
   select owner_id
   from user_service.email_verification_tokens evt
@@ -58,7 +58,7 @@ set
 where id = @user_id;
 
 -- name: UpdateCredentials :exec
-update user_service.users set email = $1, password_hash = $2 where id = @user_id;
+update user_service.users set email = $1, password_hash = $2, is_email_verified = $3 where id = @user_id;
 
 
 -- name: BatchDeleteExpiredEmailVerificationTokens :exec
