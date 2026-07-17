@@ -13,10 +13,14 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/google/uuid v1.6.0
+	github.com/jefferyjob/go-redislock v1.7.0-beta.2
+	github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260615015503-c213fe0022ec
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/redis/go-redis/v9 v9.18.0
+	github.com/pressly/goose/v3 v3.27.2
+	github.com/redis/go-redis/v9 v9.21.0
+	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.42.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -72,12 +76,10 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/pressly/goose/v3 v3.27.2 // indirect
 	github.com/savsgio/gotils v0.0.0-20250924091648-bce9a52d7761 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
@@ -100,7 +102,6 @@ require (
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/gofiber/contrib/v3/websocket v1.1.2
 	github.com/gofiber/schema v1.8.0 // indirect

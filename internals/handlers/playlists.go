@@ -53,11 +53,11 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 		return err
 	}
 
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -107,11 +107,11 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		return err
 	}
 
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err

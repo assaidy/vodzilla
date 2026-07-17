@@ -12,12 +12,12 @@ import (
 )
 
 func (me *Handler) notify(ctx context.Context, userId uuid.UUID, payload notification_service.Payload) {
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(ctx, lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(ctx, spinLockTimeout); err != nil {
 		me.logger.Error("failed to acquire read lock", "error", err, "user_id", userId)
 		return
 	}
-	defer me.lock.RUnlock(ctx, lockKey)
+	defer lock.RUnLock(ctx)
 
 	if ok, err := me.userService.DoesUserExist(ctx, userId); err != nil {
 		me.logger.Error("failed to check user existence", "error", err, "user_id", userId)

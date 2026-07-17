@@ -196,11 +196,11 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	lockKey := "video:" + videoId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -235,11 +235,11 @@ func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	lockKey := "video:" + videoId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -269,11 +269,11 @@ func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	lockKey := "video:" + videoId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -352,11 +352,11 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	lockKey := "video:" + videoId.String()
-	if err := me.lock.Lock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinWLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.Unlock(c.RequestCtx(), lockKey)
+	defer lock.WUnLock(c.RequestCtx())
 
 	if err := me.videoService.DeleteVideo(c.RequestCtx(), videoId, currentUserId); err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -379,11 +379,11 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 		return err
 	}
 
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -426,11 +426,11 @@ func (me *Handler) HandleGetVideosCountForUser(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err
@@ -452,11 +452,11 @@ func (me *Handler) HandleGetVideoThumbnailUrl(c fiber.Ctx) error {
 		return errVideoNotFound
 	}
 
-	lockKey := "video:" + videoId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
 		return err

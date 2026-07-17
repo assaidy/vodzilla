@@ -124,11 +124,11 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	lockKey := "user:" + currentUserId.String()
-	if err := me.lock.Lock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(currentUserId)
+	if err := lock.SpinWLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.Unlock(c.RequestCtx(), lockKey)
+	defer lock.WUnLock(c.RequestCtx())
 
 	if err := me.userService.DeleteUser(c.RequestCtx(), currentUserId); err != nil {
 		return err
@@ -211,11 +211,11 @@ func (me *Handler) HandleGetProfileAvatarUrl(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	lockKey := "user:" + userId.String()
-	if err := me.lock.RLock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newUserLock(userId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.RUnlock(c.RequestCtx(), lockKey)
+	defer lock.RUnLock(c.RequestCtx())
 
 	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
 		return err

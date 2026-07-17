@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log/slog"
+	"time"
 
 	history_service "github.com/assaidy/vodzilla/internals/services/history"
 	media_service "github.com/assaidy/vodzilla/internals/services/media"
@@ -10,13 +11,16 @@ import (
 	social_service "github.com/assaidy/vodzilla/internals/services/social"
 	user_service "github.com/assaidy/vodzilla/internals/services/user"
 	video_service "github.com/assaidy/vodzilla/internals/services/video"
-	"github.com/assaidy/vodzilla/internals/utils/distributed_lock"
+	"github.com/google/uuid"
+	redislock "github.com/jefferyjob/go-redislock"
+	redislock_adapter "github.com/jefferyjob/go-redislock/adapter/go-redis/V9"
 	"github.com/redis/go-redis/v9"
 )
 
 type Handler struct {
 	logger              *slog.Logger
 	redis               *redis.Client
+	redisLockInterface  redislock.RedisInter
 	userService         user_service.Service
 	videoService        video_service.Service
 	mediaService        media_service.Service
@@ -24,7 +28,6 @@ type Handler struct {
 	socialService       social_service.Service
 	notificationService notification_service.Service
 	historyService      history_service.Service
-	lock                *distributed_lock.DistributedLock
 }
 
 func New(
@@ -48,6 +51,20 @@ func New(
 		socialService:       socialService,
 		notificationService: notificationService,
 		historyService:      historyService,
-		lock:                distributed_lock.New(redis, logger),
+		redisLockInterface:  redislock_adapter.New(redis),
 	}
+}
+
+const spinLockTimeout = 5 * time.Second
+
+func (me *Handler) newSessionLock(sessionId uuid.UUID) redislock.RedisLockInter {
+	return redislock.New(me.redisLockInterface, "session:"+sessionId.String(), redislock.WithAutoRenew())
+}
+
+func (me *Handler) newUserLock(userId uuid.UUID) redislock.RedisLockInter {
+	return redislock.New(me.redisLockInterface, "user:"+userId.String(), redislock.WithAutoRenew())
+}
+
+func (me *Handler) newVideoLock(videoId uuid.UUID) redislock.RedisLockInter {
+	return redislock.New(me.redisLockInterface, "video:"+videoId.String(), redislock.WithAutoRenew())
 }

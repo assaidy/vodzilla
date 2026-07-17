@@ -29,6 +29,7 @@ import (
 // TODO: transcoding
 // TODO: monitoring
 // TODO: rate limiting
+// TODO: cors
 
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{

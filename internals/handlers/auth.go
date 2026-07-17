@@ -180,20 +180,20 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	c.Locals("user_id", session.OwnerId)
 
 	// Session lock: protects concurrent logout (DELETE session) on the same session row.
+	sessionLock := me.newSessionLock(sessionId)
 	if c.Route().Name != "logout" {
-		sessionLockKey := "session:" + session.Id.String()
-		if err := me.lock.RLock(c.RequestCtx(), sessionLockKey); err != nil {
+		if err := sessionLock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 			return err
 		}
-		defer me.lock.RUnlock(c.RequestCtx(), sessionLockKey)
+		defer sessionLock.RUnLock(c.RequestCtx())
 	}
 	// User lock: protects concurrent delete_profile (DELETE user) on the same user row.
+	userLock := me.newUserLock(session.OwnerId)
 	if c.Route().Name != "delete_profile" {
-		userLockKey := "user:" + session.OwnerId.String()
-		if err := me.lock.RLock(c.RequestCtx(), userLockKey); err != nil {
+		if err := userLock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 			return err
 		}
-		defer me.lock.RUnlock(c.RequestCtx(), userLockKey)
+		defer userLock.RUnLock(c.RequestCtx())
 	}
 
 	return c.Next()
@@ -211,11 +211,11 @@ func (me *Handler) HandleLogout(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 	currentSessionId := c.Locals("session_id").(uuid.UUID)
 
-	lockKey := "session:" + currentSessionId.String()
-	if err := me.lock.Lock(c.RequestCtx(), lockKey); err != nil {
+	lock := me.newSessionLock(currentSessionId)
+	if err := lock.SpinWLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
-	defer me.lock.Unlock(c.RequestCtx(), lockKey)
+	defer lock.WUnLock(c.RequestCtx())
 
 	if err := me.userService.Logout(c.RequestCtx(), currentUserId, currentSessionId); err != nil {
 		return err
