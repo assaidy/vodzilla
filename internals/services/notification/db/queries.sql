@@ -9,7 +9,7 @@ where id = $1 and user_id = $2;
 -- name: GetNotifications :many
 select id, user_id, kind, payload, created_at, is_read
 from notification_service.notifications
-where user_id = @user_id and (
+where user_id = sqlc.arg(user_id) and (
   sqlc.narg(last_notification_id)::uuid is null
   or id < sqlc.narg(last_notification_id)::uuid
 )

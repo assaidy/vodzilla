@@ -177,7 +177,7 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 	c.Locals("session_id", session.Id)
 	c.Locals("session_token", session.SessionToken)
 	c.Locals("csrf_token", session.CsrfToken)
-	c.Locals("user_id", session.OwnerId)
+	c.Locals("user_id", session.UserId)
 
 	// Session lock: protects concurrent logout (DELETE session) on the same session row.
 	sessionLock := me.newSessionLock(sessionId)
@@ -188,7 +188,7 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 		defer sessionLock.RUnLock(c.RequestCtx())
 	}
 	// User lock: protects concurrent delete_profile (DELETE user) on the same user row.
-	userLock := me.newUserLock(session.OwnerId)
+	userLock := me.newUserLock(session.UserId)
 	if c.Route().Name != "delete_profile" {
 		if err := userLock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 			return err

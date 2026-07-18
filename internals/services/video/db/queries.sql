@@ -1,15 +1,15 @@
 -- name: GetVideoOwner :one
-select owner_id from video_service.videos where id = $1;
+select user_id from video_service.videos where id = $1;
 
 -- name: InsertVideo :exec
-insert into video_service.videos (id, owner_id, title, description) values ($1, $2, $3, $4);
+insert into video_service.videos (id, user_id, title, description) values ($1, $2, $3, $4);
 
 -- name: GetVideoById :one
 select * from video_service.videos where id = $1 for update;
 
 -- name: GetVideosForUser :many
 select * from video_service.videos
-where owner_id = @user_id and (
+where user_id = sqlc.arg(user_id) and (
     sqlc.narg(last_video_id)::uuid is null
     or id < sqlc.narg(last_video_id)::uuid
 )
@@ -18,7 +18,7 @@ limit $1;
 
 -- name: GetVideosForMultipleUsers :many
 select * from video_service.videos
-where owner_id = any (@user_ids::uuid[]) and (
+where user_id = any (sqlc.arg(user_ids)::uuid[]) and (
     sqlc.narg(last_video_id)::uuid is null
     or id < sqlc.narg(last_video_id)::uuid
 )
@@ -26,7 +26,7 @@ order by id desc
 limit $1;
 
 -- name: GetVideosCountForUser :one
-select count(*) from video_service.videos where owner_id = $1;
+select count(*) from video_service.videos where user_id = $1;
 
 -- name: CheckVideo :one
 select exists (select 1 from video_service.videos where id = $1 for update);
@@ -43,7 +43,7 @@ delete from video_service.watchlaters where video_id = $1 and user_id = $2;
 -- name: GetVideosInWatchlaters :many
 select v.*, wl.id as watchlater_id
 from video_service.watchlaters wl
-join video_service.videos v on v.id = wl.video_id and v.owner_id = wl.user_id
+join video_service.videos v on v.id = wl.video_id and v.user_id = wl.user_id
 where wl.user_id = $1 and (
     sqlc.narg(last_watchlater_id)::bigint is null
     or wl.id < sqlc.narg(last_watchlater_id)::bigint
@@ -52,19 +52,19 @@ order by wl.id desc
 limit $2;
 
 -- name: InsertPlaylist :exec
-insert into video_service.playlists (id, name, owner_id, description) values ($1, $2, $3, $4);
+insert into video_service.playlists (id, name, user_id, description) values ($1, $2, $3, $4);
 
 -- name: DeletePlaylist :execrows
-delete from video_service.playlists where id = $1 and owner_id = $2;
+delete from video_service.playlists where id = $1 and user_id = $2;
 
 -- name: UpdatePlaylist :execrows
-update video_service.playlists set name = $2, description = $4 where id = $1 and owner_id = $3;
+update video_service.playlists set name = $2, description = $4 where id = $1 and user_id = $3;
 
 -- name: CheckPlaylist :one
 select exists (select 1 from video_service.playlists where id = $1 for update);
 
 -- name: CheckPlaylistForUser :one
-select exists (select 1 from video_service.playlists where id = $1 and owner_id = $2 for update);
+select exists (select 1 from video_service.playlists where id = $1 and user_id = $2 for update);
 
 -- name: InsertIntoPlaylist :exec
 insert into video_service.playlist_videos (playlist_id, video_id)
@@ -81,7 +81,7 @@ select
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
-where owner_id = @user_id and (
+where user_id = sqlc.arg(user_id) and (
   sqlc.narg(last_playlist_id)::uuid is null
   or p.id < sqlc.narg(last_playlist_id)::uuid
 )
@@ -118,16 +118,16 @@ where p.id = $1
 group by p.id;
 
 -- name: DeleteAllVideosForUser :many
-delete from video_service.videos where owner_id = $1 returning id;
+delete from video_service.videos where user_id = $1 returning id;
 
 -- name: DeleteAllWatchlatersForUser :exec
 delete from video_service.watchlaters where user_id= $1;
 
 -- name: DeleteAllPlaylistsForUser :exec
-delete from video_service.playlists where owner_id = $1;
+delete from video_service.playlists where user_id = $1;
 
 -- name: DeleteVideoByIdForUser :execrows
-delete from video_service.videos where id = $1 and owner_id = $2;
+delete from video_service.videos where id = $1 and user_id = $2;
 
 -- name: GetPlaylistsWithVideoStatusForUser :many
 select 
@@ -137,11 +137,11 @@ select
   count(pv.video_id) as videos_count,
   exists (
     select 1 from video_service.playlist_videos pv2
-    where pv2.playlist_id = p.id and pv2.video_id = @video_id
+    where pv2.playlist_id = p.id and pv2.video_id = sqlc.arg(video_id)
   ) as has_video
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
-where p.owner_id = @user_id and (
+where p.user_id = sqlc.arg(user_id) and (
   sqlc.narg(last_playlist_id)::uuid is null
   or p.id < sqlc.narg(last_playlist_id)::uuid
 )
@@ -153,7 +153,7 @@ limit $1;
 delete from video_service.videos where id = $1;
 
 -- name: InsertPendingVideo :exec
-insert into video_service.pending_videos (id, owner_id, title, description) values ($1, $2, $3, $4);
+insert into video_service.pending_videos (id, user_id, title, description) values ($1, $2, $3, $4);
 
 -- name: GetPendingVideoById :one
 select * from video_service.pending_videos where id = $1 for update;
@@ -165,4 +165,4 @@ delete from video_service.pending_videos where id = $1;
 delete from video_service.pending_videos where created_at < now() - '24 hours'::interval;
 
 -- name: DeleteAllPendingVideosForUser :execrows
-delete from video_service.pending_videos where owner_id = $1;
+delete from video_service.pending_videos where user_id = $1;

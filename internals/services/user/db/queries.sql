@@ -27,21 +27,21 @@ select * from user_service.users where username = $1 for update;
 select username from user_service.users where id = $1 for update;
 
 -- name: InsertSession :exec
-insert into user_service.sessions (id, owner_id, session_token, csrf_token, expires_at)
+insert into user_service.sessions (id, user_id, session_token, csrf_token, expires_at)
 values ($1, $2, $3, $4, $5);
 
 -- name: DeleteSessionForUser :execrows
-delete from user_service.sessions where id = @session_id and owner_id = @user_id;
+delete from user_service.sessions where id = sqlc.arg(session_id) and user_id = sqlc.arg(user_id);
 
 -- name: InsertEmailVerificationToken :exec
-insert into user_service.email_verification_tokens (id, owner_id, token, expires_at)
+insert into user_service.email_verification_tokens (id, user_id, token, expires_at)
 values ($1, $2, $3, $4);
 
 -- name: VerifyEmailByToken :execrows
 update user_service.users
 set is_email_verified = true
 where id in (
-  select owner_id
+  select user_id
   from user_service.email_verification_tokens evt
   where token = $1 and expires_at > now()
 );
@@ -55,10 +55,10 @@ set
   name = $1,
   username = $2,
   bio = $3
-where id = @user_id;
+where id = sqlc.arg(user_id);
 
 -- name: UpdateCredentials :exec
-update user_service.users set email = $1, password_hash = $2, is_email_verified = $3 where id = @user_id;
+update user_service.users set email = $1, password_hash = $2, is_email_verified = $3 where id = sqlc.arg(user_id);
 
 
 -- name: BatchDeleteExpiredEmailVerificationTokens :exec
@@ -107,7 +107,7 @@ on conflict (username) do nothing;
 delete from user_service.users where id = $1;
 
 -- name: DeleteAllSessionsForUser :exec
-delete from user_service.sessions where owner_id = $1 and expires_at > now();
+delete from user_service.sessions where user_id = $1 and expires_at > now();
 
 -- name: DeleteAllEmailVerificationTokensForUser :exec
-delete from user_service.email_verification_tokens where owner_id = $1 and expires_at > now();
+delete from user_service.email_verification_tokens where user_id = $1 and expires_at > now();

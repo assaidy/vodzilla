@@ -252,7 +252,7 @@ func TestVideoUploadFlow(t *testing.T) {
 		if title != "My Test Video" {
 			t.Errorf("title: want 'My Test Video', got '%s'", title)
 		}
-		ownerID, _ := data["ownerId"].(string)
+		ownerID, _ := data["userId"].(string)
 		if ownerID != user.ID.String() {
 			t.Errorf("ownerId: want '%s', got '%s'", user.ID.String(), ownerID)
 		}

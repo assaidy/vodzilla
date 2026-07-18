@@ -17,7 +17,7 @@ where followed_id = $1 or follower_id = $1;
 -- name: GetFollowerIds :many
 select follower_id
 from social_service.follows
-where followed_id = @user_id and (
+where followed_id = sqlc.arg(user_id) and (
     sqlc.narg(last_user_id)::uuid is null
     or follower_id < sqlc.narg(last_user_id)::uuid
 )
@@ -27,7 +27,7 @@ limit $1;
 -- name: GetFollowedIds :many
 select followed_id
 from social_service.follows
-where follower_id = @user_id and (
+where follower_id = sqlc.arg(user_id) and (
     sqlc.narg(last_user_id)::uuid is null
     or followed_id < sqlc.narg(last_user_id)::uuid
 )
@@ -37,12 +37,12 @@ limit $1;
 -- name: GetAllFollowedIds :many
 select followed_id
 from social_service.follows
-where follower_id = @user_id;
+where follower_id = sqlc.arg(user_id);
 
 -- name: GetAllFollowerIds :many
 select follower_id
 from social_service.follows
-where followed_id = @user_id;
+where followed_id = sqlc.arg(user_id);
 
 -- name: DeleteFollowsForUser :exec
 delete from social_service.follows where follower_id = $1 or followed_id = $1;

@@ -129,7 +129,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	videoId, err := me.videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
-		OwnerId:     currentUserId,
+		UserId:      currentUserId,
 		Title:       request.Title,
 		Description: request.Description,
 	})
@@ -296,7 +296,7 @@ func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
 
 type videoResponse struct {
 	Id          uuid.UUID `json:"id"`
-	OwnerId     uuid.UUID `json:"ownerId"`
+	UserId      uuid.UUID `json:"userId"`
 	Timestamp   time.Time `json:"timestamp"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
@@ -321,7 +321,7 @@ func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 
 	return c.JSON(videoResponse{
 		Id:          video.Id,
-		OwnerId:     video.OwnerId,
+		UserId:      video.UserId,
 		Timestamp:   video.Timestamp,
 		Title:       video.Title,
 		Description: video.Description,
@@ -406,7 +406,7 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 	for _, v := range videos {
 		items = append(items, videoResponse{
 			Id:          v.Id,
-			OwnerId:     v.OwnerId,
+			UserId:      v.UserId,
 			Timestamp:   v.Timestamp,
 			Title:       v.Title,
 			Description: v.Description,

@@ -270,7 +270,7 @@ func createVerifiedVideo(t *testing.T, ownerID uuid.UUID, title, description str
 
 	videoID := uuid.Must(uuid.NewV7())
 	_, err := testDb.Exec(`
-		INSERT INTO video_service.videos (id, owner_id, title, description, created_at)
+		INSERT INTO video_service.videos (id, user_id, title, description, created_at)
 		VALUES ($1, $2, $3, $4, NOW())
 	`, videoID, ownerID, title, description)
 	require.NoError(t, err)

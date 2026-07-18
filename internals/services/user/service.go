@@ -213,7 +213,7 @@ func (me *impl) SendVerificationEmail(ctx context.Context, email, url string) er
 
 	if err := qtx.InsertEmailVerificationToken(ctx, queries.InsertEmailVerificationTokenParams{
 		Id:        verificationTokenId,
-		OwnerId:   user.Id,
+		UserId:    user.Id,
 		Token:     verificationToken,
 		ExpiresAt: time.Now().Add(5 * time.Minute),
 	}); err != nil {
@@ -258,7 +258,7 @@ func (me *impl) emailVerificationTokensCleanupJob(ctx context.Context) error {
 
 type Session struct {
 	Id           uuid.UUID
-	OwnerId      uuid.UUID
+	UserId       uuid.UUID
 	SessionToken string
 	CsrfToken    string
 	ExpiresAt    time.Time
@@ -292,7 +292,7 @@ func (me *impl) Login(ctx context.Context, email, password string) (*Session, er
 
 	if err := qtx.InsertSession(ctx, queries.InsertSessionParams{
 		Id:           sessionId,
-		OwnerId:      user.Id,
+		UserId:       user.Id,
 		SessionToken: sessionToken,
 		CsrfToken:    csrfToken,
 		ExpiresAt:    sessionExpirationDate,
@@ -329,7 +329,7 @@ func (me *impl) GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, 
 
 	return &Session{
 		Id:           session.Id,
-		OwnerId:      session.OwnerId,
+		UserId:       session.UserId,
 		SessionToken: session.SessionToken,
 		CsrfToken:    session.CsrfToken,
 		ExpiresAt:    session.ExpiresAt,

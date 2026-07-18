@@ -13,7 +13,7 @@ import (
 type watchHistoryResponse struct {
 	EntryId     int       `json:"entryId"`
 	VideoId     uuid.UUID `json:"videoId"`
-	OwnerId     uuid.UUID `json:"ownerId"`
+	UserId      uuid.UUID `json:"userId"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	WatchedAt   time.Time `json:"watchedAt"`
@@ -50,7 +50,7 @@ func (me *Handler) HandleGetWatchHistory(c fiber.Ctx) error {
 		items = append(items, watchHistoryResponse{
 			EntryId:     e.Id,
 			VideoId:     e.VideoId,
-			OwnerId:     video.OwnerId,
+			UserId:      video.UserId,
 			Title:       video.Title,
 			Description: video.Description,
 			WatchedAt:   e.WatchedAt,

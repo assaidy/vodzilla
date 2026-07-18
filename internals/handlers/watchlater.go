@@ -30,7 +30,7 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 	for _, v := range videos {
 		items = append(items, videoResponse{
 			Id:                v.Id,
-			OwnerId:           v.OwnerId,
+			UserId:            v.UserId,
 			Timestamp:         v.Timestamp,
 			Title:             v.Title,
 			Description:       v.Description,

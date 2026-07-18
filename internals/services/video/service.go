@@ -91,7 +91,7 @@ func (me *impl) Stop(ctx context.Context) error {
 }
 
 type CreateVideoParams struct {
-	OwnerId     uuid.UUID
+	UserId      uuid.UUID
 	Title       string
 	Description string
 }
@@ -101,7 +101,7 @@ func (me *impl) CreateVideo(ctx context.Context, params CreateVideoParams) (uuid
 
 	if err := me.queries.InsertPendingVideo(ctx, queries.InsertPendingVideoParams{
 		Id:          videoId,
-		OwnerId:     params.OwnerId,
+		UserId:      params.UserId,
 		Title:       params.Title,
 		Description: sql.NullString{Valid: params.Description != "", String: params.Description},
 	}); err != nil {
@@ -133,7 +133,7 @@ func (me *impl) ActivateVideo(ctx context.Context, videoId uuid.UUID) error {
 
 	if err := qtx.InsertVideo(ctx, queries.InsertVideoParams{
 		Id:          videoId,
-		OwnerId:     pending.OwnerId,
+		UserId:      pending.UserId,
 		Title:       pending.Title,
 		Description: pending.Description,
 	}); err != nil {
@@ -149,7 +149,7 @@ func (me *impl) ActivateVideo(ctx context.Context, videoId uuid.UUID) error {
 
 type Video struct {
 	Id          uuid.UUID
-	OwnerId     uuid.UUID
+	UserId      uuid.UUID
 	Timestamp   time.Time
 	Title       string
 	Description string
@@ -176,7 +176,7 @@ func (me *impl) GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error) 
 
 	return &Video{
 		Id:          video.Id,
-		OwnerId:     video.OwnerId,
+		UserId:      video.UserId,
 		Timestamp:   video.CreatedAt,
 		Title:       video.Title,
 		Description: video.Description.String,
@@ -206,7 +206,7 @@ func (me *impl) GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.U
 	for _, v := range videos {
 		result = append(result, Video{
 			Id:          v.Id,
-			OwnerId:     v.OwnerId,
+			UserId:      v.UserId,
 			Timestamp:   v.CreatedAt,
 			Title:       v.Title,
 			Description: v.Description.String,
@@ -234,7 +234,7 @@ func (me *impl) GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UU
 	for _, v := range videos {
 		result = append(result, Video{
 			Id:          v.Id,
-			OwnerId:     v.OwnerId,
+			UserId:      v.UserId,
 			Timestamp:   v.CreatedAt,
 			Title:       v.Title,
 			Description: v.Description.String,
@@ -351,7 +351,7 @@ func (me *impl) GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, las
 		result = append(result, WatchlaterVideo{
 			Video: Video{
 				Id:          row.Id,
-				OwnerId:     row.OwnerId,
+				UserId:      row.UserId,
 				Timestamp:   row.CreatedAt,
 				Title:       row.Title,
 				Description: row.Description.String,
@@ -380,7 +380,7 @@ func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, name, desc
 	if err := me.queries.InsertPlaylist(ctx, queries.InsertPlaylistParams{
 		Id:          playlistId,
 		Name:        name,
-		OwnerId:     userId,
+		UserId:      userId,
 		Description: sql.NullString{String: description, Valid: description != ""},
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert playlist: %w", err)
@@ -391,8 +391,8 @@ func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, name, desc
 
 func (me *impl) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error {
 	if n, err := me.queries.DeletePlaylist(ctx, queries.DeletePlaylistParams{
-		Id:      playlistId,
-		OwnerId: userId,
+		Id:     playlistId,
+		UserId: userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete playlist: %w", err)
 	} else if n == 0 {
@@ -405,7 +405,7 @@ func (me *impl) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID
 func (me *impl) EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string) error {
 	if n, err := me.queries.UpdatePlaylist(ctx, queries.UpdatePlaylistParams{
 		Id:          playlistId,
-		OwnerId:     userId,
+		UserId:      userId,
 		Name:        name,
 		Description: sql.NullString{String: description, Valid: description != ""},
 	}); err != nil {
@@ -432,8 +432,8 @@ func (me *impl) AddVideoToPlaylist(ctx context.Context, userId, videoId, playlis
 	}
 
 	if ok, err := qtx.CheckPlaylistForUser(ctx, queries.CheckPlaylistForUserParams{
-		Id:      playlistId,
-		OwnerId: userId,
+		Id:     playlistId,
+		UserId: userId,
 	}); err != nil {
 		return fmt.Errorf("failed to check playlist: %w", err)
 	} else if !ok {
@@ -478,8 +478,8 @@ func (me *impl) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, pl
 	}
 
 	if ok, err := qtx.CheckPlaylistForUser(ctx, queries.CheckPlaylistForUserParams{
-		Id:      playlistId,
-		OwnerId: userId,
+		Id:     playlistId,
+		UserId: userId,
 	}); err != nil {
 		return fmt.Errorf("failed to check playlist for user: %w", err)
 	} else if !ok {
@@ -619,7 +619,7 @@ func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, l
 		result = append(result, PlaylistVideo{
 			Video: Video{
 				Id:          row.Id,
-				OwnerId:     row.OwnerId,
+				UserId:      row.UserId,
 				Timestamp:   row.CreatedAt,
 				Title:       row.Title,
 				Description: row.Description.String,
@@ -712,8 +712,8 @@ func (me *impl) pendingVideosCleanupJob(ctx context.Context) error {
 
 func (me *impl) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error {
 	if n, err := me.queries.DeleteVideoByIdForUser(ctx, queries.DeleteVideoByIdForUserParams{
-		Id:      videoId,
-		OwnerId: userId,
+		Id:     videoId,
+		UserId: userId,
 	}); err != nil {
 		return fmt.Errorf("failed to delete video by id for user: %w", err)
 	} else if n == 0 {

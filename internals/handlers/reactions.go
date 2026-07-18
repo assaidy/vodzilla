@@ -176,10 +176,10 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return err
 	}
 
-	if video.OwnerId != currentUserId {
+	if video.UserId != currentUserId {
 		me.notify(
 			c.RequestCtx(),
-			video.OwnerId,
+			video.UserId,
 			notification_service.VideoCommentPayload{
 				UserId:    currentUserId,
 				VideoId:   videoId,
@@ -193,7 +193,7 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 
 type commentResponse struct {
 	Id           uuid.UUID `json:"id"`
-	OwnerId      uuid.UUID `json:"ownerId"`
+	UserId       uuid.UUID `json:"userId"`
 	Content      string    `json:"content"`
 	CreatedAt    time.Time `json:"createdAt"`
 	RepliesCount int       `json:"repliesCount"`
@@ -236,7 +236,7 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 	for _, c := range comments {
 		items = append(items, commentResponse{
 			Id:           c.Id,
-			OwnerId:      c.UserId,
+			UserId:       c.UserId,
 			Content:      c.Content,
 			CreatedAt:    c.CreatedAt,
 			RepliesCount: c.RepliesCount,
@@ -344,7 +344,7 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	for _, r := range replies {
 		items = append(items, commentResponse{
 			Id:           r.Id,
-			OwnerId:      r.UserId,
+			UserId:       r.UserId,
 			Content:      r.Content,
 			CreatedAt:    r.CreatedAt,
 			RepliesCount: r.RepliesCount,
@@ -469,9 +469,9 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 		return err
 	}
 
-	if video.OwnerId != currentUserId {
+	if video.UserId != currentUserId {
 		me.notify(c.RequestCtx(),
-			video.OwnerId,
+			video.UserId,
 			notification_service.VideoFeelingPayload{
 				UserId:  currentUserId,
 				VideoId: videoId,
