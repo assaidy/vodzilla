@@ -52,13 +52,13 @@ order by wl.id desc
 limit $2;
 
 -- name: InsertPlaylist :exec
-insert into video_service.playlists (id, name, owner_id) values ($1, $2, $3);
+insert into video_service.playlists (id, name, owner_id, description) values ($1, $2, $3, $4);
 
 -- name: DeletePlaylist :execrows
 delete from video_service.playlists where id = $1 and owner_id = $2;
 
--- name: UpdatePlaylistName :execrows
-update video_service.playlists set name = $2 where id = $1 and owner_id = $3;
+-- name: UpdatePlaylist :execrows
+update video_service.playlists set name = $2, description = $4 where id = $1 and owner_id = $3;
 
 -- name: CheckPlaylist :one
 select exists (select 1 from video_service.playlists where id = $1 for update);
@@ -77,6 +77,7 @@ delete from video_service.playlist_videos where playlist_id = $1 and video_id = 
 select 
   p.id,
   p.name,
+  p.description,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
@@ -109,6 +110,7 @@ select exists (
 select
   p.id,
   p.name,
+  p.description,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
@@ -131,6 +133,7 @@ delete from video_service.videos where id = $1 and owner_id = $2;
 select 
   p.id,
   p.name,
+  p.description,
   count(pv.video_id) as videos_count,
   exists (
     select 1 from video_service.playlist_videos pv2

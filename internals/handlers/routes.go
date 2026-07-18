@@ -66,14 +66,14 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Get("/playlists/:playlist_id", me.WithSession, me.HandleGetPlaylist)
 	router.Get("/playlists/:playlist_id/videos", me.WithSession, me.HandleGetPlaylistVideos)
 	router.Delete("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleDeletePlaylist)
-	router.Put("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleRenamePlaylist)
+	router.Put("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleEditPlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideoFromPlaylist)
-	// TODO: add playlist description
-	// TODO: add playlist bookmarking(saving)
 	// TODO: add playlist visibility (is_public)
+	// TODO: add playlist bookmarking(saving)
 
 	// Reactions
+	// TODO: generalize comments/replies with target kind like i did in views and feelings.
 	router.Post("/reactions/views/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleViewVideo)
 	router.Get("/reactions/views/videos/:video_id/count", me.WithSession, me.HandleGetVideoViewsCount)
 	router.Post("/reactions/views/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleViewPlaylist)

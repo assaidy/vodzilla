@@ -49,8 +49,28 @@ func TestHandleCreatePlaylist(t *testing.T) {
 		assertKind(t, status, data, 400, "InvalidData")
 	})
 
-	t.Run("success", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "My Playlist"}, user.Session)
+	t.Run("validation description too long", func(t *testing.T) {
+		longDesc := ""
+		for i := 0; i < 501; i++ {
+			longDesc += "a"
+		}
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "My Playlist", "description": longDesc}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("success without description", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "No Desc"}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		playlistID, _ := data["playlistId"].(string)
+		require.NotEmpty(t, playlistID)
+		_, err := uuid.Parse(playlistID)
+		require.NoError(t, err)
+	})
+
+	t.Run("success with description", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "With Desc", "description": "A cool playlist"}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 		playlistID, _ := data["playlistId"].(string)
@@ -88,7 +108,7 @@ func TestHandleGetPlaylists(t *testing.T) {
 	})
 
 	t.Run("success with playlists", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "PL One"}, user.Session)
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "PL One", "description": "First playlist"}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 		pl1, _ := data["playlistId"].(string)
@@ -107,6 +127,11 @@ func TestHandleGetPlaylists(t *testing.T) {
 		for _, item := range items {
 			m := item.(map[string]any)
 			ids[m["id"].(string)] = true
+			if m["id"].(string) == pl1 {
+				require.Equal(t, "First playlist", m["description"])
+			} else {
+				require.Equal(t, "", m["description"])
+			}
 		}
 		require.True(t, ids[pl1])
 		require.True(t, ids[pl2])
@@ -154,7 +179,7 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 	})
 
 	t.Run("success with hasVideo", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "WVS PL"}, user.Session)
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "WVS PL", "description": "WVS description"}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 		plID, _ := data["playlistId"].(string)
@@ -170,6 +195,7 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 		require.Len(t, items, 1)
 		item := items[0].(map[string]any)
 		require.Equal(t, plID, item["id"])
+		require.Equal(t, "WVS description", item["description"])
 		require.Equal(t, true, item["hasVideo"])
 	})
 }
@@ -178,7 +204,7 @@ func TestHandleGetPlaylist(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 	user := createVerifiedUser(t, app, "plgetpl@example.com", "Password123", "PL Get PL", "plgetpl")
-	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Get PL Test"}, user.Session)
+	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Get PL Test", "description": "Get PL desc"}, user.Session)
 	status, data := parseResponse(t, resp)
 	assertKind(t, status, data, 200, "")
 	playlistID, _ := data["playlistId"].(string)
@@ -201,14 +227,16 @@ func TestHandleGetPlaylist(t *testing.T) {
 		assertKind(t, status, data, 200, "")
 		name, _ := data["name"].(string)
 		require.Equal(t, "Get PL Test", name)
+		desc, _ := data["description"].(string)
+		require.Equal(t, "Get PL desc", desc)
 	})
 }
 
-func TestHandleRenamePlaylist(t *testing.T) {
+func TestHandleEditPlaylist(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 	user := createVerifiedUser(t, app, "plren@example.com", "Password123", "PL Ren", "plren")
-	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Old Name"}, user.Session)
+	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Old Name", "description": "Old desc"}, user.Session)
 	status, data := parseResponse(t, resp)
 	assertKind(t, status, data, 200, "")
 	playlistID, _ := data["playlistId"].(string)
@@ -239,7 +267,7 @@ func TestHandleRenamePlaylist(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPut, "/playlists/"+playlistID, fiber.Map{"name": "New Name"}, user.Session)
+		resp := testRequest(t, app, http.MethodPut, "/playlists/"+playlistID, fiber.Map{"name": "New Name", "description": "New desc"}, user.Session)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 
@@ -250,6 +278,7 @@ func TestHandleRenamePlaylist(t *testing.T) {
 		require.Len(t, items, 1)
 		item := items[0].(map[string]any)
 		require.Equal(t, "New Name", item["name"])
+		require.Equal(t, "New desc", item["description"])
 	})
 }
 

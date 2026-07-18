@@ -32,9 +32,9 @@ type Service interface {
 	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
 	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchlaterVideo, error)
 	GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error)
-	CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error)
+	CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string) (uuid.UUID, error)
 	DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error
-	RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error
+	EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string) error
 	AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
 	DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
 	GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error)
@@ -375,12 +375,13 @@ func (me *impl) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID
 	return ownerId, nil
 }
 
-func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, playlistName string) (uuid.UUID, error) {
+func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string) (uuid.UUID, error) {
 	playlistId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertPlaylist(ctx, queries.InsertPlaylistParams{
-		Id:      playlistId,
-		Name:    playlistName,
-		OwnerId: userId,
+		Id:          playlistId,
+		Name:        name,
+		OwnerId:     userId,
+		Description: sql.NullString{String: description, Valid: description != ""},
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert playlist: %w", err)
 	}
@@ -401,13 +402,14 @@ func (me *impl) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID
 	return nil
 }
 
-func (me *impl) RenamePlaylist(ctx context.Context, userId, playlistId uuid.UUID, name string) error {
-	if n, err := me.queries.UpdatePlaylistName(ctx, queries.UpdatePlaylistNameParams{
-		Id:      playlistId,
-		Name:    name,
-		OwnerId: userId,
+func (me *impl) EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string) error {
+	if n, err := me.queries.UpdatePlaylist(ctx, queries.UpdatePlaylistParams{
+		Id:          playlistId,
+		OwnerId:     userId,
+		Name:        name,
+		Description: sql.NullString{String: description, Valid: description != ""},
 	}); err != nil {
-		return fmt.Errorf("failed to rename playlist: %w", err)
+		return fmt.Errorf("failed to update playlist: %w", err)
 	} else if n == 0 {
 		return ErrPlaylistNotFound
 	}
@@ -503,6 +505,7 @@ func (me *impl) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, pl
 type Playlist struct {
 	Id          uuid.UUID
 	Name        string
+	Description string
 	VideosCount int
 }
 
@@ -526,6 +529,7 @@ func (me *impl) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UU
 		result = append(result, Playlist{
 			Id:          p.Id,
 			Name:        p.Name,
+			Description: p.Description.String,
 			VideosCount: int(p.VideosCount),
 		})
 	}
@@ -563,6 +567,7 @@ func (me *impl) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId
 			Playlist: Playlist{
 				Id:          row.Id,
 				Name:        row.Name,
+				Description: row.Description.String,
 				VideosCount: int(row.VideosCount),
 			},
 			HasVideo: row.HasVideo,
@@ -588,6 +593,7 @@ func (me *impl) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlis
 	return &Playlist{
 		Id:          playlist.Id,
 		Name:        playlist.Name,
+		Description: playlist.Description.String,
 		VideosCount: int(playlist.VideosCount),
 	}, nil
 }

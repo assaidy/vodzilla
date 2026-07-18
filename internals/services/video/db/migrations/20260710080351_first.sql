@@ -10,23 +10,24 @@ create table video_service.videos (
 );
 
 create table video_service.watchlaters (
-  id       bigserial primary key,
-  video_id uuid not null references video_service.videos (id) on delete cascade,
-  user_id  uuid not null,
+  id       bigserial   primary key,
+  video_id uuid        not null references video_service.videos (id) on delete cascade,
+  user_id  uuid        not null,
   added_at timestamptz not null default now(),
 
   unique (video_id, user_id)
 );
 
 create table video_service.playlists (
-  id         uuid        primary key,
-  name       varchar(50) not null,
-  owner_id   uuid        not null,
-  created_at timestamptz not null default now()
+  id          uuid        primary key,
+  name        varchar(50) not null,
+  description varchar(500),
+  owner_id    uuid        not null,
+  created_at  timestamptz not null default now()
 );
 
 create table video_service.playlist_videos (
-  id          bigserial primary key,
+  id          bigserial   primary key,
   playlist_id uuid        not null references video_service.playlists (id) on delete cascade,
   video_id    uuid        not null references video_service.videos (id) on delete cascade,
   added_at    timestamptz not null default now(),

@@ -12,23 +12,31 @@ import (
 
 func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	var request struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
 	}
 	if err := c.Bind().Body(&request); err != nil {
 		return errInvalidRequestBody.details(err)
 	}
 
 	request.Name = strings.TrimSpace(request.Name)
+	request.Description = strings.TrimSpace(request.Description)
 
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
+		validation.Field(&request.Description, validation.Length(0, 500)),
 	); err != nil {
 		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	playlistId, err := me.videoService.CreatePlaylist(c.RequestCtx(), currentUserId, request.Name)
+	playlistId, err := me.videoService.CreatePlaylist(
+		c.RequestCtx(),
+		currentUserId,
+		request.Name,
+		request.Description,
+	)
 	if err != nil {
 		return err
 	}
@@ -39,6 +47,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 type playlistResponse struct {
 	Id          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
+	Description string    `json:"description"`
 	VideosCount int       `json:"videosCount"`
 }
 
@@ -80,6 +89,7 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 		items = append(items, playlistResponse{
 			Id:          p.Id,
 			Name:        p.Name,
+			Description: p.Description,
 			VideosCount: p.VideosCount,
 		})
 	}
@@ -140,6 +150,7 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		items = append(items, fiber.Map{
 			"id":          p.Id,
 			"name":        p.Name,
+			"description": p.Description,
 			"videosCount": p.VideosCount,
 			"hasVideo":    p.HasVideo,
 		})
@@ -170,38 +181,43 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 	return c.JSON(playlistResponse{
 		Id:          playlist.Id,
 		Name:        playlist.Name,
+		Description: playlist.Description,
 		VideosCount: playlist.VideosCount,
 	})
 }
 
-func (me *Handler) HandleRenamePlaylist(c fiber.Ctx) error {
+func (me *Handler) HandleEditPlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
 	}
 
 	var request struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
 	}
 	if err := c.Bind().Body(&request); err != nil {
 		return errInvalidRequestBody.details(err)
 	}
 
 	request.Name = strings.TrimSpace(request.Name)
+	request.Description = strings.TrimSpace(request.Description)
 
 	if err := validation.ValidateStruct(&request,
 		validation.Field(&request.Name, validation.Required, validation.Length(1, 50)),
+		validation.Field(&request.Description, validation.Length(0, 500)),
 	); err != nil {
 		return errInvalidData.details(err)
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.videoService.RenamePlaylist(
+	if err := me.videoService.EditPlaylist(
 		c.RequestCtx(),
 		currentUserId,
 		playlistId,
 		request.Name,
+		request.Description,
 	); err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
 			return errPlaylistNotFound
