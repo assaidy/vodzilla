@@ -19,16 +19,14 @@ import (
 
 type Service interface {
 	services.Service
-	ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error
-	GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error)
-	IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
-	AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error
-	DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.UUID) error
-	AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error
-	DeleteCommentFeeling(ctx context.Context, userId, commentId uuid.UUID) error
-	GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*FeelingCounts, error)
-	GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (FeelingKind, error)
-	GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error)
+	AddView(ctx context.Context, userId uuid.UUID, kind ViewTargetKind, targetId uuid.UUID) error
+	GetViewsCount(ctx context.Context, kind ViewTargetKind, targetId uuid.UUID) (int, error)
+	AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind, kind FeelingKind) error
+	DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind) error
+	GetFeelingCounts(ctx context.Context, targetId uuid.UUID, targetKind FeelingTargetKind) (*FeelingCounts, error)
+	GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, targetKind FeelingTargetKind) (FeelingKind, error)
+	DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error)
+	GetCommentByID(ctx context.Context, commentId uuid.UUID) (*Comment, error)
 	CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error)
 	EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error
 	DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error
@@ -85,20 +83,42 @@ func (me *impl) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (me *impl) ViewVideo(ctx context.Context, videoId, userId uuid.UUID) error {
-	_, err := me.queries.InsertView(ctx, queries.InsertViewParams{
-		VideoId: videoId,
-		UserId:  userId,
-	})
-	if err != nil {
+type ViewTargetKind string
+
+const (
+	ViewTargetVideo    ViewTargetKind = "video"
+	ViewTargetPlaylist ViewTargetKind = "playlist"
+)
+
+func (k ViewTargetKind) isValid() bool {
+	return k == ViewTargetVideo || k == ViewTargetPlaylist
+}
+
+func (me *impl) AddView(ctx context.Context, userId uuid.UUID, kind ViewTargetKind, targetId uuid.UUID) error {
+	if !kind.isValid() {
+		return fmt.Errorf("invalid view kind: %q", kind)
+	}
+
+	if _, err := me.queries.InsertView(ctx, queries.InsertViewParams{
+		TargetId: targetId,
+		UserId:   userId,
+		Kind:     string(kind),
+	}); err != nil {
 		return fmt.Errorf("failed to insert view: %w", err)
 	}
 
 	return nil
 }
 
-func (me *impl) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
-	count, err := me.queries.GetViewsCount(ctx, videoId)
+func (me *impl) GetViewsCount(ctx context.Context, kind ViewTargetKind, targetId uuid.UUID) (int, error) {
+	if !kind.isValid() {
+		return 0, fmt.Errorf("invalid view kind: %q", kind)
+	}
+
+	count, err := me.queries.GetViewsCount(ctx, queries.GetViewsCountParams{
+		TargetId: targetId,
+		Kind:     string(kind),
+	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get views count: %w", err)
 	}
@@ -106,16 +126,15 @@ func (me *impl) GetVideoViewsCount(ctx context.Context, videoId uuid.UUID) (int,
 	return int(count), nil
 }
 
-func (me *impl) IsVideoViewedByUser(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
-	ok, err := me.queries.CheckVideoViewer(ctx, queries.CheckVideoViewerParams{
-		VideoId: videoId,
-		UserId:  userId,
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to check video viewer: %w", err)
-	}
+type FeelingTargetKind string
 
-	return ok, nil
+const (
+	FeelingTargetVideo   FeelingTargetKind = "video"
+	FeelingTargetComment FeelingTargetKind = "comment"
+)
+
+func (k FeelingTargetKind) isValid() bool {
+	return k == FeelingTargetVideo || k == FeelingTargetComment
 }
 
 type FeelingKind string
@@ -129,93 +148,38 @@ func (k FeelingKind) isValid() bool {
 	return k == FeelingLike || k == FeelingDislike
 }
 
-func (me *impl) AddVideoFeeling(ctx context.Context, userId, videoId uuid.UUID, kind FeelingKind) error {
+func (me *impl) AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind, kind FeelingKind) error {
+	if !targetKind.isValid() {
+		return fmt.Errorf("invalid feeling target kind: %q", targetKind)
+	}
 	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
 	if err := me.queries.UpsertFeeling(ctx, queries.UpsertFeelingParams{
-		ForId:  videoId,
-		UserId: userId,
-		Kind:   string(kind),
+		TargetId:   targetId,
+		UserId:     userId,
+		TargetKind: string(targetKind),
+		Kind:       string(kind),
 	}); err != nil {
-		return fmt.Errorf("failed to upsert video feeling (kind: %s): %w", kind, err)
+		return fmt.Errorf("failed to upsert feeling (target: %s, kind: %s): %w", targetKind, kind, err)
 	}
 
 	return nil
 }
 
-func (me *impl) DeleteVideoFeeling(ctx context.Context, userId, videoId uuid.UUID) error {
+func (me *impl) DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind) error {
+	if !targetKind.isValid() {
+		return fmt.Errorf("invalid feeling target kind: %q", targetKind)
+	}
 	n, err := me.queries.DeleteFeeling(ctx, queries.DeleteFeelingParams{
-		ForId:  videoId,
-		UserId: userId,
+		TargetId:   targetId,
+		UserId:     userId,
+		TargetKind: string(targetKind),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to delete video feeling: %w", err)
+		return fmt.Errorf("failed to delete feeling: %w", err)
 	} else if n == 0 {
 		return ErrFeelingNotFound
-	}
-
-	return nil
-}
-
-func (me *impl) AddCommentFeeling(ctx context.Context, userId, commentId uuid.UUID, kind FeelingKind) error {
-	if !kind.isValid() {
-		return fmt.Errorf("invalid feeling kind: %q", kind)
-	}
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckComment(ctx, commentId); err != nil {
-		return fmt.Errorf("failed to check comment: %w", err)
-	} else if !ok {
-		return ErrCommentNotFound
-	}
-
-	if err := qtx.UpsertFeeling(ctx, queries.UpsertFeelingParams{
-		ForId:  commentId,
-		UserId: userId,
-		Kind:   string(kind),
-	}); err != nil {
-		return fmt.Errorf("failed to upsert comment feeling (kind: %s): %w", kind, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	return nil
-}
-
-func (me *impl) DeleteCommentFeeling(ctx context.Context, userId, commentId uuid.UUID) error {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckComment(ctx, commentId); err != nil {
-		return fmt.Errorf("failed to check comment: %w", err)
-	} else if !ok {
-		return ErrCommentNotFound
-	}
-
-	n, err := qtx.DeleteFeeling(ctx, queries.DeleteFeelingParams{
-		ForId:  commentId,
-		UserId: userId,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to delete comment feeling: %w", err)
-	} else if n == 0 {
-		return ErrFeelingNotFound
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return nil
@@ -226,8 +190,15 @@ type FeelingCounts struct {
 	Dislikes int
 }
 
-func (me *impl) GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*FeelingCounts, error) {
-	counts, err := me.queries.GetFeelingCounts(ctx, forId)
+func (me *impl) GetFeelingCounts(ctx context.Context, targetId uuid.UUID, targetKind FeelingTargetKind) (*FeelingCounts, error) {
+	if !targetKind.isValid() {
+		return nil, fmt.Errorf("invalid feeling target kind: %q", targetKind)
+	}
+
+	counts, err := me.queries.GetFeelingCounts(ctx, queries.GetFeelingCountsParams{
+		TargetId:   targetId,
+		TargetKind: string(targetKind),
+	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get feeling counts: %w", err)
 	}
@@ -238,10 +209,15 @@ func (me *impl) GetFeelingCounts(ctx context.Context, forId uuid.UUID) (*Feeling
 	}, nil
 }
 
-func (me *impl) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (FeelingKind, error) {
+func (me *impl) GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, targetKind FeelingTargetKind) (FeelingKind, error) {
+	if !targetKind.isValid() {
+		return "", fmt.Errorf("invalid feeling target kind: %q", targetKind)
+	}
+
 	kind, err := me.queries.GetUserFeeling(ctx, queries.GetUserFeelingParams{
-		ForId:  forId,
-		UserId: userId,
+		TargetId:   targetId,
+		UserId:     userId,
+		TargetKind: string(targetKind),
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -253,16 +229,24 @@ func (me *impl) GetUserFeeling(ctx context.Context, forId, userId uuid.UUID) (Fe
 	return FeelingKind(kind), nil
 }
 
-func (me *impl) GetCommentOwner(ctx context.Context, commentId uuid.UUID) (uuid.UUID, error) {
-	ownerId, err := me.queries.GetCommentOwner(ctx, commentId)
+func (me *impl) DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error) {
+	return me.queries.CheckComment(ctx, commentId)
+}
+
+func (me *impl) GetCommentByID(ctx context.Context, commentId uuid.UUID) (*Comment, error) {
+	dbComment, err := me.queries.GetCommentById(ctx, commentId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return uuid.Nil, ErrCommentNotFound
+			return nil, ErrCommentNotFound
 		}
-		return uuid.Nil, fmt.Errorf("failed to get comment owner: %w", err)
+		return nil, fmt.Errorf("failed to get comment: %w", err)
 	}
-
-	return ownerId, nil
+	return &Comment{
+		Id:        dbComment.Id,
+		UserId:    dbComment.UserId,
+		Content:   dbComment.Content,
+		CreatedAt: dbComment.CreatedAt,
+	}, nil
 }
 
 func (me *impl) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
@@ -526,12 +510,18 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
-				if err := qtx.DeleteAllViewsForVideo(ctx, payload.VideoId); err != nil {
+				if err := qtx.DeleteAllViewsForTarget(ctx, queries.DeleteAllViewsForTargetParams{
+					TargetId: payload.VideoId,
+					Kind:     string(ViewTargetVideo),
+				}); err != nil {
 					return fmt.Errorf("failed to delete all views for video: %w", err)
 				}
 
-				if err := qtx.DeleteAllFeelingsByForId(ctx, payload.VideoId); err != nil {
-					return fmt.Errorf("failed to delete all feelings by for_id: %w", err)
+				if err := qtx.DeleteAllFeelingsForTarget(ctx, queries.DeleteAllFeelingsForTargetParams{
+					TargetId:   payload.VideoId,
+					TargetKind: string(FeelingTargetVideo),
+				}); err != nil {
+					return fmt.Errorf("failed to delete all feelings for target: %w", err)
 				}
 
 				if err := qtx.DeleteAllCommentsFor(ctx, payload.VideoId); err != nil {

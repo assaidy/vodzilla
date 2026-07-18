@@ -26,6 +26,7 @@ type Service interface {
 	GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error)
 	GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error)
 	DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error)
+	DoesPlaylistExist(ctx context.Context, id uuid.UUID) (bool, error)
 	IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
 	AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
 	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
@@ -247,6 +248,15 @@ func (me *impl) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) 
 	ok, err := me.queries.CheckVideo(ctx, id)
 	if err != nil {
 		return false, fmt.Errorf("failed to check video: %w", err)
+	}
+
+	return ok, nil
+}
+
+func (me *impl) DoesPlaylistExist(ctx context.Context, id uuid.UUID) (bool, error) {
+	ok, err := me.queries.CheckPlaylist(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("failed to check playlist: %w", err)
 	}
 
 	return ok, nil

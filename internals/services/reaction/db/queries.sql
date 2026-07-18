@@ -1,38 +1,35 @@
 -- name: InsertView :execrows
-insert into reaction_service.views (video_id, user_id) values ($1, $2)
-on conflict (video_id, user_id) do nothing;
+insert into reaction_service.views (target_id, user_id, kind) values ($1, $2, $3)
+on conflict (target_id, user_id, kind) do nothing;
 
 -- name: GetViewsCount :one
-select count(*) from reaction_service.views where video_id = $1;
-
--- name: CheckVideoViewer :one
-select exists (select 1 from reaction_service.views where video_id = $1 and user_id = $2 for update);
+select count(*) from reaction_service.views where target_id = $1 and kind = $2;
 
 -- name: UpsertFeeling :exec
-insert into reaction_service.feelings (for_id, user_id, kind) values ($1, $2, $3)
-on conflict (for_id, user_id) do update set
+insert into reaction_service.feelings (target_id, user_id, target_kind, kind) values ($1, $2, $3, $4)
+on conflict (target_id, user_id, target_kind) do update set
   kind = excluded.kind,
   added_at = now();
 
 -- name: DeleteFeeling :execrows
-delete from reaction_service.feelings where for_id = $1 and user_id = $2;
+delete from reaction_service.feelings where target_id = $1 and user_id = $2 and target_kind = $3;
 
 -- name: GetFeelingCounts :one
 select
     count(*) filter (where kind = 'like')    as likes,
     count(*) filter (where kind = 'dislike') as dislikes
 from reaction_service.feelings
-where for_id = $1;
+where target_id = $1 and target_kind = $2;
 
 -- name: GetUserFeeling :one
 select kind from reaction_service.feelings
-where for_id = $1 and user_id = $2;
+where target_id = $1 and user_id = $2 and target_kind = $3;
 
 -- name: CheckComment :one
 select exists (select 1 from reaction_service.comments where id = $1 for update);
 
--- name: GetCommentOwner :one
-select user_id from reaction_service.comments where id = $1;
+-- name: GetCommentById :one
+select id, user_id, content, created_at from reaction_service.comments where id = $1;
 
 -- name: InsertComment :exec
 insert into reaction_service.comments (id, for_id, user_id, content) values ($1, $2, $3, $4);
@@ -74,11 +71,11 @@ delete from reaction_service.feelings where user_id = $1;
 -- name: DeleteAllCommentsForUser :exec
 delete from reaction_service.comments where user_id = $1;
 
--- name: DeleteAllViewsForVideo :exec
-delete from reaction_service.views where video_id = $1;
+-- name: DeleteAllViewsForTarget :exec
+delete from reaction_service.views where target_id = $1 and kind = $2;
 
--- name: DeleteAllFeelingsByForId :exec
-delete from reaction_service.feelings where for_id = $1;
+-- name: DeleteAllFeelingsForTarget :exec
+delete from reaction_service.feelings where target_id = $1 and target_kind = $2;
 
 -- name: GetCommentsCount :one
 select count(*) from reaction_service.comments where for_id = $1;

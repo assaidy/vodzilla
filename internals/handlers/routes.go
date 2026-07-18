@@ -69,9 +69,15 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Put("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleRenamePlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideoFromPlaylist)
+	// TODO: add playlist description
+	// TODO: add playlist bookmarking(saving)
+	// TODO: add playlist visibility (is_public)
 
 	// Reactions
 	router.Post("/reactions/views/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleViewVideo)
+	router.Get("/reactions/views/videos/:video_id/count", me.WithSession, me.HandleGetVideoViewsCount)
+	router.Post("/reactions/views/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleViewPlaylist)
+	router.Get("/reactions/views/playlists/:playlist_id/count", me.WithSession, me.HandleGetPlaylistViewsCount)
 	router.Post("/reactions/comments/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleCreateVideoComment)
 	router.Get("/reactions/comments/videos/:video_id", me.WithSession, me.HandleGetVideoComments)
 	router.Post("/reactions/comments/:comment_id/replies", me.WithSession, me.WithCsrfToken, me.HandleCreateCommentReply)

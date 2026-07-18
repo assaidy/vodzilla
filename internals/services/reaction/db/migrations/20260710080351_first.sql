@@ -2,20 +2,22 @@
 create schema reaction_service;
 
 create table reaction_service.views (
-  video_id   uuid        not null,
+  target_id  uuid        not null,
   user_id    uuid        not null,
+  kind       varchar     not null,
   created_at timestamptz not null default now(),
 
-  primary key (video_id, user_id)
+  primary key (target_id, user_id, kind)
 );
 
 create table reaction_service.feelings (
-  for_id   uuid        not null,
-  user_id  uuid        not null,
-  kind     varchar     not null,
-  added_at timestamptz not null default now(),
+  target_id   uuid        not null,
+  user_id     uuid        not null,
+  target_kind varchar     not null,
+  kind        varchar     not null,
+  added_at    timestamptz not null default now(),
 
-  primary key(for_id, user_id)
+  primary key(target_id, user_id, target_kind)
 );
 
 create table reaction_service.comments (

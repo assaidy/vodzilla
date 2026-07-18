@@ -7,6 +7,7 @@ import (
 
 	notification_service "github.com/assaidy/vodzilla/internals/services/notification"
 	reaction_service "github.com/assaidy/vodzilla/internals/services/reaction"
+	video_service "github.com/assaidy/vodzilla/internals/services/video"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -32,7 +33,96 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 		return errVideoNotFound
 	}
 
-	if err := me.reactionService.ViewVideo(c.RequestCtx(), videoId, currentUserId); err != nil {
+	if err := me.reactionService.AddView(
+		c.RequestCtx(),
+		currentUserId,
+		reaction_service.ViewTargetVideo,
+		videoId,
+	); err != nil {
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleGetVideoViewsCount(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
+	}
+
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return errVideoNotFound
+	}
+
+	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), reaction_service.ViewTargetVideo, videoId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"count": count})
+}
+
+func (me *Handler) HandleGetPlaylistViewsCount(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
+	}
+
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.videoService.DoesPlaylistExist(c.RequestCtx(), playlistId); err != nil {
+		return err
+	} else if !ok {
+		return errPlaylistNotFound
+	}
+
+	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), reaction_service.ViewTargetPlaylist, playlistId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"count": count})
+}
+
+func (me *Handler) HandleViewPlaylist(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.videoService.DoesPlaylistExist(c.RequestCtx(), playlistId); err != nil {
+		return err
+	} else if !ok {
+		return errPlaylistNotFound
+	}
+
+	if err := me.reactionService.AddView(
+		c.RequestCtx(),
+		currentUserId,
+		reaction_service.ViewTargetPlaylist,
+		playlistId,
+	); err != nil {
 		return err
 	}
 
@@ -66,10 +156,12 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+	video, err := me.videoService.GetVideoById(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
 		return err
-	} else if !ok {
-		return errVideoNotFound
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
@@ -84,14 +176,10 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 		return err
 	}
 
-	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId)
-	if err != nil {
-		return err
-	}
-	if ownerId != currentUserId {
+	if video.OwnerId != currentUserId {
 		me.notify(
 			c.RequestCtx(),
-			ownerId,
+			video.OwnerId,
 			notification_service.VideoCommentPayload{
 				UserId:    currentUserId,
 				VideoId:   videoId,
@@ -186,6 +274,20 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	comment, err := me.reactionService.GetCommentByID(c.RequestCtx(), commentId)
+	if err != nil {
+		if errors.Is(err, reaction_service.ErrCommentNotFound) {
+			return errCommentNotFound
+		}
+		return err
+	}
+
 	replyId, err := me.reactionService.CreateCommentReply(
 		c.RequestCtx(),
 		currentUserId,
@@ -199,17 +301,10 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		return err
 	}
 
-	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), commentId)
-	if err != nil {
-		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return errCommentNotFound
-		}
-		return err
-	}
-	if ownerId != currentUserId {
+	if comment.UserId != currentUserId {
 		me.notify(
 			c.RequestCtx(),
-			ownerId,
+			comment.UserId,
 			notification_service.CommentReplyPayload{
 				UserId:    currentUserId,
 				CommentId: commentId,
@@ -271,6 +366,12 @@ func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	}
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinWLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.WUnLock(c.RequestCtx())
 
 	if err := me.reactionService.DeleteComment(c.RequestCtx(), currentUserId, commentId); err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
@@ -350,29 +451,27 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+	video, err := me.videoService.GetVideoById(c.RequestCtx(), videoId)
+	if err != nil {
+		if errors.Is(err, video_service.ErrVideoNotFound) {
+			return errVideoNotFound
+		}
 		return err
-	} else if !ok {
-		return errVideoNotFound
 	}
 
-	if err := me.reactionService.AddVideoFeeling(
+	if err := me.reactionService.AddFeeling(
 		c.RequestCtx(),
 		currentUserId,
 		videoId,
+		reaction_service.FeelingTargetVideo,
 		request.Kind,
 	); err != nil {
 		return err
 	}
 
-	ownerId, err := me.videoService.GetVideoOwner(c.RequestCtx(), videoId)
-	if err != nil {
-		return err
-	}
-	if ownerId != currentUserId {
-		me.notify(
-			c.RequestCtx(),
-			ownerId,
+	if video.OwnerId != currentUserId {
+		me.notify(c.RequestCtx(),
+			video.OwnerId,
 			notification_service.VideoFeelingPayload{
 				UserId:  currentUserId,
 				VideoId: videoId,
@@ -404,7 +503,12 @@ func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 		return errVideoNotFound
 	}
 
-	if err := me.reactionService.DeleteVideoFeeling(c.RequestCtx(), currentUserId, videoId); err != nil {
+	if err := me.reactionService.DeleteFeeling(
+		c.RequestCtx(),
+		currentUserId,
+		videoId,
+		reaction_service.FeelingTargetVideo,
+	); err != nil {
 		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
 			return errFeelingNotFound
 		}
@@ -438,29 +542,34 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.reactionService.AddCommentFeeling(
-		c.RequestCtx(),
-		currentUserId,
-		commentId,
-		request.Kind,
-	); err != nil {
-		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return errCommentNotFound
-		}
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
+	defer lock.RUnLock(c.RequestCtx())
 
-	ownerId, err := me.reactionService.GetCommentOwner(c.RequestCtx(), commentId)
+	comment, err := me.reactionService.GetCommentByID(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return errCommentNotFound
 		}
 		return err
 	}
-	if ownerId != currentUserId {
+
+	if err := me.reactionService.AddFeeling(
+		c.RequestCtx(),
+		currentUserId,
+		commentId,
+		reaction_service.FeelingTargetComment,
+		request.Kind,
+	); err != nil {
+		return err
+	}
+
+	if comment.UserId != currentUserId {
 		me.notify(
 			c.RequestCtx(),
-			ownerId,
+			comment.UserId,
 			notification_service.CommentFeelingPayload{
 				UserId:    currentUserId,
 				CommentId: commentId,
@@ -480,10 +589,24 @@ func (me *Handler) HandleDeleteCommentFeeling(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	if err := me.reactionService.DeleteCommentFeeling(c.RequestCtx(), currentUserId, commentId); err != nil {
-		if errors.Is(err, reaction_service.ErrCommentNotFound) {
-			return errCommentNotFound
-		}
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.reactionService.DoesCommentExist(c.RequestCtx(), commentId); err != nil {
+		return err
+	} else if !ok {
+		return errCommentNotFound
+	}
+
+	if err := me.reactionService.DeleteFeeling(
+		c.RequestCtx(),
+		currentUserId,
+		commentId,
+		reaction_service.FeelingTargetComment,
+	); err != nil {
 		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
 			return errFeelingNotFound
 		}

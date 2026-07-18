@@ -68,3 +68,11 @@ func (me *Handler) newUserLock(userId uuid.UUID) redislock.RedisLockInter {
 func (me *Handler) newVideoLock(videoId uuid.UUID) redislock.RedisLockInter {
 	return redislock.New(me.redisLockInterface, "video:"+videoId.String(), redislock.WithAutoRenew())
 }
+
+func (me *Handler) newPlaylistLock(playlistId uuid.UUID) redislock.RedisLockInter {
+	return redislock.New(me.redisLockInterface, "playlist:"+playlistId.String(), redislock.WithAutoRenew())
+}
+
+func (me *Handler) newCommentLock(commentId uuid.UUID) redislock.RedisLockInter {
+	return redislock.New(me.redisLockInterface, "comment:"+commentId.String(), redislock.WithAutoRenew())
+}

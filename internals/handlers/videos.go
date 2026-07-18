@@ -295,13 +295,14 @@ func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
 }
 
 type videoResponse struct {
-	Id                uuid.UUID `json:"id"`
-	OwnerId           uuid.UUID `json:"ownerId"`
-	Timestamp         time.Time `json:"timestamp"`
-	Title             string    `json:"title"`
-	Description       string    `json:"description"`
-	WatchlaterVideoId int       `json:"watchlaterVideoId,omitempty"`
-	PlaylistVideoId   int       `json:"playlistVideoId,omitempty"`
+	Id          uuid.UUID `json:"id"`
+	OwnerId     uuid.UUID `json:"ownerId"`
+	Timestamp   time.Time `json:"timestamp"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	// TODO: these are used for pagination; they will be replaced by index (reordering feature) in future.
+	WatchlaterVideoId int `json:"watchlaterVideoId,omitempty"`
+	PlaylistVideoId   int `json:"playlistVideoId,omitempty"`
 }
 
 func (me *Handler) HandleGetVideo(c fiber.Ctx) error {

@@ -220,6 +220,12 @@ func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinWLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.WUnLock(c.RequestCtx())
+
 	if err := me.videoService.DeletePlaylist(c.RequestCtx(), currentUserId, playlistId); err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
 			return errPlaylistNotFound

@@ -47,6 +47,48 @@ func TestHandleViewVideo(t *testing.T) {
 	})
 }
 
+func TestHandleViewPlaylist(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "vp@example.com", "Password123", "View Playlist", "vp")
+
+	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "View Test PL"}, user.Session)
+	status, data := parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	playlistID, _ := data["playlistId"].(string)
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/"+playlistID, nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/"+playlistID, nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid playlist_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/not-a-uuid", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("non-existent playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/00000000-0000-0000-0000-000000000000", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/"+playlistID, nil, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+}
+
 func TestHandleCreateVideoComment(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
@@ -553,6 +595,100 @@ func TestHandleDeleteVideoFeeling(t *testing.T) {
 		resp := testRequest(t, app, http.MethodDelete, "/reactions/feelings/videos/"+videoID.String(), nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 404, "FeelingNotFound")
+	})
+}
+
+func TestHandleGetVideoViewsCount(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gvvc@example.com", "Password123", "Get VV Count", "gvvc")
+	videoID := createVerifiedVideo(t, user.ID, "Views Count Test", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/videos/"+videoID.String()+"/count", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid video_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/videos/not-a-uuid/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/videos/00000000-0000-0000-0000-000000000000/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("zero views", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/videos/"+videoID.String()+"/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		count, _ := data["count"].(float64)
+		require.Equal(t, float64(0), count)
+	})
+
+	t.Run("non-zero views", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/videos/"+videoID.String(), nil, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/views/videos/"+videoID.String()+"/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		count, _ := data["count"].(float64)
+		require.Equal(t, float64(1), count)
+	})
+}
+
+func TestHandleGetPlaylistViewsCount(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gpvc@example.com", "Password123", "Get PV Count", "gpvc")
+
+	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Views Count PL"}, user.Session)
+	status, data := parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	playlistID, _ := data["playlistId"].(string)
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/playlists/"+playlistID+"/count", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid playlist_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/playlists/not-a-uuid/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("non-existent playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/playlists/00000000-0000-0000-0000-000000000000/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("zero views", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/views/playlists/"+playlistID+"/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		count, _ := data["count"].(float64)
+		require.Equal(t, float64(0), count)
+	})
+
+	t.Run("non-zero views", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/views/playlists/"+playlistID, nil, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/views/playlists/"+playlistID+"/count", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		count, _ := data["count"].(float64)
+		require.Equal(t, float64(1), count)
 	})
 }
 
