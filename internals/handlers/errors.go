@@ -57,6 +57,8 @@ var (
 	errWatchlaterConflict            = newApiError("WatchlaterConflict", "The video is already in watchlaters", fiber.StatusConflict)
 	errPlaylistVideoConflict         = newApiError("PlaylistVideoConflict", "The video is already in the playlist.", fiber.StatusConflict)
 	errPlaylistVideoNotFound         = newApiError("PlaylistVideoNotFound", "Video not found in playlist.", fiber.StatusNotFound)
+	errSavedPlaylistConflict         = newApiError("SavedPlaylistConflict", "The playlist is already saved.", fiber.StatusConflict)
+	errSavedPlaylistNotFound         = newApiError("SavedPlaylistNotFound", "Playlist not found in saved.", fiber.StatusNotFound)
 	errCommentNotFound               = newApiError("CommentNotFound", "Comment not found.", fiber.StatusNotFound)
 	errFeelingNotFound               = newApiError("FeelingNotFound", "Feeling not found.", fiber.StatusNotFound)
 	errThumbnailNotFound             = newApiError("ThumbnailNotFound", "Thumbnail not found.", fiber.StatusNotFound)

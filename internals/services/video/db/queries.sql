@@ -129,6 +129,31 @@ delete from video_service.watchlaters where user_id= $1;
 -- name: DeleteAllPlaylistsForUser :exec
 delete from video_service.playlists where user_id = $1;
 
+-- name: CheckSavedPlaylist :one
+select exists (select 1 from video_service.saved_playlists where playlist_id = $1 and user_id = $2 for update);
+
+-- name: InsertIntoSavedPlaylists :exec
+insert into video_service.saved_playlists (playlist_id, user_id) values ($1, $2);
+
+-- name: DeleteFromSavedPlaylists :execrows
+delete from video_service.saved_playlists where playlist_id = $1 and user_id = $2;
+
+-- name: GetSavedPlaylistsForUser :many
+select sp.id as saved_playlist_id, p.id, p.user_id, p.name, p.description, p.is_public, count(pv.video_id) as videos_count
+from video_service.saved_playlists sp
+join video_service.playlists p on p.id = sp.playlist_id
+left join video_service.playlist_videos pv on p.id = pv.playlist_id
+where sp.user_id = $1 and (
+  sqlc.narg(last_saved_playlist_id)::bigint is null
+  or sp.id < sqlc.narg(last_saved_playlist_id)::bigint
+)
+group by sp.id, p.id
+order by sp.id desc
+limit $2;
+
+-- name: DeleteAllSavedPlaylistsForUser :exec
+delete from video_service.saved_playlists where user_id = $1;
+
 -- name: DeleteVideoByIdForUser :execrows
 delete from video_service.videos where id = $1 and user_id = $2;
 

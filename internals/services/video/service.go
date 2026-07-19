@@ -40,6 +40,9 @@ type Service interface {
 	GetUserPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]PlaylistWithVideoStatus, error)
 	GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error)
 	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error)
+	SavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error
+	UnsavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error
+	GetSavedPlaylists(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]SavedPlaylist, error)
 	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
 }
 
@@ -507,6 +510,11 @@ type PlaylistWithVideoStatus struct {
 	HasVideo bool
 }
 
+type SavedPlaylist struct {
+	Playlist
+	SavedPlaylistId int
+}
+
 func (me *impl) GetUserPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]Playlist, error) {
 	playlists, err := me.queries.GetPlaylistsForUser(ctx, queries.GetPlaylistsForUserParams{
 		UserId:          userId,
@@ -626,6 +634,78 @@ func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, l
 	return result, nil
 }
 
+func (me *impl) SavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error {
+	tx, err := me.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+	qtx := me.queries.WithTx(tx)
+
+	if ok, err := qtx.CheckSavedPlaylist(ctx, queries.CheckSavedPlaylistParams{
+		PlaylistId: playlistId,
+		UserId:     userId,
+	}); err != nil {
+		return fmt.Errorf("failed to check saved playlist: %w", err)
+	} else if ok {
+		return ErrSavedPlaylistConflict
+	}
+
+	if err := qtx.InsertIntoSavedPlaylists(ctx, queries.InsertIntoSavedPlaylistsParams{
+		PlaylistId: playlistId,
+		UserId:     userId,
+	}); err != nil {
+		return fmt.Errorf("failed to insert into saved playlists: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit tx: %w", err)
+	}
+
+	return nil
+}
+
+func (me *impl) UnsavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error {
+	if n, err := me.queries.DeleteFromSavedPlaylists(ctx, queries.DeleteFromSavedPlaylistsParams{
+		PlaylistId: playlistId,
+		UserId:     userId,
+	}); err != nil {
+		return fmt.Errorf("failed to delete from saved playlists: %w", err)
+	} else if n == 0 {
+		return ErrSavedPlaylistNotFound
+	}
+
+	return nil
+}
+
+func (me *impl) GetSavedPlaylists(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]SavedPlaylist, error) {
+	rows, err := me.queries.GetSavedPlaylistsForUser(ctx, queries.GetSavedPlaylistsForUserParams{
+		UserId:              userId,
+		LastSavedPlaylistId: sql.NullInt64{Int64: int64(lastId), Valid: lastId != 0},
+		Limit:               int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get saved playlists: %w", err)
+	}
+
+	result := make([]SavedPlaylist, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, SavedPlaylist{
+			Playlist: Playlist{
+				Id:          row.Id,
+				UserId:      row.UserId,
+				Name:        row.Name,
+				Description: row.Description.String,
+				IsPublic:    row.IsPublic,
+				VideosCount: int(row.VideosCount),
+			},
+			SavedPlaylistId: int(row.SavedPlaylistId),
+		})
+	}
+
+	return result, nil
+}
+
 func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
 	defer sub.Close()
@@ -663,6 +743,10 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 
 				if err := qtx.DeleteAllPlaylistsForUser(ctx, payload.UserId); err != nil {
 					return fmt.Errorf("failed to delete all playlists for user: %w", err)
+				}
+
+				if err := qtx.DeleteAllSavedPlaylistsForUser(ctx, payload.UserId); err != nil {
+					return fmt.Errorf("failed to delete all saved playlists for user: %w", err)
 				}
 
 				if err := tx.Commit(); err != nil {

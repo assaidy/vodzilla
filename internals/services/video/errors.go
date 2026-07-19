@@ -9,4 +9,6 @@ var (
 	ErrWatchlaterVideoNotFound = errors.New("video not found in watchlater")
 	ErrPlaylistVideoConflict   = errors.New("video already in playlist")
 	ErrPlaylistVideoNotFound   = errors.New("video not found in playlist")
+	ErrSavedPlaylistConflict   = errors.New("playlist already saved")
+	ErrSavedPlaylistNotFound   = errors.New("playlist not found in saved")
 )

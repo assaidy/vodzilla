@@ -44,5 +44,14 @@ create table video_service.pending_videos (
   created_at   timestamptz  not null default now()
 );
 
+create table video_service.saved_playlists (
+  id          bigserial   primary key,
+  playlist_id uuid        not null references video_service.playlists (id) on delete cascade,
+  user_id     uuid        not null,
+  added_at    timestamptz not null default now(),
+
+  unique (playlist_id, user_id)
+);
+
 -- +goose Down
 drop schema video_service cascade;

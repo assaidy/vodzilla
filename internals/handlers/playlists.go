@@ -47,12 +47,13 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 }
 
 type playlistResponse struct {
-	Id          uuid.UUID `json:"id"`
-	UserId      uuid.UUID `json:"userId"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	IsPublic    bool      `json:"isPublic"`
-	VideosCount int       `json:"videosCount"`
+	Id              uuid.UUID `json:"id"`
+	UserId          uuid.UUID `json:"userId"`
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	IsPublic        bool      `json:"isPublic"`
+	VideosCount     int       `json:"videosCount"`
+	SavedPlaylistId int       `json:"savedPlaylistId,omitempty"`
 }
 
 func (me *Handler) HandleGetUserPlaylists(c fiber.Ctx) error {
@@ -384,4 +385,109 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	}
 
 	return c.JSON(response)
+}
+
+func (me *Handler) HandleGetSavedPlaylists(c fiber.Ctx) error {
+	pr, err := parsePaginatedRequest[int](c)
+	if err != nil {
+		return err
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	playlists, err := me.videoService.GetSavedPlaylists(
+		c.RequestCtx(),
+		currentUserId,
+		pr.Cursor,
+		pr.Limit,
+	)
+	if err != nil {
+		return err
+	}
+
+	items := make([]playlistResponse, 0, len(playlists))
+	for _, p := range playlists {
+		items = append(items, playlistResponse{
+			Id:              p.Id,
+			UserId:          p.UserId,
+			Name:            p.Name,
+			Description:     p.Description,
+			IsPublic:        p.IsPublic,
+			VideosCount:     p.VideosCount,
+			SavedPlaylistId: p.SavedPlaylistId,
+		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		response.Cursor = encodeCursor(playlists[len(playlists)-1].SavedPlaylistId)
+	}
+
+	return c.JSON(response)
+}
+
+func (me *Handler) HandleAddToSavedPlaylists(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
+	}
+
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	} else if !playlist.IsPublic && playlist.UserId != currentUserId {
+		return errPlaylistNotFound
+	}
+
+	if err := me.videoService.SavePlaylist(c.RequestCtx(), playlistId, currentUserId); err != nil {
+		if errors.Is(err, video_service.ErrSavedPlaylistConflict) {
+			return errSavedPlaylistConflict
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (me *Handler) HandleDeleteFromSavedPlaylists(c fiber.Ctx) error {
+	playlistId, err := uuid.Parse(c.Params("playlist_id"))
+	if err != nil {
+		return errPlaylistNotFound
+	}
+
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	} else if !playlist.IsPublic && playlist.UserId != currentUserId {
+		return errPlaylistNotFound
+	}
+
+	if err := me.videoService.UnsavePlaylist(c.RequestCtx(), playlistId, currentUserId); err != nil {
+		if errors.Is(err, video_service.ErrSavedPlaylistNotFound) {
+			return errSavedPlaylistNotFound
+		}
+		return err
+	}
+
+	return c.SendStatus(fiber.StatusOK)
 }

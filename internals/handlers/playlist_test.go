@@ -622,3 +622,119 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 		assertKind(t, status, data, 404, "PlaylistNotFound")
 	})
 }
+
+func TestHandleSavedPlaylists(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "svpl@example.com", "Password123", "SV PL", "svpl")
+	otherUser := createVerifiedUser(t, app, "svploth@example.com", "Password123", "SV PL Oth", "svploth")
+
+	resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Public PL", "isPublic": true}, otherUser.Session)
+	status, data := parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	publicPL, _ := data["playlistId"].(string)
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Private PL", "isPublic": false}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	privatePL, _ := data["playlistId"].(string)
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Public 2", "isPublic": true}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	unsavedPL, _ := data["playlistId"].(string)
+
+	t.Run("add no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/"+publicPL, nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("add no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/"+publicPL, nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("add non-existent playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/00000000-0000-0000-0000-000000000000", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("add another user's private playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/"+privatePL, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
+	})
+
+	t.Run("add another user's public playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/"+publicPL, nil, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+	})
+
+	t.Run("add already saved", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists/saved/"+publicPL, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 409, "SavedPlaylistConflict")
+	})
+
+	t.Run("delete no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/playlists/saved/"+publicPL, nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("delete no CSRF", func(t *testing.T) {
+		noCsrf := &testSession{Cookies: user.Session.Cookies}
+		resp := testRequest(t, app, http.MethodDelete, "/playlists/saved/"+publicPL, nil, noCsrf)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("delete not saved", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/playlists/saved/"+unsavedPL, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "SavedPlaylistNotFound")
+	})
+
+	t.Run("get no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/saved/list", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("get success", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/saved/list", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, publicPL, item["id"])
+		require.Equal(t, "Public PL", item["name"])
+		require.Equal(t, true, item["isPublic"])
+		spID, _ := item["savedPlaylistId"].(float64)
+		require.NotZero(t, spID)
+	})
+
+	t.Run("delete success", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/playlists/saved/"+publicPL, nil, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/playlists/saved/list", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
+	})
+
+	t.Run("delete again", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodDelete, "/playlists/saved/"+publicPL, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "SavedPlaylistNotFound")
+	})
+}

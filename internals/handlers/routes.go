@@ -69,7 +69,10 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Put("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleEditPlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideoFromPlaylist)
-	// TODO: add playlist bookmarking(saving)
+	// NOTE: added postfix /list to avoid conflict with GET /playlists/:playlist_id
+	router.Get("/playlists/saved/list", me.WithSession, me.HandleGetSavedPlaylists)
+	router.Post("/playlists/saved/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleAddToSavedPlaylists)
+	router.Delete("/playlists/saved/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteFromSavedPlaylists)
 
 	// Reactions
 	// TODO: generalize comments/replies with target kind like i did in views and feelings.
