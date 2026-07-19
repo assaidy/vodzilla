@@ -14,6 +14,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 	var request struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		IsPublic    bool   `json:"isPublic"`
 	}
 	if err := c.Bind().Body(&request); err != nil {
 		return errInvalidRequestBody.details(err)
@@ -36,6 +37,7 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 		currentUserId,
 		request.Name,
 		request.Description,
+		request.IsPublic,
 	)
 	if err != nil {
 		return err
@@ -46,12 +48,14 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 
 type playlistResponse struct {
 	Id          uuid.UUID `json:"id"`
+	UserId      uuid.UUID `json:"userId"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
+	IsPublic    bool      `json:"isPublic"`
 	VideosCount int       `json:"videosCount"`
 }
 
-func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
+func (me *Handler) HandleGetUserPlaylists(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -74,11 +78,15 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 		return errUserNotFound
 	}
 
-	playlists, err := me.videoService.GetPlaylists(
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+	includePrivates := userId == currentUserId
+
+	playlists, err := me.videoService.GetUserPlaylists(
 		c.RequestCtx(),
 		userId,
 		pr.Cursor,
 		pr.Limit,
+		includePrivates,
 	)
 	if err != nil {
 		return err
@@ -88,8 +96,10 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 	for _, p := range playlists {
 		items = append(items, playlistResponse{
 			Id:          p.Id,
+			UserId:      p.UserId,
 			Name:        p.Name,
 			Description: p.Description,
+			IsPublic:    p.IsPublic,
 			VideosCount: p.VideosCount,
 		})
 	}
@@ -103,10 +113,6 @@ func (me *Handler) HandleGetPlaylists(c fiber.Ctx) error {
 }
 
 func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
-	userId, err := uuid.Parse(c.Params("user_id"))
-	if err != nil {
-		return errUserNotFound
-	}
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -117,24 +123,16 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		return err
 	}
 
-	lock := me.newUserLock(userId)
-	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
-		return err
-	}
-	defer lock.RUnLock(c.RequestCtx())
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+	includePrivates := true
 
-	if ok, err := me.userService.DoesUserExist(c.RequestCtx(), userId); err != nil {
-		return err
-	} else if !ok {
-		return errUserNotFound
-	}
-
-	playlists, err := me.videoService.GetPlaylistsWithVideoStatus(
+	playlists, err := me.videoService.GetUserPlaylistsWithVideoStatus(
 		c.RequestCtx(),
-		userId,
+		currentUserId,
 		videoId,
 		pr.Cursor,
 		pr.Limit,
+		includePrivates,
 	)
 	if err != nil {
 		if errors.Is(err, video_service.ErrVideoNotFound) {
@@ -149,8 +147,10 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	for _, p := range playlists {
 		items = append(items, fiber.Map{
 			"id":          p.Id,
+			"userId":      p.UserId,
 			"name":        p.Name,
 			"description": p.Description,
+			"isPublic":    p.IsPublic,
 			"videosCount": p.VideosCount,
 			"hasVideo":    p.HasVideo,
 		})
@@ -178,10 +178,18 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 		return err
 	}
 
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if !playlist.IsPublic && playlist.UserId != currentUserId {
+		return errPlaylistNotFound
+	}
+
 	return c.JSON(playlistResponse{
 		Id:          playlist.Id,
+		UserId:      playlist.UserId,
 		Name:        playlist.Name,
 		Description: playlist.Description,
+		IsPublic:    playlist.IsPublic,
 		VideosCount: playlist.VideosCount,
 	})
 }
@@ -195,6 +203,7 @@ func (me *Handler) HandleEditPlaylist(c fiber.Ctx) error {
 	var request struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		IsPublic    bool   `json:"isPublic"`
 	}
 	if err := c.Bind().Body(&request); err != nil {
 		return errInvalidRequestBody.details(err)
@@ -218,6 +227,7 @@ func (me *Handler) HandleEditPlaylist(c fiber.Ctx) error {
 		playlistId,
 		request.Name,
 		request.Description,
+		request.IsPublic,
 	); err != nil {
 		if errors.Is(err, video_service.ErrPlaylistNotFound) {
 			return errPlaylistNotFound
@@ -329,6 +339,23 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 		return err
 	}
 
+	lock := me.newPlaylistLock(playlistId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
+		return err
+	} else if !playlist.IsPublic && playlist.UserId != currentUserId {
+		return errPlaylistNotFound
+	}
+
 	videos, err := me.videoService.GetVideosInPlaylist(
 		c.RequestCtx(),
 		playlistId,
@@ -336,9 +363,6 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 		pr.Limit,
 	)
 	if err != nil {
-		if errors.Is(err, video_service.ErrPlaylistNotFound) {
-			return errPlaylistNotFound
-		}
 		return err
 	}
 

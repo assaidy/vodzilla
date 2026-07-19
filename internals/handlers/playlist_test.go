@@ -79,6 +79,18 @@ func TestHandleCreatePlaylist(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("success with public visibility", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Public PL", "description": "Public", "isPublic": true}, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		playlistID, _ := data["playlistId"].(string)
+		require.NotEmpty(t, playlistID)
+
+		resp = testRequest(t, app, http.MethodGet, "/playlists/"+playlistID, nil, user.Session)
+		status, data = parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		require.Equal(t, true, data["isPublic"])
+	})
 }
 
 func TestHandleGetPlaylists(t *testing.T) {
@@ -144,6 +156,26 @@ func TestHandleGetPlaylists(t *testing.T) {
 		items, _ := data["items"].([]any)
 		require.Empty(t, items)
 	})
+
+	t.Run("view other user's playlists respects visibility", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Public", "isPublic": true}, otherUser.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		otherPublicID, _ := data["playlistId"].(string)
+
+		resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Private", "isPublic": false}, otherUser.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+
+		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+otherUser.ID.String(), nil, user.Session)
+		status, data = parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, otherPublicID, item["id"])
+		require.Equal(t, true, item["isPublic"])
+	})
 }
 
 func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
@@ -153,50 +185,63 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 	videoID := createVerifiedVideo(t, user.ID, "PL WVS Video", "")
 
 	t.Run("no session", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/"+videoID.String(), nil, nil)
+		resp := testRequest(t, app, http.MethodGet, "/playlists/videos/"+videoID.String(), nil, nil)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
 
-	t.Run("non-existent user", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/playlists/users/00000000-0000-0000-0000-000000000000/videos/"+videoID.String(), nil, user.Session)
-		status, data := parseResponse(t, resp)
-		assertKind(t, status, data, 404, "UserNotFound")
-	})
-
 	t.Run("non-existent video", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/00000000-0000-0000-0000-000000000000", nil, user.Session)
+		resp := testRequest(t, app, http.MethodGet, "/playlists/videos/00000000-0000-0000-0000-000000000000", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 404, "VideoNotFound")
 	})
 
 	t.Run("empty list", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/"+videoID.String(), nil, user.Session)
+		resp := testRequest(t, app, http.MethodGet, "/playlists/videos/"+videoID.String(), nil, user.Session)
 		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
 		items, _ := data["items"].([]any)
 		require.Empty(t, items)
 	})
 
-	t.Run("success with hasVideo", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "WVS PL", "description": "WVS description"}, user.Session)
+	t.Run("success with visibility and hasVideo", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Public WVS", "description": "Public list", "isPublic": true}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
-		plID, _ := data["playlistId"].(string)
+		publicPL, _ := data["playlistId"].(string)
 
-		resp = testRequest(t, app, http.MethodPost, "/playlists/"+plID+"/videos/"+videoID.String(), nil, user.Session)
+		resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Private WVS", "description": "Private list", "isPublic": false}, user.Session)
+		status, data = parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		privatePL, _ := data["playlistId"].(string)
+
+		resp = testRequest(t, app, http.MethodPost, "/playlists/"+publicPL+"/videos/"+videoID.String(), nil, user.Session)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 		resp.Body.Close()
 
-		resp = testRequest(t, app, http.MethodGet, "/playlists/users/"+user.ID.String()+"/videos/"+videoID.String(), nil, user.Session)
+		resp = testRequest(t, app, http.MethodGet, "/playlists/videos/"+videoID.String(), nil, user.Session)
 		status, data = parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
 		items, _ := data["items"].([]any)
-		require.Len(t, items, 1)
-		item := items[0].(map[string]any)
-		require.Equal(t, plID, item["id"])
-		require.Equal(t, "WVS description", item["description"])
-		require.Equal(t, true, item["hasVideo"])
+		require.Len(t, items, 2)
+
+		byID := make(map[string]map[string]any)
+		for _, item := range items {
+			m := item.(map[string]any)
+			byID[m["id"].(string)] = m
+		}
+
+		pub := byID[publicPL]
+		require.NotNil(t, pub)
+		require.Equal(t, "Public list", pub["description"])
+		require.Equal(t, true, pub["isPublic"])
+		require.Equal(t, true, pub["hasVideo"])
+
+		priv := byID[privatePL]
+		require.NotNil(t, priv)
+		require.Equal(t, "Private list", priv["description"])
+		require.Equal(t, false, priv["isPublic"])
+		require.Equal(t, false, priv["hasVideo"])
 	})
 }
 
@@ -208,6 +253,17 @@ func TestHandleGetPlaylist(t *testing.T) {
 	status, data := parseResponse(t, resp)
 	assertKind(t, status, data, 200, "")
 	playlistID, _ := data["playlistId"].(string)
+
+	otherUser := createVerifiedUser(t, app, "plgetploth@example.com", "Password123", "PL Get PL Oth", "plgetploth")
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Public", "isPublic": true}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	otherPublicID, _ := data["playlistId"].(string)
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Private", "isPublic": false}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	otherPrivateID, _ := data["playlistId"].(string)
 
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID, nil, nil)
@@ -221,7 +277,7 @@ func TestHandleGetPlaylist(t *testing.T) {
 		assertKind(t, status, data, 404, "PlaylistNotFound")
 	})
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("success own playlist", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID, nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
@@ -229,6 +285,20 @@ func TestHandleGetPlaylist(t *testing.T) {
 		require.Equal(t, "Get PL Test", name)
 		desc, _ := data["description"].(string)
 		require.Equal(t, "Get PL desc", desc)
+		require.Equal(t, false, data["isPublic"])
+	})
+
+	t.Run("other user's public playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/"+otherPublicID, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 200, "")
+		require.Equal(t, true, data["isPublic"])
+	})
+
+	t.Run("other user's private playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/"+otherPrivateID, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
 	})
 }
 
@@ -279,6 +349,26 @@ func TestHandleEditPlaylist(t *testing.T) {
 		item := items[0].(map[string]any)
 		require.Equal(t, "New Name", item["name"])
 		require.Equal(t, "New desc", item["description"])
+	})
+
+	t.Run("edit visibility", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPut, "/playlists/"+playlistID, fiber.Map{"name": "New Name", "isPublic": true}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/playlists/"+playlistID, nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		require.Equal(t, true, data["isPublic"])
+
+		resp = testRequest(t, app, http.MethodPut, "/playlists/"+playlistID, fiber.Map{"name": "New Name", "isPublic": false}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/playlists/"+playlistID, nil, user.Session)
+		status, data = parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		require.Equal(t, false, data["isPublic"])
 	})
 }
 
@@ -460,6 +550,27 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
+	otherUser := createVerifiedUser(t, app, "plgetpvoth@example.com", "Password123", "PL Get PV Oth", "plgetpvoth")
+	otherVideo := createVerifiedVideo(t, otherUser.ID, "PL Other Video", "")
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Public", "isPublic": true}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	otherPublicID, _ := data["playlistId"].(string)
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists/"+otherPublicID+"/videos/"+otherVideo.String(), nil, otherUser.Session)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists", fiber.Map{"name": "Other Private", "isPublic": false}, otherUser.Session)
+	status, data = parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	otherPrivateID, _ := data["playlistId"].(string)
+
+	resp = testRequest(t, app, http.MethodPost, "/playlists/"+otherPrivateID+"/videos/"+otherVideo.String(), nil, otherUser.Session)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
 	t.Run("no session", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos", nil, nil)
 		status, data := parseResponse(t, resp)
@@ -484,7 +595,7 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 		assertKind(t, status, data, 400, "InvalidLimit")
 	})
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("success own playlist", func(t *testing.T) {
 		resp := testRequest(t, app, http.MethodGet, "/playlists/"+playlistID+"/videos", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		require.Equal(t, http.StatusOK, status)
@@ -493,5 +604,21 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 		item := items[0].(map[string]any)
 		require.NotEmpty(t, item["playlistVideoId"])
 		require.Equal(t, videoID.String(), item["id"])
+	})
+
+	t.Run("other user's public playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/"+otherPublicID+"/videos", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, otherVideo.String(), item["id"])
+	})
+
+	t.Run("other user's private playlist", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/playlists/"+otherPrivateID+"/videos", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "PlaylistNotFound")
 	})
 }

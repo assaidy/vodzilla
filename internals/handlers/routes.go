@@ -61,15 +61,14 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 
 	// Playlists
 	router.Post("/playlists", me.WithSession, me.WithCsrfToken, me.HandleCreatePlaylist)
-	router.Get("/playlists/users/:user_id", me.WithSession, me.HandleGetPlaylists)
-	router.Get("/playlists/users/:user_id/videos/:video_id", me.WithSession, me.HandleGetPlaylistsWithVideoStatus)
+	router.Get("/playlists/users/:user_id", me.WithSession, me.HandleGetUserPlaylists)
+	router.Get("/playlists/videos/:video_id", me.WithSession, me.HandleGetPlaylistsWithVideoStatus)
 	router.Get("/playlists/:playlist_id", me.WithSession, me.HandleGetPlaylist)
 	router.Get("/playlists/:playlist_id/videos", me.WithSession, me.HandleGetPlaylistVideos)
 	router.Delete("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleDeletePlaylist)
 	router.Put("/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleEditPlaylist)
 	router.Post("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleAddVideoToPlaylist)
 	router.Delete("/playlists/:playlist_id/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteVideoFromPlaylist)
-	// TODO: add playlist visibility (is_public)
 	// TODO: add playlist bookmarking(saving)
 
 	// Reactions

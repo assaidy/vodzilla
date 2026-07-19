@@ -26,22 +26,20 @@ type Service interface {
 	GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error)
 	GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error)
 	DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error)
-	DoesPlaylistExist(ctx context.Context, id uuid.UUID) (bool, error)
 	IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
 	AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
 	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
 	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchlaterVideo, error)
 	GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error)
-	CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string) (uuid.UUID, error)
+	CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string, isPublic bool) (uuid.UUID, error)
 	DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error
-	EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string) error
+	EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string, isPublic bool) error
 	AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
 	DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
-	GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error)
-	GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error)
+	GetUserPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]Playlist, error)
+	GetUserPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]PlaylistWithVideoStatus, error)
 	GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error)
 	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error)
-	IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error)
 	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
 }
 
@@ -253,15 +251,6 @@ func (me *impl) DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error) 
 	return ok, nil
 }
 
-func (me *impl) DoesPlaylistExist(ctx context.Context, id uuid.UUID) (bool, error) {
-	ok, err := me.queries.CheckPlaylist(ctx, id)
-	if err != nil {
-		return false, fmt.Errorf("failed to check playlist: %w", err)
-	}
-
-	return ok, nil
-}
-
 func (me *impl) IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error) {
 	return me.queries.CheckVideoInWatchlaters(ctx, queries.CheckVideoInWatchlatersParams{
 		VideoId: videoId,
@@ -375,13 +364,14 @@ func (me *impl) GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID
 	return ownerId, nil
 }
 
-func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string) (uuid.UUID, error) {
+func (me *impl) CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string, isPublic bool) (uuid.UUID, error) {
 	playlistId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertPlaylist(ctx, queries.InsertPlaylistParams{
 		Id:          playlistId,
 		Name:        name,
 		UserId:      userId,
 		Description: sql.NullString{String: description, Valid: description != ""},
+		IsPublic:    isPublic,
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert playlist: %w", err)
 	}
@@ -402,12 +392,13 @@ func (me *impl) DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID
 	return nil
 }
 
-func (me *impl) EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string) error {
+func (me *impl) EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string, isPublic bool) error {
 	if n, err := me.queries.UpdatePlaylist(ctx, queries.UpdatePlaylistParams{
 		Id:          playlistId,
 		UserId:      userId,
 		Name:        name,
 		Description: sql.NullString{String: description, Valid: description != ""},
+		IsPublic:    isPublic,
 	}); err != nil {
 		return fmt.Errorf("failed to update playlist: %w", err)
 	} else if n == 0 {
@@ -504,8 +495,10 @@ func (me *impl) DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, pl
 
 type Playlist struct {
 	Id          uuid.UUID
+	UserId      uuid.UUID
 	Name        string
 	Description string
+	IsPublic    bool
 	VideosCount int
 }
 
@@ -514,11 +507,12 @@ type PlaylistWithVideoStatus struct {
 	HasVideo bool
 }
 
-func (me *impl) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int) ([]Playlist, error) {
+func (me *impl) GetUserPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]Playlist, error) {
 	playlists, err := me.queries.GetPlaylistsForUser(ctx, queries.GetPlaylistsForUserParams{
-		UserId:         userId,
-		LastPlaylistId: uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
-		Limit:          int32(limit),
+		UserId:          userId,
+		LastPlaylistId:  uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
+		Limit:           int32(limit),
+		IncludePrivates: includePrivates,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all playlists for user: %w", err)
@@ -528,8 +522,10 @@ func (me *impl) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UU
 	for _, p := range playlists {
 		result = append(result, Playlist{
 			Id:          p.Id,
+			UserId:      p.UserId,
 			Name:        p.Name,
 			Description: p.Description.String,
+			IsPublic:    p.IsPublic,
 			VideosCount: int(p.VideosCount),
 		})
 	}
@@ -537,7 +533,7 @@ func (me *impl) GetPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UU
 	return result, nil
 }
 
-func (me *impl) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int) ([]PlaylistWithVideoStatus, error) {
+func (me *impl) GetUserPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]PlaylistWithVideoStatus, error) {
 	tx, err := me.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin tx: %w", err)
@@ -552,10 +548,11 @@ func (me *impl) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId
 	}
 
 	rows, err := qtx.GetPlaylistsWithVideoStatusForUser(ctx, queries.GetPlaylistsWithVideoStatusForUserParams{
-		UserId:         userId,
-		VideoId:        videoId,
-		LastPlaylistId: uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
-		Limit:          int32(limit),
+		UserId:          userId,
+		VideoId:         videoId,
+		LastPlaylistId:  uuid.NullUUID{UUID: lastPlaylistId, Valid: lastPlaylistId != uuid.Nil},
+		Limit:           int32(limit),
+		IncludePrivates: includePrivates,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get playlists with video status: %w", err)
@@ -566,8 +563,10 @@ func (me *impl) GetPlaylistsWithVideoStatus(ctx context.Context, userId, videoId
 		result = append(result, PlaylistWithVideoStatus{
 			Playlist: Playlist{
 				Id:          row.Id,
+				UserId:      row.UserId,
 				Name:        row.Name,
 				Description: row.Description.String,
+				IsPublic:    row.IsPublic,
 				VideosCount: int(row.VideosCount),
 			},
 			HasVideo: row.HasVideo,
@@ -592,19 +591,15 @@ func (me *impl) GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlis
 
 	return &Playlist{
 		Id:          playlist.Id,
+		UserId:      playlist.UserId,
 		Name:        playlist.Name,
 		Description: playlist.Description.String,
+		IsPublic:    playlist.IsPublic,
 		VideosCount: int(playlist.VideosCount),
 	}, nil
 }
 
 func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error) {
-	if ok, err := me.queries.CheckPlaylist(ctx, playlistId); err != nil {
-		return nil, fmt.Errorf("failed to check playlist: %w", err)
-	} else if !ok {
-		return nil, ErrPlaylistNotFound
-	}
-
 	rows, err := me.queries.GetVideosInPlaylist(ctx, queries.GetVideosInPlaylistParams{
 		PlaylistId: playlistId,
 		LastId:     sql.NullInt64{Int64: int64(lastId), Valid: lastId != 0},
@@ -629,13 +624,6 @@ func (me *impl) GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, l
 	}
 
 	return result, nil
-}
-
-func (me *impl) IsInPlaylist(ctx context.Context, videoId, playlistId uuid.UUID) (bool, error) {
-	return me.queries.CheckVideoInPlaylist(ctx, queries.CheckVideoInPlaylistParams{
-		VideoId:    videoId,
-		PlaylistId: playlistId,
-	})
 }
 
 func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {

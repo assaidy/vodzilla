@@ -22,8 +22,9 @@ create table video_service.playlists (
   id          uuid        primary key,
   name        varchar(50) not null,
   description varchar(500),
-  user_id    uuid        not null,
-  created_at  timestamptz not null default now()
+  user_id     uuid        not null,
+  created_at  timestamptz not null default now(),
+  is_public   boolean     not null
 );
 
 create table video_service.playlist_videos (

@@ -52,16 +52,13 @@ order by wl.id desc
 limit $2;
 
 -- name: InsertPlaylist :exec
-insert into video_service.playlists (id, name, user_id, description) values ($1, $2, $3, $4);
+insert into video_service.playlists (id, name, user_id, description, is_public) values ($1, $2, $3, $4, $5);
 
 -- name: DeletePlaylist :execrows
 delete from video_service.playlists where id = $1 and user_id = $2;
 
 -- name: UpdatePlaylist :execrows
-update video_service.playlists set name = $2, description = $4 where id = $1 and user_id = $3;
-
--- name: CheckPlaylist :one
-select exists (select 1 from video_service.playlists where id = $1 for update);
+update video_service.playlists set name = $1, description = $2, is_public = $3 where id = $4 and user_id = $5;
 
 -- name: CheckPlaylistForUser :one
 select exists (select 1 from video_service.playlists where id = $1 and user_id = $2 for update);
@@ -77,11 +74,15 @@ delete from video_service.playlist_videos where playlist_id = $1 and video_id = 
 select 
   p.id,
   p.name,
+  p.user_id,
   p.description,
+  p.is_public,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
 where user_id = sqlc.arg(user_id) and (
+  p.is_public = true or sqlc.arg(include_privates)::boolean = true
+) and (
   sqlc.narg(last_playlist_id)::uuid is null
   or p.id < sqlc.narg(last_playlist_id)::uuid
 )
@@ -109,8 +110,10 @@ select exists (
 -- name: GetPlaylist :one
 select
   p.id,
+  p.user_id,
   p.name,
   p.description,
+  p.is_public,
   count(pv.video_id) as videos_count
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
@@ -132,8 +135,10 @@ delete from video_service.videos where id = $1 and user_id = $2;
 -- name: GetPlaylistsWithVideoStatusForUser :many
 select 
   p.id,
+  p.user_id,
   p.name,
   p.description,
+  p.is_public,
   count(pv.video_id) as videos_count,
   exists (
     select 1 from video_service.playlist_videos pv2
@@ -142,6 +147,8 @@ select
 from video_service.playlists p
 left join video_service.playlist_videos pv on p.id = pv.playlist_id
 where p.user_id = sqlc.arg(user_id) and (
+  p.is_public = true or sqlc.arg(include_privates)::boolean = true
+) and (
   sqlc.narg(last_playlist_id)::uuid is null
   or p.id < sqlc.narg(last_playlist_id)::uuid
 )

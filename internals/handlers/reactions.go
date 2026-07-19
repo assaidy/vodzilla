@@ -83,9 +83,14 @@ func (me *Handler) HandleGetPlaylistViewsCount(c fiber.Ctx) error {
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	if ok, err := me.videoService.DoesPlaylistExist(c.RequestCtx(), playlistId); err != nil {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
 		return err
-	} else if !ok {
+	} else if !playlist.IsPublic && playlist.UserId != currentUserId {
 		return errPlaylistNotFound
 	}
 
@@ -103,17 +108,20 @@ func (me *Handler) HandleViewPlaylist(c fiber.Ctx) error {
 		return errPlaylistNotFound
 	}
 
-	currentUserId := c.Locals("user_id").(uuid.UUID)
-
 	lock := me.newPlaylistLock(playlistId)
 	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
 		return err
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	if ok, err := me.videoService.DoesPlaylistExist(c.RequestCtx(), playlistId); err != nil {
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	if playlist, err := me.videoService.GetPlaylist(c.RequestCtx(), playlistId); err != nil {
+		if errors.Is(err, video_service.ErrPlaylistNotFound) {
+			return errPlaylistNotFound
+		}
 		return err
-	} else if !ok {
+	} else if !playlist.IsPublic && playlist.UserId != currentUserId {
 		return errPlaylistNotFound
 	}
 
