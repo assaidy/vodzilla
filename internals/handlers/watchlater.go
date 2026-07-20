@@ -29,12 +29,11 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
 		items = append(items, videoResponse{
-			Id:                v.Id,
-			UserId:            v.UserId,
-			Timestamp:         v.Timestamp,
-			Title:             v.Title,
-			Description:       v.Description,
-			WatchlaterVideoId: v.WatchlaterVideoId,
+			Id:          v.Id,
+			UserId:      v.UserId,
+			Timestamp:   v.Timestamp,
+			Title:       v.Title,
+			Description: v.Description,
 		})
 	}
 

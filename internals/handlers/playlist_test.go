@@ -226,22 +226,25 @@ func TestHandleGetPlaylistsWithVideoStatus(t *testing.T) {
 		require.Len(t, items, 2)
 
 		byID := make(map[string]map[string]any)
+		hasVideoByID := make(map[string]bool)
 		for _, item := range items {
 			m := item.(map[string]any)
-			byID[m["id"].(string)] = m
+			pl := m["playlist"].(map[string]any)
+			byID[pl["id"].(string)] = pl
+			hasVideoByID[pl["id"].(string)] = m["hasVideo"].(bool)
 		}
 
 		pub := byID[publicPL]
 		require.NotNil(t, pub)
 		require.Equal(t, "Public list", pub["description"])
 		require.Equal(t, true, pub["isPublic"])
-		require.Equal(t, true, pub["hasVideo"])
+		require.Equal(t, true, hasVideoByID[publicPL])
 
 		priv := byID[privatePL]
 		require.NotNil(t, priv)
 		require.Equal(t, "Private list", priv["description"])
 		require.Equal(t, false, priv["isPublic"])
-		require.Equal(t, false, priv["hasVideo"])
+		require.Equal(t, false, hasVideoByID[privatePL])
 	})
 }
 
@@ -602,7 +605,6 @@ func TestHandleGetPlaylistVideos(t *testing.T) {
 		items, _ := data["items"].([]any)
 		require.Len(t, items, 1)
 		item := items[0].(map[string]any)
-		require.NotEmpty(t, item["playlistVideoId"])
 		require.Equal(t, videoID.String(), item["id"])
 	})
 
@@ -716,8 +718,7 @@ func TestHandleSavedPlaylists(t *testing.T) {
 		require.Equal(t, publicPL, item["id"])
 		require.Equal(t, "Public PL", item["name"])
 		require.Equal(t, true, item["isPublic"])
-		spID, _ := item["savedPlaylistId"].(float64)
-		require.NotZero(t, spID)
+
 	})
 
 	t.Run("delete success", func(t *testing.T) {

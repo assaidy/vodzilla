@@ -47,13 +47,12 @@ func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
 }
 
 type playlistResponse struct {
-	Id              uuid.UUID `json:"id"`
-	UserId          uuid.UUID `json:"userId"`
-	Name            string    `json:"name"`
-	Description     string    `json:"description"`
-	IsPublic        bool      `json:"isPublic"`
-	VideosCount     int       `json:"videosCount"`
-	SavedPlaylistId int       `json:"savedPlaylistId,omitempty"`
+	Id          uuid.UUID `json:"id"`
+	UserId      uuid.UUID `json:"userId"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	IsPublic    bool      `json:"isPublic"`
+	VideosCount int       `json:"videosCount"`
 }
 
 func (me *Handler) HandleGetUserPlaylists(c fiber.Ctx) error {
@@ -113,6 +112,11 @@ func (me *Handler) HandleGetUserPlaylists(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+type playlistWithVideoStatusResponse struct {
+	Playlist playlistResponse `json:"playlist"`
+	HasVideo bool             `json:"hasVideo"`
+}
+
 func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
@@ -142,18 +146,18 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 		return err
 	}
 
-	// I cannot add HasVideo field with tag omitempty to [playlistResponse] and reused it;
-	// omitempty would drop HasVideo=false, but the this response must include it.
-	items := make([]fiber.Map, 0, len(playlists))
+	items := make([]playlistWithVideoStatusResponse, 0, len(playlists))
 	for _, p := range playlists {
-		items = append(items, fiber.Map{
-			"id":          p.Id,
-			"userId":      p.UserId,
-			"name":        p.Name,
-			"description": p.Description,
-			"isPublic":    p.IsPublic,
-			"videosCount": p.VideosCount,
-			"hasVideo":    p.HasVideo,
+		items = append(items, playlistWithVideoStatusResponse{
+			Playlist: playlistResponse{
+				Id:          p.Id,
+				UserId:      p.UserId,
+				Name:        p.Name,
+				Description: p.Description,
+				IsPublic:    p.IsPublic,
+				VideosCount: p.VideosCount,
+			},
+			HasVideo: p.HasVideo,
 		})
 	}
 
@@ -370,12 +374,11 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	items := make([]videoResponse, 0, len(videos))
 	for _, v := range videos {
 		items = append(items, videoResponse{
-			Id:              v.Id,
-			UserId:          v.UserId,
-			Timestamp:       v.Timestamp,
-			Title:           v.Title,
-			Description:     v.Description,
-			PlaylistVideoId: v.PlaylistVideoId,
+			Id:          v.Id,
+			UserId:      v.UserId,
+			Timestamp:   v.Timestamp,
+			Title:       v.Title,
+			Description: v.Description,
 		})
 	}
 
@@ -408,13 +411,12 @@ func (me *Handler) HandleGetSavedPlaylists(c fiber.Ctx) error {
 	items := make([]playlistResponse, 0, len(playlists))
 	for _, p := range playlists {
 		items = append(items, playlistResponse{
-			Id:              p.Id,
-			UserId:          p.UserId,
-			Name:            p.Name,
-			Description:     p.Description,
-			IsPublic:        p.IsPublic,
-			VideosCount:     p.VideosCount,
-			SavedPlaylistId: p.SavedPlaylistId,
+			Id:          p.Id,
+			UserId:      p.UserId,
+			Name:        p.Name,
+			Description: p.Description,
+			IsPublic:    p.IsPublic,
+			VideosCount: p.VideosCount,
 		})
 	}
 

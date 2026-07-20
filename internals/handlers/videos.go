@@ -300,9 +300,6 @@ type videoResponse struct {
 	Timestamp   time.Time `json:"timestamp"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	// TODO: these are used for pagination; they will be replaced by index (reordering feature) in future.
-	WatchlaterVideoId int `json:"watchlaterVideoId,omitempty"`
-	PlaylistVideoId   int `json:"playlistVideoId,omitempty"`
 }
 
 func (me *Handler) HandleGetVideo(c fiber.Ctx) error {

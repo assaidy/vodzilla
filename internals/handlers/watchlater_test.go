@@ -50,7 +50,6 @@ func TestHandleGetWatchlaters(t *testing.T) {
 		items, _ := data["items"].([]any)
 		require.Len(t, items, 1)
 		item, _ := items[0].(map[string]any)
-		require.NotEmpty(t, item["watchlaterVideoId"])
 		require.Equal(t, videoID.String(), item["id"])
 	})
 
