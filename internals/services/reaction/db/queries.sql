@@ -32,7 +32,7 @@ select exists (select 1 from reaction_service.comments where id = $1 for update)
 select id, user_id, content, created_at from reaction_service.comments where id = $1;
 
 -- name: InsertComment :exec
-insert into reaction_service.comments (id, for_id, user_id, content) values ($1, $2, $3, $4);
+insert into reaction_service.comments (id, target_id, target_kind, user_id, content) values ($1, $2, $3, $4, $5);
 
 -- name: CheckCommentForUser :one
 select exists (select 1 from reaction_service.comments where id = $1 and user_id = $2 for update);
@@ -53,8 +53,8 @@ select
   c.created_at,
   count(r.id) as replies_count
 from reaction_service.comments c
-left join reaction_service.comments r on c.id = r.for_id
-where c.for_id = $1 and (
+left join reaction_service.comments r on c.id = r.target_id
+where c.target_id = $1 and (
   sqlc.narg(last_comment_id)::uuid is null
   or c.id < sqlc.narg(last_comment_id)::uuid
 )
@@ -78,7 +78,7 @@ delete from reaction_service.views where target_id = $1 and kind = $2;
 delete from reaction_service.feelings where target_id = $1 and target_kind = $2;
 
 -- name: GetCommentsCount :one
-select count(*) from reaction_service.comments where for_id = $1;
+select count(*) from reaction_service.comments where target_id = $1;
 
--- name: DeleteAllCommentsFor :exec
-delete from reaction_service.comments where for_id = $1;
+-- name: DeleteAllCommentsForTarget :exec
+delete from reaction_service.comments where target_id = $1;

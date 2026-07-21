@@ -75,7 +75,6 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Delete("/playlists/saved/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleDeleteFromSavedPlaylists)
 
 	// Reactions
-	// TODO: generalize comments/replies with target kind like i did in views and feelings.
 	router.Post("/reactions/views/videos/:video_id", me.WithSession, me.WithCsrfToken, me.HandleViewVideo)
 	router.Get("/reactions/views/videos/:video_id/count", me.WithSession, me.HandleGetVideoViewsCount)
 	router.Post("/reactions/views/playlists/:playlist_id", me.WithSession, me.WithCsrfToken, me.HandleViewPlaylist)

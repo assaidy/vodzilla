@@ -21,11 +21,14 @@ create table reaction_service.feelings (
 );
 
 create table reaction_service.comments (
-  id         uuid         primary key,
-  for_id     uuid         not null,
-  user_id    uuid         not null,
-  content    varchar(500) not null,
-  created_at timestamptz  not null default now()
+  id          uuid         primary key,
+  target_id   uuid         not null,
+  target_kind varchar      not null,
+  user_id     uuid         not null,
+  content     varchar(500) not null,
+  created_at  timestamptz  not null default now(),
+
+  unique (id, target_id)
 );
 
 -- +goose Down

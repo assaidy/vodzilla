@@ -26,14 +26,12 @@ type Service interface {
 	GetFeelingCounts(ctx context.Context, targetId uuid.UUID, targetKind FeelingTargetKind) (*FeelingCounts, error)
 	GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, targetKind FeelingTargetKind) (FeelingKind, error)
 	DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error)
-	GetCommentByID(ctx context.Context, commentId uuid.UUID) (*Comment, error)
-	CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error)
+	GetCommentById(ctx context.Context, commentId uuid.UUID) (*Comment, error)
+	CreateComment(ctx context.Context, userId, targetId uuid.UUID, targetKind CommentTargetKind, content string) (uuid.UUID, error)
 	EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error
 	DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error
-	GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error)
-	GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, limit int) ([]Comment, error)
-	CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error)
-	GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error)
+	GetCommentsCount(ctx context.Context, targetId uuid.UUID) (int, error)
+	GetComments(ctx context.Context, targetId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error)
 }
 
 type impl struct {
@@ -155,6 +153,7 @@ func (me *impl) AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targ
 	if !kind.isValid() {
 		return fmt.Errorf("invalid feeling kind: %q", kind)
 	}
+
 	if err := me.queries.UpsertFeeling(ctx, queries.UpsertFeelingParams{
 		TargetId:   targetId,
 		UserId:     userId,
@@ -171,6 +170,7 @@ func (me *impl) DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID, t
 	if !targetKind.isValid() {
 		return fmt.Errorf("invalid feeling target kind: %q", targetKind)
 	}
+
 	n, err := me.queries.DeleteFeeling(ctx, queries.DeleteFeelingParams{
 		TargetId:   targetId,
 		UserId:     userId,
@@ -229,11 +229,22 @@ func (me *impl) GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, 
 	return FeelingKind(kind), nil
 }
 
+type CommentTargetKind string
+
+const (
+	CommentTargetVideo   CommentTargetKind = "video"
+	CommentTargetComment CommentTargetKind = "comment"
+)
+
+func (me CommentTargetKind) isValid() bool {
+	return me == CommentTargetVideo || me == CommentTargetComment
+}
+
 func (me *impl) DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error) {
 	return me.queries.CheckComment(ctx, commentId)
 }
 
-func (me *impl) GetCommentByID(ctx context.Context, commentId uuid.UUID) (*Comment, error) {
+func (me *impl) GetCommentById(ctx context.Context, commentId uuid.UUID) (*Comment, error) {
 	dbComment, err := me.queries.GetCommentById(ctx, commentId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -249,13 +260,18 @@ func (me *impl) GetCommentByID(ctx context.Context, commentId uuid.UUID) (*Comme
 	}, nil
 }
 
-func (me *impl) CreateVideoComment(ctx context.Context, userId, videoId uuid.UUID, content string) (uuid.UUID, error) {
+func (me *impl) CreateComment(ctx context.Context, userId, targetId uuid.UUID, targetKind CommentTargetKind, content string) (uuid.UUID, error) {
+	if !targetKind.isValid() {
+		return uuid.Nil, fmt.Errorf("invalid comment target kind: %q", targetKind)
+	}
+
 	commentId := uuid.Must(uuid.NewV7())
 	if err := me.queries.InsertComment(ctx, queries.InsertCommentParams{
-		Id:      commentId,
-		ForId:   videoId,
-		UserId:  userId,
-		Content: content,
+		Id:         commentId,
+		TargetId:   targetId,
+		TargetKind: string(targetKind),
+		UserId:     userId,
+		Content:    content,
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert comment: %w", err)
 	}
@@ -308,6 +324,8 @@ func (me *impl) DeleteComment(ctx context.Context, userId, commentId uuid.UUID) 
 	}); err != nil {
 		return fmt.Errorf("failed to check comment: %w", err)
 	} else if !ok {
+		// TODO: in alot of places in the system we should return a ErrNotOwner or something similar
+		// for cases like this.
 		return ErrCommentNotFound
 	}
 
@@ -318,7 +336,7 @@ func (me *impl) DeleteComment(ctx context.Context, userId, commentId uuid.UUID) 
 		return fmt.Errorf("failed to delete comment: %w", err)
 	}
 
-	if err := qtx.DeleteAllCommentsFor(ctx, commentId); err != nil {
+	if err := qtx.DeleteAllCommentsForTarget(ctx, commentId); err != nil {
 		return err
 	}
 
@@ -337,17 +355,17 @@ type Comment struct {
 	RepliesCount int
 }
 
-func (me *impl) GetVideoCommentsCount(ctx context.Context, videoId uuid.UUID) (int, error) {
-	count, err := me.queries.GetCommentsCount(ctx, videoId)
+func (me *impl) GetCommentsCount(ctx context.Context, targetId uuid.UUID) (int, error) {
+	count, err := me.queries.GetCommentsCount(ctx, targetId)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get comments count: %w", err)
 	}
 	return int(count), nil
 }
 
-func (me *impl) GetVideoComments(ctx context.Context, videoId, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
+func (me *impl) GetComments(ctx context.Context, targetId, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
 	dbComments, err := me.queries.GetComments(ctx, queries.GetCommentsParams{
-		ForId:         videoId,
+		TargetId:      targetId,
 		LastCommentId: uuid.NullUUID{UUID: lastCommentId, Valid: lastCommentId != uuid.Nil},
 		Limit:         int32(limit),
 	})
@@ -364,78 +382,6 @@ func (me *impl) GetVideoComments(ctx context.Context, videoId, lastCommentId uui
 			CreatedAt:    c.CreatedAt,
 			RepliesCount: int(c.RepliesCount),
 		})
-	}
-
-	return result, nil
-}
-
-func (me *impl) CreateCommentReply(ctx context.Context, userId, commentId uuid.UUID, content string) (uuid.UUID, error) {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckComment(ctx, commentId); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to check comment: %w", err)
-	} else if !ok {
-		return uuid.Nil, ErrCommentNotFound
-	}
-
-	replyId := uuid.Must(uuid.NewV7())
-	if err := qtx.InsertComment(ctx, queries.InsertCommentParams{
-		Id:      replyId,
-		ForId:   commentId,
-		UserId:  userId,
-		Content: content,
-	}); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to insert comment: %w", err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to commit tx: %w", err)
-	}
-
-	return replyId, nil
-}
-
-func (me *impl) GetCommentReplies(ctx context.Context, commentId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error) {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
-	if ok, err := qtx.CheckComment(ctx, commentId); err != nil {
-		return nil, fmt.Errorf("failed to check comment: %w", err)
-	} else if !ok {
-		return nil, ErrCommentNotFound
-	}
-
-	dbComments, err := qtx.GetComments(ctx, queries.GetCommentsParams{
-		ForId:         commentId,
-		LastCommentId: uuid.NullUUID{UUID: lastCommentId, Valid: lastCommentId != uuid.Nil},
-		Limit:         int32(limit),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get comment replies: %w", err)
-	}
-
-	result := make([]Comment, 0, len(dbComments))
-	for _, c := range dbComments {
-		result = append(result, Comment{
-			Id:           c.Id,
-			UserId:       c.UserId,
-			Content:      c.Content,
-			CreatedAt:    c.CreatedAt,
-			RepliesCount: int(c.RepliesCount),
-		})
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit tx: %w", err)
 	}
 
 	return result, nil
@@ -524,7 +470,7 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 					return fmt.Errorf("failed to delete all feelings for target: %w", err)
 				}
 
-				if err := qtx.DeleteAllCommentsFor(ctx, payload.VideoId); err != nil {
+				if err := qtx.DeleteAllCommentsForTarget(ctx, payload.VideoId); err != nil {
 					return fmt.Errorf("failed to delete all comments for video: %w", err)
 				}
 

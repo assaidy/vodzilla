@@ -174,10 +174,11 @@ func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	commentId, err := me.reactionService.CreateVideoComment(
+	commentId, err := me.reactionService.CreateComment(
 		c.RequestCtx(),
 		currentUserId,
 		videoId,
+		reaction_service.CommentTargetVideo,
 		request.Content,
 	)
 	if err != nil {
@@ -230,7 +231,7 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 		return errVideoNotFound
 	}
 
-	comments, err := me.reactionService.GetVideoComments(
+	comments, err := me.reactionService.GetComments(
 		c.RequestCtx(),
 		videoId,
 		pr.Cursor,
@@ -288,7 +289,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	comment, err := me.reactionService.GetCommentByID(c.RequestCtx(), commentId)
+	comment, err := me.reactionService.GetCommentById(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return errCommentNotFound
@@ -296,10 +297,11 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 		return err
 	}
 
-	replyId, err := me.reactionService.CreateCommentReply(
+	replyId, err := me.reactionService.CreateComment(
 		c.RequestCtx(),
 		currentUserId,
 		commentId,
+		reaction_service.CommentTargetComment,
 		request.Content,
 	)
 	if err != nil {
@@ -335,7 +337,19 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 		return err
 	}
 
-	replies, err := me.reactionService.GetCommentReplies(
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.reactionService.DoesCommentExist(c.RequestCtx(), commentId); err != nil {
+		return err
+	} else if !ok {
+		return errCommentNotFound
+	}
+
+	replies, err := me.reactionService.GetComments(
 		c.RequestCtx(),
 		commentId,
 		pr.Cursor,
@@ -556,7 +570,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 	}
 	defer lock.RUnLock(c.RequestCtx())
 
-	comment, err := me.reactionService.GetCommentByID(c.RequestCtx(), commentId)
+	comment, err := me.reactionService.GetCommentById(c.RequestCtx(), commentId)
 	if err != nil {
 		if errors.Is(err, reaction_service.ErrCommentNotFound) {
 			return errCommentNotFound
