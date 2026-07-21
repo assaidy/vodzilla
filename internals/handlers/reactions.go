@@ -36,8 +36,8 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 	if err := me.reactionService.AddView(
 		c.RequestCtx(),
 		currentUserId,
-		reaction_service.ViewTargetVideo,
 		videoId,
+		reaction_service.ViewTargetVideo,
 	); err != nil {
 		return err
 	}
@@ -63,7 +63,7 @@ func (me *Handler) HandleGetVideoViewsCount(c fiber.Ctx) error {
 		return errVideoNotFound
 	}
 
-	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), reaction_service.ViewTargetVideo, videoId)
+	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), videoId)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (me *Handler) HandleGetPlaylistViewsCount(c fiber.Ctx) error {
 		return errPlaylistNotFound
 	}
 
-	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), reaction_service.ViewTargetPlaylist, playlistId)
+	count, err := me.reactionService.GetViewsCount(c.RequestCtx(), playlistId)
 	if err != nil {
 		return err
 	}
@@ -128,8 +128,8 @@ func (me *Handler) HandleViewPlaylist(c fiber.Ctx) error {
 	if err := me.reactionService.AddView(
 		c.RequestCtx(),
 		currentUserId,
-		reaction_service.ViewTargetPlaylist,
 		playlistId,
+		reaction_service.ViewTargetPlaylist,
 	); err != nil {
 		return err
 	}
@@ -529,7 +529,6 @@ func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 		c.RequestCtx(),
 		currentUserId,
 		videoId,
-		reaction_service.FeelingTargetVideo,
 	); err != nil {
 		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
 			return errFeelingNotFound
@@ -627,7 +626,6 @@ func (me *Handler) HandleDeleteCommentFeeling(c fiber.Ctx) error {
 		c.RequestCtx(),
 		currentUserId,
 		commentId,
-		reaction_service.FeelingTargetComment,
 	); err != nil {
 		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
 			return errFeelingNotFound

@@ -19,12 +19,12 @@ import (
 
 type Service interface {
 	services.Service
-	AddView(ctx context.Context, userId uuid.UUID, kind ViewTargetKind, targetId uuid.UUID) error
-	GetViewsCount(ctx context.Context, kind ViewTargetKind, targetId uuid.UUID) (int, error)
+	AddView(ctx context.Context, userId uuid.UUID, targetId uuid.UUID, targetKind ViewTargetKind) error
+	GetViewsCount(ctx context.Context, targetId uuid.UUID) (int, error)
 	AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind, kind FeelingKind) error
-	DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind) error
-	GetFeelingCounts(ctx context.Context, targetId uuid.UUID, targetKind FeelingTargetKind) (*FeelingCounts, error)
-	GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, targetKind FeelingTargetKind) (FeelingKind, error)
+	DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID) error
+	GetFeelingCounts(ctx context.Context, targetId uuid.UUID) (*FeelingCounts, error)
+	GetUserFeeling(ctx context.Context, userId, targetId uuid.UUID) (FeelingKind, error)
 	DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error)
 	GetCommentById(ctx context.Context, commentId uuid.UUID) (*Comment, error)
 	CreateComment(ctx context.Context, userId, targetId uuid.UUID, targetKind CommentTargetKind, content string) (uuid.UUID, error)
@@ -92,15 +92,15 @@ func (k ViewTargetKind) isValid() bool {
 	return k == ViewTargetVideo || k == ViewTargetPlaylist
 }
 
-func (me *impl) AddView(ctx context.Context, userId uuid.UUID, kind ViewTargetKind, targetId uuid.UUID) error {
-	if !kind.isValid() {
-		return fmt.Errorf("invalid view kind: %q", kind)
+func (me *impl) AddView(ctx context.Context, userId uuid.UUID, targetId uuid.UUID, targetKind ViewTargetKind) error {
+	if !targetKind.isValid() {
+		return fmt.Errorf("invalid view kind: %q", targetKind)
 	}
 
-	if _, err := me.queries.InsertView(ctx, queries.InsertViewParams{
-		TargetId: targetId,
-		UserId:   userId,
-		Kind:     string(kind),
+	if err := me.queries.InsertView(ctx, queries.InsertViewParams{
+		TargetId:   targetId,
+		UserId:     userId,
+		TargetKind: string(targetKind),
 	}); err != nil {
 		return fmt.Errorf("failed to insert view: %w", err)
 	}
@@ -108,16 +108,9 @@ func (me *impl) AddView(ctx context.Context, userId uuid.UUID, kind ViewTargetKi
 	return nil
 }
 
-func (me *impl) GetViewsCount(ctx context.Context, kind ViewTargetKind, targetId uuid.UUID) (int, error) {
-	if !kind.isValid() {
-		return 0, fmt.Errorf("invalid view kind: %q", kind)
-	}
-
-	count, err := me.queries.GetViewsCount(ctx, queries.GetViewsCountParams{
-		TargetId: targetId,
-		Kind:     string(kind),
-	})
-	if err != nil {
+func (me *impl) GetViewsCount(ctx context.Context, targetId uuid.UUID) (int, error) {
+	count, err := me.queries.GetViewsCount(ctx, targetId)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, fmt.Errorf("failed to get views count: %w", err)
 	}
 
@@ -166,15 +159,10 @@ func (me *impl) AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targ
 	return nil
 }
 
-func (me *impl) DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind) error {
-	if !targetKind.isValid() {
-		return fmt.Errorf("invalid feeling target kind: %q", targetKind)
-	}
-
+func (me *impl) DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID) error {
 	n, err := me.queries.DeleteFeeling(ctx, queries.DeleteFeelingParams{
-		TargetId:   targetId,
-		UserId:     userId,
-		TargetKind: string(targetKind),
+		TargetId: targetId,
+		UserId:   userId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete feeling: %w", err)
@@ -190,15 +178,8 @@ type FeelingCounts struct {
 	Dislikes int
 }
 
-func (me *impl) GetFeelingCounts(ctx context.Context, targetId uuid.UUID, targetKind FeelingTargetKind) (*FeelingCounts, error) {
-	if !targetKind.isValid() {
-		return nil, fmt.Errorf("invalid feeling target kind: %q", targetKind)
-	}
-
-	counts, err := me.queries.GetFeelingCounts(ctx, queries.GetFeelingCountsParams{
-		TargetId:   targetId,
-		TargetKind: string(targetKind),
-	})
+func (me *impl) GetFeelingCounts(ctx context.Context, targetId uuid.UUID) (*FeelingCounts, error) {
+	counts, err := me.queries.GetFeelingCounts(ctx, targetId)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("failed to get feeling counts: %w", err)
 	}
@@ -209,20 +190,12 @@ func (me *impl) GetFeelingCounts(ctx context.Context, targetId uuid.UUID, target
 	}, nil
 }
 
-func (me *impl) GetUserFeeling(ctx context.Context, targetId, userId uuid.UUID, targetKind FeelingTargetKind) (FeelingKind, error) {
-	if !targetKind.isValid() {
-		return "", fmt.Errorf("invalid feeling target kind: %q", targetKind)
-	}
-
+func (me *impl) GetUserFeeling(ctx context.Context, userId, targetId uuid.UUID) (FeelingKind, error) {
 	kind, err := me.queries.GetUserFeeling(ctx, queries.GetUserFeelingParams{
-		TargetId:   targetId,
-		UserId:     userId,
-		TargetKind: string(targetKind),
+		TargetId: targetId,
+		UserId:   userId,
 	})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
-		}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("failed to get user feeling: %w", err)
 	}
 
@@ -456,17 +429,11 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
-				if err := qtx.DeleteAllViewsForTarget(ctx, queries.DeleteAllViewsForTargetParams{
-					TargetId: payload.VideoId,
-					Kind:     string(ViewTargetVideo),
-				}); err != nil {
+				if err := qtx.DeleteAllViewsForTarget(ctx, payload.VideoId); err != nil {
 					return fmt.Errorf("failed to delete all views for video: %w", err)
 				}
 
-				if err := qtx.DeleteAllFeelingsForTarget(ctx, queries.DeleteAllFeelingsForTargetParams{
-					TargetId:   payload.VideoId,
-					TargetKind: string(FeelingTargetVideo),
-				}); err != nil {
+				if err := qtx.DeleteAllFeelingsForTarget(ctx, payload.VideoId); err != nil {
 					return fmt.Errorf("failed to delete all feelings for target: %w", err)
 				}
 

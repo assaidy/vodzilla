@@ -1,29 +1,29 @@
--- name: InsertView :execrows
-insert into reaction_service.views (target_id, user_id, kind) values ($1, $2, $3)
-on conflict (target_id, user_id, kind) do nothing;
+-- name: InsertView :exec
+insert into reaction_service.views (target_id, user_id, target_kind) values ($1, $2, $3)
+on conflict (target_id, user_id) do nothing;
 
 -- name: GetViewsCount :one
-select count(*) from reaction_service.views where target_id = $1 and kind = $2;
+select count(*) from reaction_service.views where target_id = $1;
 
 -- name: UpsertFeeling :exec
 insert into reaction_service.feelings (target_id, user_id, target_kind, kind) values ($1, $2, $3, $4)
-on conflict (target_id, user_id, target_kind) do update set
+on conflict (target_id, user_id) do update set
   kind = excluded.kind,
   added_at = now();
 
 -- name: DeleteFeeling :execrows
-delete from reaction_service.feelings where target_id = $1 and user_id = $2 and target_kind = $3;
+delete from reaction_service.feelings where target_id = $1 and user_id = $2;
 
 -- name: GetFeelingCounts :one
 select
     count(*) filter (where kind = 'like')    as likes,
     count(*) filter (where kind = 'dislike') as dislikes
 from reaction_service.feelings
-where target_id = $1 and target_kind = $2;
+where target_id = $1;
 
 -- name: GetUserFeeling :one
 select kind from reaction_service.feelings
-where target_id = $1 and user_id = $2 and target_kind = $3;
+where target_id = $1 and user_id = $2;
 
 -- name: CheckComment :one
 select exists (select 1 from reaction_service.comments where id = $1 for update);
@@ -72,10 +72,10 @@ delete from reaction_service.feelings where user_id = $1;
 delete from reaction_service.comments where user_id = $1;
 
 -- name: DeleteAllViewsForTarget :exec
-delete from reaction_service.views where target_id = $1 and kind = $2;
+delete from reaction_service.views where target_id = $1;
 
 -- name: DeleteAllFeelingsForTarget :exec
-delete from reaction_service.feelings where target_id = $1 and target_kind = $2;
+delete from reaction_service.feelings where target_id = $1;
 
 -- name: GetCommentsCount :one
 select count(*) from reaction_service.comments where target_id = $1;
