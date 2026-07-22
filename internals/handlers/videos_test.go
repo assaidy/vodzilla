@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestVideoUploadFlow(t *testing.T) {
+func TestVideoCreateFlow(t *testing.T) {
 	defer resetDb(t)
 	app := newTestApp(t)
 	user := createVerifiedUser(t, app, "vidupload@example.com", "Password123", "Video Upload", "vidupload")
@@ -256,6 +256,108 @@ func TestVideoUploadFlow(t *testing.T) {
 		if ownerID != user.ID.String() {
 			t.Errorf("ownerId: want '%s', got '%s'", user.ID.String(), ownerID)
 		}
+	})
+}
+
+// testUploadWorkflow runs generate → upload each chunk → confirm.
+// Returns the chunks metadata for assertions.
+func testUploadWorkflow(t *testing.T, app *fiber.App, session *testSession, fileSize int64, data []byte) []any {
+	t.Helper()
+	require.Equal(t, int64(len(data)), fileSize, "data length must match fileSize")
+
+	resp := testRequest(t, app, http.MethodPost, "/videos/upload", fiber.Map{
+		"contentType": "video/mp4",
+		"fileSize":    fileSize,
+	}, session)
+	status, genData := parseResponse(t, resp)
+	assertKind(t, status, genData, http.StatusOK, "")
+
+	uploadID, _ := genData["uploadId"].(string)
+	objectKey, _ := genData["objectKey"].(string)
+	require.NotEmpty(t, uploadID)
+	require.NotEmpty(t, objectKey)
+
+	chunks, _ := genData["chunks"].([]any)
+	require.NotEmpty(t, chunks)
+
+	var parts []fiber.Map
+	for partNumber := 1; partNumber <= len(chunks); partNumber++ {
+		chunk := chunks[partNumber-1].(map[string]any)
+		url, _ := chunk["Url"].(string)
+		require.NotEmpty(t, url)
+
+		offset := int64(chunk["Offset"].(float64))
+		size := int64(chunk["Size"].(float64))
+		chunkData := data[offset : offset+size]
+
+		req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(chunkData))
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		etag := strings.Trim(resp.Header.Get("ETag"), "\"")
+		require.NotEmpty(t, etag)
+
+		parts = append(parts, fiber.Map{"etag": etag, "partNumber": partNumber})
+	}
+
+	resp = testRequest(t, app, http.MethodPut, "/videos/upload/confirm", fiber.Map{
+		"objectKey": objectKey,
+		"uploadId":  uploadID,
+		"parts":     parts,
+	}, session)
+	status, _ = parseResponse(t, resp)
+	assertKind(t, status, genData, http.StatusOK, "")
+
+	return chunks
+}
+
+func TestVideoUploadWorkflow(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "viduploadwf@example.com", "Password123", "Video Upload WF", "viduploadwf")
+
+	t.Run("multiple chunks", func(t *testing.T) {
+		fileSize := 11 * 1024 * 1024
+		data := make([]byte, fileSize)
+		chunks := testUploadWorkflow(t, app, user.Session, int64(fileSize), data)
+
+		require.Len(t, chunks, 3)
+
+		chunk0 := chunks[0].(map[string]any)
+		require.Equal(t, float64(0), chunk0["Offset"])
+		require.Equal(t, float64(5*1024*1024), chunk0["Size"])
+
+		chunk1 := chunks[1].(map[string]any)
+		require.Equal(t, float64(5*1024*1024), chunk1["Offset"])
+		require.Equal(t, float64(5*1024*1024), chunk1["Size"])
+
+		chunk2 := chunks[2].(map[string]any)
+		require.Equal(t, float64(10*1024*1024), chunk2["Offset"])
+		require.Equal(t, float64(1*1024*1024), chunk2["Size"])
+	})
+
+	t.Run("single 5 MB chunk", func(t *testing.T) {
+		fileSize := 5 * 1024 * 1024
+		data := make([]byte, fileSize)
+		chunks := testUploadWorkflow(t, app, user.Session, int64(fileSize), data)
+
+		require.Len(t, chunks, 1)
+		chunk := chunks[0].(map[string]any)
+		require.Equal(t, float64(0), chunk["Offset"])
+		require.Equal(t, float64(5*1024*1024), chunk["Size"])
+	})
+
+	t.Run("file smaller than 5 MB", func(t *testing.T) {
+		fileSize := 1 * 1024 * 1024
+		data := make([]byte, fileSize)
+		chunks := testUploadWorkflow(t, app, user.Session, int64(fileSize), data)
+
+		require.Len(t, chunks, 1)
+		chunk := chunks[0].(map[string]any)
+		require.Equal(t, float64(0), chunk["Offset"])
+		require.Equal(t, float64(1*1024*1024), chunk["Size"])
 	})
 }
 

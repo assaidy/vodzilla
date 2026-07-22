@@ -101,7 +101,7 @@ func (me *impl) Stop(ctx context.Context) error {
 const (
 	videosBucket               = "videos"
 	maxVideoPartCount          = 10_000
-	minVideoPartSize           = 5 * utils.MegaByte // TODO: what if file size is < 5 MB
+	minVideoPartSize           = 5 * utils.MegaByte
 	presignedVideoUploadExpiry = 24 * time.Hour
 	presignedVideoGetExpiry    = 1 * time.Hour
 
@@ -128,6 +128,9 @@ type VideoPresignedUpload struct {
 	Chunks    []VideoUploadChunk
 }
 
+// GenerateVideoPresignedPutUrls creates a multipart upload and returns presigned URLs for each part.
+// Multipart upload works for all file sizes — files smaller than [minVideoPartSize]
+// result in a single part, and S3 allows the last (and only) part to be smaller than 5 MB.
 func (me *impl) GenerateVideoPresignedPutUrls(
 	ctx context.Context,
 	userId uuid.UUID,
