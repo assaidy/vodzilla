@@ -17,6 +17,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services/media/queries"
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/workers"
+	"github.com/assaidy/workers/lock"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -52,12 +53,15 @@ type impl struct {
 
 func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) Service {
 	service := &impl{
-		db:            db,
-		queries:       queries.New(db),
-		s3:            s3,
-		redis:         redis,
-		logger:        logger,
-		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
+		db:      db,
+		queries: queries.New(db),
+		s3:      s3,
+		redis:   redis,
+		logger:  logger,
+		workerManager: workers.NewWorkerManager(
+			workers.WithLogger(logger),
+			workers.WithLockGenerator(lock.NewRedisGenerator(redis)),
+		),
 	}
 
 	service.workerManager.RegisterWorker(
@@ -82,6 +86,7 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) Se
 			service.orphanVideoUploadsCleanupJob,
 			workers.WithTick(1*time.Hour),
 			workers.WithTimeout(10*time.Minute),
+			workers.WithSingleInstance(),
 		),
 	)
 

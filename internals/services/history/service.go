@@ -12,6 +12,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/history/queries"
 	"github.com/assaidy/workers"
+	"github.com/assaidy/workers/lock"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -34,11 +35,14 @@ type impl struct {
 
 func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
 	service := &impl{
-		db:            db,
-		queries:       queries.New(db),
-		redis:         redis,
-		logger:        logger,
-		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
+		db:      db,
+		queries: queries.New(db),
+		redis:   redis,
+		logger:  logger,
+		workerManager: workers.NewWorkerManager(
+			workers.WithLogger(logger),
+			workers.WithLockGenerator(lock.NewRedisGenerator(redis)),
+		),
 	}
 
 	service.workerManager.RegisterWorker(

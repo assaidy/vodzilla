@@ -31,6 +31,7 @@ import (
 // TODO: rate limiting
 // TODO: cors
 // TODO: api docs
+// TODO: doc services/utils
 
 func main() {
 	logger := slog.New(log.NewWithOptions(os.Stderr, log.Options{

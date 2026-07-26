@@ -18,6 +18,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/utils"
 	"github.com/assaidy/vodzilla/internals/utils/mailer"
 	"github.com/assaidy/workers"
+	"github.com/assaidy/workers/lock"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -37,6 +38,7 @@ type Service interface {
 	DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error)
 	EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error
 	DeleteUser(ctx context.Context, userId uuid.UUID) error
+	// TODO: only allow editing password, and disallow login for users with unverified emails.
 	EditCredentials(ctx context.Context, userId uuid.UUID, currentPassword, email, password string) error
 }
 
@@ -52,13 +54,16 @@ type impl struct {
 
 func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer mailer.Mailer, logger *slog.Logger) Service {
 	service := &impl{
-		db:            db,
-		queries:       queries.New(db),
-		redis:         redis,
-		s3:            s3,
-		mailer:        mailer,
-		logger:        logger,
-		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
+		db:      db,
+		queries: queries.New(db),
+		redis:   redis,
+		s3:      s3,
+		mailer:  mailer,
+		logger:  logger,
+		workerManager: workers.NewWorkerManager(
+			workers.WithLogger(logger),
+			workers.WithLockGenerator(lock.NewRedisGenerator(redis)),
+		),
 	}
 
 	service.workerManager.RegisterWorker(
@@ -76,6 +81,7 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer mailer.Mailer, l
 			workers.WithTick(1*time.Hour),
 			workers.WithTimeout(5*time.Minute),
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+			workers.WithSingleInstance(),
 		),
 	)
 	service.workerManager.RegisterWorker(
@@ -85,6 +91,7 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer mailer.Mailer, l
 			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
 			workers.WithTimeout(10*time.Minute),
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
+			workers.WithSingleInstance(),
 		),
 	)
 

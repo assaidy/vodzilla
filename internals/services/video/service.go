@@ -13,6 +13,7 @@ import (
 	"github.com/assaidy/vodzilla/internals/services"
 	"github.com/assaidy/vodzilla/internals/services/video/queries"
 	"github.com/assaidy/workers"
+	"github.com/assaidy/workers/lock"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -56,11 +57,14 @@ type impl struct {
 
 func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
 	service := &impl{
-		db:            db,
-		queries:       queries.New(db),
-		redis:         redis,
-		logger:        logger,
-		workerManager: workers.NewWorkerManager(workers.WithLogger(logger)),
+		db:      db,
+		queries: queries.New(db),
+		redis:   redis,
+		logger:  logger,
+		workerManager: workers.NewWorkerManager(
+			workers.WithLogger(logger),
+			workers.WithLockGenerator(lock.NewRedisGenerator(redis)),
+		),
 	}
 
 	service.workerManager.RegisterWorker(
@@ -76,6 +80,7 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
 			"pending videos cleanup",
 			service.pendingVideosCleanupJob,
 			workers.WithTick(1*time.Hour),
+			workers.WithSingleInstance(),
 		),
 	)
 	return service
