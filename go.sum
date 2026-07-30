@@ -12,8 +12,8 @@ github.com/andybalholm/brotli v1.2.1 h1:R+f5xP285VArJDRgowrfb9DqL18yVK0gKAW/F+eT
 github.com/andybalholm/brotli v1.2.1/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496 h1:zV3ejI06GQ59hwDQAvmK1qxOQGB3WuVTRoY0okPTAv0=
 github.com/asaskevich/govalidator v0.0.0-20200108200545-475eaeb16496/go.mod h1:oGkLhpf+kjZl6xBf758TQhh5XrAeiJv/7FRz/2spLIg=
-github.com/assaidy/workers v1.4.0 h1:+62EjWfvaBl3Cdrc4R8zeJK6vhxII8AW07fXWiHglN0=
-github.com/assaidy/workers v1.4.0/go.mod h1:mqOOMBJv7kfcbpC62g80yNdAfUQJqChGzFPtZAQYsgA=
+github.com/assaidy/workers v1.5.2 h1:z2F8iHoZWWTm9MmPkeBH/Hw03bAMbnNnBUDX6ADgXlA=
+github.com/assaidy/workers v1.5.2/go.mod h1:mqOOMBJv7kfcbpC62g80yNdAfUQJqChGzFPtZAQYsgA=
 github.com/aws/aws-sdk-go-v2 v1.41.7 h1:DWpAJt66FmnnaRIOT/8ASTucrvuDPZASqhhLey6tLY8=
 github.com/aws/aws-sdk-go-v2 v1.41.7/go.mod h1:4LAfZOPHNVNQEckOACQx60Y8pSRjIkNZQz1w92xpMJc=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 h1:gx1AwW1Iyk9Z9dD9F4akX5gnN3QZwUB20GGKH/I+Rho=
@@ -137,8 +137,8 @@ github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo
 github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
 github.com/jefferyjob/go-redislock v1.7.0-beta.2 h1:LIGvjvSQBpv3kV1Q99AZDJK1JryrAN1fuEB4pp6hTek=
 github.com/jefferyjob/go-redislock v1.7.0-beta.2/go.mod h1:pCwZqMtJeXv6WxvuiYAGHXnTIcFMUlvXsSFGkLFrhVE=
-github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260615015503-c213fe0022ec h1:0p/66Ge5jZ/RTzRFVwmcLOZ7+CxPV7UoqFquKWEsE+s=
-github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260615015503-c213fe0022ec/go.mod h1:ra4EsXnZcd0mLEo7M7r0nY7Uh2acvTVaSfUBpU/5g38=
+github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260730013658-fabb7c555568 h1:H4gvZvPJiRcgXWJDTsPR/U02GKliSHIH/cm6qLMV6Ig=
+github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260730013658-fabb7c555568/go.mod h1:ra4EsXnZcd0mLEo7M7r0nY7Uh2acvTVaSfUBpU/5g38=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/klauspost/compress v1.18.6 h1:2jupLlAwFm95+YDR+NwD2MEfFO9d4z4Prjl1XXDjuao=

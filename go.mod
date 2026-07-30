@@ -3,7 +3,7 @@ module github.com/assaidy/vodzilla
 go 1.26.4
 
 require (
-	github.com/assaidy/workers v1.4.0
+	github.com/assaidy/workers v1.5.2
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16
@@ -14,7 +14,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jefferyjob/go-redislock v1.7.0-beta.2
-	github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260615015503-c213fe0022ec
+	github.com/jefferyjob/go-redislock/adapter/go-redis/V9 v0.0.0-20260730013658-fabb7c555568
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.12.3
 	github.com/oklog/ulid/v2 v2.1.1

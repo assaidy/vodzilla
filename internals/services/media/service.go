@@ -302,7 +302,7 @@ func (me *impl) ConfirmVideoUpload(
 		return fmt.Errorf("failed to insert orphan upload: %w", err)
 	}
 
-	if err := me.redis.Del(ctx, videoUploadRedisPrefix+objectKey); err != nil {
+	if err := me.redis.Del(ctx, videoUploadRedisPrefix+objectKey).Err(); err != nil {
 		me.logger.Error("failed to delete pending video upload from redis", "error", err)
 	}
 

@@ -57,8 +57,8 @@ set
   bio = $3
 where id = sqlc.arg(user_id);
 
--- name: UpdateCredentials :exec
-update user_service.users set email = $1, password_hash = $2, is_email_verified = $3 where id = sqlc.arg(user_id);
+-- name: UpdatePassword :exec
+update user_service.users set password_hash = $1 where id = sqlc.arg(user_id);
 
 
 -- name: BatchDeleteExpiredEmailVerificationTokens :exec

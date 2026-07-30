@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -314,7 +315,15 @@ func resetDb(t *testing.T) {
 	}
 
 	slog.Info("database reset complete")
-	testRedis.FlushAll(context.Background())
+	ctx := context.Background()
+	// Delete app Redis keys but preserve worker lock keys (which use `{worker_name}` format)
+	keys, err := testRedis.Keys(ctx, "*").Result()
+	require.NoError(t, err)
+	for _, key := range keys {
+		if !strings.HasPrefix(key, "{") {
+			testRedis.Del(ctx, key)
+		}
+	}
 	testMailer.Clear()
 }
 

@@ -19,7 +19,7 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Post("/auth/logout", me.WithSession, me.HandleLogout).Name("logout")
 	router.Post("/auth/verification_email", me.HandleSendVerificationEmail)
 	router.Get("/auth/verification_email/verify", me.HandleVerifyEmail)
-	router.Put("/auth/credentials", me.WithSession, me.WithCsrfToken, me.HandleEditCredentials)
+	router.Put("/auth/password", me.WithSession, me.WithCsrfToken, me.HandleEditPassword)
 
 	// Profiles
 	router.Get("/profiles", me.WithSession, me.HandleGetProfile)

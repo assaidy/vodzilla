@@ -38,8 +38,7 @@ type Service interface {
 	DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error)
 	EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error
 	DeleteUser(ctx context.Context, userId uuid.UUID) error
-	// TODO: only allow editing password, and disallow login for users with unverified emails.
-	EditCredentials(ctx context.Context, userId uuid.UUID, currentPassword, email, password string) error
+	EditPassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error
 }
 
 type impl struct {
@@ -290,6 +289,10 @@ func (me *impl) Login(ctx context.Context, email, password string) (*Session, er
 		return nil, ErrUnauthorized
 	}
 
+	if !user.IsEmailVerified {
+		return nil, ErrEmailNotVerified
+	}
+
 	sessionId := uuid.Must(uuid.NewV7())
 	// session id prefix ensures uniqueness
 	sessionToken := fmt.Sprintf("%s_%s", sessionId, generateCryptoRandomHex(32))
@@ -521,14 +524,7 @@ func (me *impl) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 	return nil
 }
 
-func (me *impl) EditCredentials(ctx context.Context, userId uuid.UUID, currentPassword, email, password string) error {
-	tx, err := me.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin tx: %w", err)
-	}
-	defer tx.Rollback()
-	qtx := me.queries.WithTx(tx)
-
+func (me *impl) EditPassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error {
 	user, err := me.queries.GetUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -537,39 +533,20 @@ func (me *impl) EditCredentials(ctx context.Context, userId uuid.UUID, currentPa
 		return fmt.Errorf("failed to get user by id: %w", err)
 	}
 
-	if !user.IsEmailVerified {
-		return ErrEmailNotVerified
-	}
-
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)) != nil {
 		return ErrUnauthorized
 	}
 
-	emailChanged := user.Email != email
-	if emailChanged {
-		if ok, err := qtx.CheckEmail(ctx, email); err != nil {
-			return fmt.Errorf("failed to check email: %w", err)
-		} else if ok {
-			return ErrEmailConflict
-		}
-	}
-
-	password_hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	if err := qtx.UpdateCredentials(ctx, queries.UpdateCredentialsParams{
-		UserId:          userId,
-		Email:           email,
-		PasswordHash:    string(password_hash),
-		IsEmailVerified: !emailChanged,
+	if err := me.queries.UpdatePassword(ctx, queries.UpdatePasswordParams{
+		UserId:       userId,
+		PasswordHash: string(passwordHash),
 	}); err != nil {
-		return err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit tx: %w", err)
+		return fmt.Errorf("failed to update password: %w", err)
 	}
 
 	return nil
