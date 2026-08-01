@@ -12,6 +12,14 @@ type Mailer interface {
 	Send(ctx context.Context, message Message) error
 }
 
+type Message struct {
+	From        string
+	To          []string
+	Subject     string
+	ContentType string
+	Body        string
+}
+
 type impl struct {
 	host     string
 	port     int
@@ -53,12 +61,4 @@ func (me *impl) Send(ctx context.Context, message Message) error {
 	case err := <-errChan:
 		return err
 	}
-}
-
-type Message struct {
-	From        string
-	To          []string
-	Subject     string
-	ContentType string
-	Body        string
 }

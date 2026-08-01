@@ -3,7 +3,7 @@ create schema video_service;
 
 create table video_service.videos (
   id           uuid         primary key,
-  user_id     uuid         not null,
+  user_id      uuid         not null,
   title        varchar(256) not null,
   description  varchar(500),
   created_at   timestamptz  not null default now()
@@ -38,7 +38,7 @@ create table video_service.playlist_videos (
 
 create table video_service.pending_videos (
   id           uuid         primary key,
-  user_id     uuid         not null,
+  user_id      uuid         not null,
   title        varchar(256) not null,
   description  varchar(500),
   created_at   timestamptz  not null default now()

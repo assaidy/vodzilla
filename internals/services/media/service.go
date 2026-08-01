@@ -84,8 +84,9 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, logger *slog.Logger) Se
 		workers.NewWorker(
 			"orphan video uploads cleanup",
 			service.orphanVideoUploadsCleanupJob,
-			workers.WithTick(1*time.Hour),
+			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
 			workers.WithTimeout(10*time.Minute),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 			workers.WithSingleInstance(),
 		),
 	)
@@ -789,6 +790,10 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 	}
 }
 
+// FIX: reform the upload setup by first creating the video in video service then waiting for it to be uploaded.
+// - media service will controle the expiration and will publish events: VideoUploadExpired, VideoUploadCompleted
+// - video service will have multiple states for a video: uploading, transcoding, ..., published
+// - remove redundant cleanup workers and tables in both services.
 func (me *impl) orphanVideoUploadsCleanupJob(ctx context.Context) error {
 	objectKeys, err := me.queries.GetExpiredOrphanUploads(ctx)
 	if err != nil {

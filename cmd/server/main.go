@@ -29,7 +29,6 @@ import (
 // TODO: transcoding
 // TODO: monitoring
 // TODO: rate limiting
-// TODO: cors
 // TODO: api docs
 // TODO: doc services/utils
 

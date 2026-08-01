@@ -79,7 +79,9 @@ func New(db *sql.DB, redis *redis.Client, logger *slog.Logger) Service {
 		workers.NewWorker(
 			"pending videos cleanup",
 			service.pendingVideosCleanupJob,
-			workers.WithTick(1*time.Hour),
+			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
+			workers.WithTimeout(10*time.Minute),
+			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 			workers.WithSingleInstance(),
 		),
 	)
@@ -780,7 +782,6 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 }
 
 func (me *impl) pendingVideosCleanupJob(ctx context.Context) error {
-	me.logger.Info("cleaning up expired pending videos")
 	if err := me.queries.DeleteExpiredPendingVideos(ctx); err != nil {
 		return fmt.Errorf("failed to delete expired pending videos: %w", err)
 	}

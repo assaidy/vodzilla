@@ -77,8 +77,8 @@ func New(db *sql.DB, redis *redis.Client, s3 *s3.Client, mailer mailer.Mailer, l
 		workers.NewWorker(
 			"expired email verification tokens cleanup",
 			service.emailVerificationTokensCleanupJob,
-			workers.WithTick(1*time.Hour),
-			workers.WithTimeout(5*time.Minute),
+			workers.WithSchedules(workers.WeeklyAt(time.Friday, 2, 0)),
+			workers.WithTimeout(10*time.Minute),
 			workers.WithBackoffStrategy(workers.DecorrelatedJitterBackoff(10*time.Minute)),
 			workers.WithSingleInstance(),
 		),
