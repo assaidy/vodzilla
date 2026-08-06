@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleGenerateVideoUpload(c fiber.Ctx) error {
+func (me *Handler) handleGenerateVideoUpload(c fiber.Ctx) error {
 	var request struct {
 		ContentType string `json:"contentType"`
 		FileSize    int64  `json:"fileSize"`
@@ -57,7 +57,7 @@ func (me *Handler) HandleGenerateVideoUpload(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
+func (me *Handler) handleConfirmVideoUpload(c fiber.Ctx) error {
 	var request struct {
 		ObjectKey string `json:"objectKey"`
 		UploadId  string `json:"uploadId"`
@@ -104,7 +104,7 @@ func (me *Handler) HandleConfirmVideoUpload(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"objectKey": request.ObjectKey})
 }
 
-func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
+func (me *Handler) handlePostVideo(c fiber.Ctx) error {
 	var request struct {
 		Title       string `json:"title"`
 		Description string `json:"description"`
@@ -166,7 +166,7 @@ func (me *Handler) HandlePostVideo(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"videoId": videoId})
 }
 
-func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
+func (me *Handler) handleEditVideoThumbnail(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -227,7 +227,7 @@ func (me *Handler) HandleEditVideoThumbnail(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
+func (me *Handler) handleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -261,7 +261,7 @@ func (me *Handler) HandleConfirmVideoThumbnailUpload(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"thumbnailUrl": thumbnailUrl})
 }
 
-func (me *Handler) HandleDeleteVideoThumbnail(c fiber.Ctx) error {
+func (me *Handler) handleDeleteVideoThumbnail(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -302,7 +302,7 @@ type videoResponse struct {
 	Description string    `json:"description"`
 }
 
-func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
+func (me *Handler) handleGetVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -325,7 +325,7 @@ func (me *Handler) HandleGetVideo(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
+func (me *Handler) handleGetVideoStreamUrl(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -342,7 +342,7 @@ func (me *Handler) HandleGetVideoStreamUrl(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"url": url})
 }
 
-func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
+func (me *Handler) handleDeleteVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -366,7 +366,7 @@ func (me *Handler) HandleDeleteVideo(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
+func (me *Handler) handleGetVideosForUser(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -418,7 +418,7 @@ func (me *Handler) HandleGetVideosForUser(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleGetVideosCountForUser(c fiber.Ctx) error {
+func (me *Handler) handleGetVideosCountForUser(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -444,7 +444,7 @@ func (me *Handler) HandleGetVideosCountForUser(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"count": count})
 }
 
-func (me *Handler) HandleGetVideoThumbnailUrl(c fiber.Ctx) error {
+func (me *Handler) handleGetVideoThumbnailUrl(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound

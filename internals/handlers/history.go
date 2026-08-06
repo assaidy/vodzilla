@@ -19,7 +19,7 @@ type watchHistoryResponse struct {
 	WatchedAt   time.Time `json:"watchedAt"`
 }
 
-func (me *Handler) HandleGetWatchHistory(c fiber.Ctx) error {
+func (me *Handler) handleGetWatchHistory(c fiber.Ctx) error {
 	pr, err := parsePaginatedRequest[int](c)
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func (me *Handler) HandleGetWatchHistory(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleAddToWatchHistory(c fiber.Ctx) error {
+func (me *Handler) handleAddToWatchHistory(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -92,7 +92,7 @@ func (me *Handler) HandleAddToWatchHistory(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteWatchHistoryEntry(c fiber.Ctx) error {
+func (me *Handler) handleDeleteWatchHistoryEntry(c fiber.Ctx) error {
 	entryId := fiber.Params[int](c, "entry_id")
 	if entryId == 0 {
 		return errWatchHistoryEntryNotFound
@@ -110,7 +110,7 @@ func (me *Handler) HandleDeleteWatchHistoryEntry(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleClearWatchHistory(c fiber.Ctx) error {
+func (me *Handler) handleClearWatchHistory(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.historyService.ClearWatchHistory(c.RequestCtx(), currentUserId); err != nil {

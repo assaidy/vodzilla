@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleFollow(c fiber.Ctx) error {
+func (me *Handler) handleFollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -51,7 +51,7 @@ func (me *Handler) HandleFollow(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
+func (me *Handler) handleUnfollow(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -81,7 +81,7 @@ func (me *Handler) HandleUnfollow(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
+func (me *Handler) handleIsFollowing(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -109,7 +109,7 @@ func (me *Handler) HandleIsFollowing(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"isFollowing": ok})
 }
 
-func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
+func (me *Handler) handleGetFollowCounts(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -138,7 +138,7 @@ func (me *Handler) HandleGetFollowCounts(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
+func (me *Handler) handleGetFollowers(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -184,7 +184,7 @@ func (me *Handler) HandleGetFollowers(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleGetFolloweds(c fiber.Ctx) error {
+func (me *Handler) handleGetFolloweds(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound

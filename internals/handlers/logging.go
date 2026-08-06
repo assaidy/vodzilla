@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-func (me *Handler) WithLogging(c fiber.Ctx) error {
+func (me *Handler) withLogging(c fiber.Ctx) error {
 	start := time.Now()
 	err := c.Next()
 	took := time.Since(start)

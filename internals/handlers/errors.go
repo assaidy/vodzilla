@@ -69,7 +69,7 @@ var (
 	errInvalidConfirmVideoUploadData = newApiError("InvalidConfirmVideoUploadData", "Invalid complete upload data.", fiber.StatusUnprocessableEntity)
 )
 
-func (me *Handler) WithErrorResolver(c fiber.Ctx) error {
+func (me *Handler) withErrorResolver(c fiber.Ctx) error {
 	err := c.Next()
 	if err == nil {
 		return nil

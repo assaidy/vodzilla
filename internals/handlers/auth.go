@@ -15,7 +15,7 @@ import (
 
 var usernameLettersRule = validation.Match(regexp.MustCompile(`^[A-Za-z0-9_]*$`)).Error("can only contain letters, digits or _")
 
-func (me *Handler) HandleRegister(c fiber.Ctx) error {
+func (me *Handler) handleRegister(c fiber.Ctx) error {
 	var request struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -58,7 +58,7 @@ func (me *Handler) HandleRegister(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
+func (me *Handler) handleSendVerificationEmail(c fiber.Ctx) error {
 	var request struct {
 		Email   string `json:"email"`
 		BaseUrl string `json:"baseUrl"`
@@ -87,7 +87,7 @@ func (me *Handler) HandleSendVerificationEmail(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleVerifyEmail(c fiber.Ctx) error {
+func (me *Handler) handleVerifyEmail(c fiber.Ctx) error {
 	token := strings.TrimSpace(c.Query("token"))
 	if token == "" {
 		return errTokenNotFound
@@ -103,7 +103,7 @@ func (me *Handler) HandleVerifyEmail(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleLogin(c fiber.Ctx) error {
+func (me *Handler) handleLogin(c fiber.Ctx) error {
 	var request struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -153,7 +153,7 @@ func (me *Handler) HandleLogin(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) WithSession(c fiber.Ctx) error {
+func (me *Handler) withSession(c fiber.Ctx) error {
 	sessionIdStr := c.Cookies("session_id")
 	sessionToken := c.Cookies("session_token")
 
@@ -203,14 +203,14 @@ func (me *Handler) WithSession(c fiber.Ctx) error {
 }
 
 // Request must go through [WithSession] first.
-func (me *Handler) WithCsrfToken(c fiber.Ctx) error {
+func (me *Handler) withCsrfToken(c fiber.Ctx) error {
 	if c.Locals("csrf_token").(string) != c.Get("X-CSRF-Token") {
 		return errUnauthorized.details("missing or invalid CSRF token")
 	}
 	return c.Next()
 }
 
-func (me *Handler) HandleLogout(c fiber.Ctx) error {
+func (me *Handler) handleLogout(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 	currentSessionId := c.Locals("session_id").(uuid.UUID)
 
@@ -227,7 +227,7 @@ func (me *Handler) HandleLogout(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleEditPassword(c fiber.Ctx) error {
+func (me *Handler) handleEditPassword(c fiber.Ctx) error {
 	var request struct {
 		CurrentPassword string `json:"currentPassword"`
 		NewPassword     string `json:"newPassword"`

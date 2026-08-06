@@ -21,7 +21,7 @@ type profileResponse struct {
 	Bio      string    `json:"bio"`
 }
 
-func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
+func (me *Handler) handleGetProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	user, err := me.userService.GetUserById(c.RequestCtx(), currentUserId)
@@ -38,7 +38,7 @@ func (me *Handler) HandleGetProfile(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
+func (me *Handler) handleGetProfileByUsername(c fiber.Ctx) error {
 	username := c.Params("username")
 
 	user, err := me.userService.GetUserByUsername(c.RequestCtx(), username)
@@ -58,7 +58,7 @@ func (me *Handler) HandleGetProfileByUsername(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleGetProfileById(c fiber.Ctx) error {
+func (me *Handler) handleGetProfileById(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -81,7 +81,7 @@ func (me *Handler) HandleGetProfileById(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
+func (me *Handler) handleEditProfile(c fiber.Ctx) error {
 	var request struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
@@ -121,7 +121,7 @@ func (me *Handler) HandleEditProfile(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
+func (me *Handler) handleDeleteProfile(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	lock := me.newUserLock(currentUserId)
@@ -137,7 +137,7 @@ func (me *Handler) HandleDeleteProfile(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
+func (me *Handler) handleEditProfileAvatar(c fiber.Ctx) error {
 	var request struct {
 		ContentType string `json:"contentType"`
 		FileSize    int64  `json:"fileSize"`
@@ -178,7 +178,7 @@ func (me *Handler) HandleEditProfileAvatar(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleConfirmProfileAvatarUpload(c fiber.Ctx) error {
+func (me *Handler) handleConfirmProfileAvatarUpload(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	avatarUrl, err := me.mediaService.ConfirmAvatarUpload(c.RequestCtx(), currentUserId)
@@ -192,7 +192,7 @@ func (me *Handler) HandleConfirmProfileAvatarUpload(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"avatarUrl": avatarUrl})
 }
 
-func (me *Handler) HandleDeleteProfileAvatar(c fiber.Ctx) error {
+func (me *Handler) handleDeleteProfileAvatar(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	if err := me.mediaService.DeleteAvatar(c.RequestCtx(), currentUserId); err != nil {
@@ -205,7 +205,7 @@ func (me *Handler) HandleDeleteProfileAvatar(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleGetProfileAvatarUrl(c fiber.Ctx) error {
+func (me *Handler) handleGetProfileAvatarUrl(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound

@@ -48,7 +48,7 @@ func (me *Handler) notify(ctx context.Context, userId uuid.UUID, payload notific
 	}
 }
 
-func (me *Handler) HandleGetNotifications(c fiber.Ctx) error {
+func (me *Handler) handleGetNotifications(c fiber.Ctx) error {
 	pr, err := parsePaginatedRequest[uuid.UUID](c)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func (me *Handler) HandleGetNotifications(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleGetUnreadNotificationsCount(c fiber.Ctx) error {
+func (me *Handler) handleGetUnreadNotificationsCount(c fiber.Ctx) error {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	count, err := me.notificationService.GetUnreadNotificationsCount(c.RequestCtx(), currentUserId)
@@ -96,7 +96,7 @@ func (me *Handler) HandleGetUnreadNotificationsCount(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"count": count})
 }
 
-func (me *Handler) HandleMarkNotificationAsRead(c fiber.Ctx) error {
+func (me *Handler) handleMarkNotificationAsRead(c fiber.Ctx) error {
 	notificationId, err := uuid.Parse(c.Params("notification_id"))
 	if err != nil {
 		return errNotificationNotFound

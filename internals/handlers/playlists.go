@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleCreatePlaylist(c fiber.Ctx) error {
+func (me *Handler) handleCreatePlaylist(c fiber.Ctx) error {
 	var request struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -55,7 +55,7 @@ type playlistResponse struct {
 	VideosCount int       `json:"videosCount"`
 }
 
-func (me *Handler) HandleGetUserPlaylists(c fiber.Ctx) error {
+func (me *Handler) handleGetUserPlaylists(c fiber.Ctx) error {
 	userId, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errUserNotFound
@@ -117,7 +117,7 @@ type playlistWithVideoStatusResponse struct {
 	HasVideo bool             `json:"hasVideo"`
 }
 
-func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
+func (me *Handler) handleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -169,7 +169,7 @@ func (me *Handler) HandleGetPlaylistsWithVideoStatus(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
+func (me *Handler) handleGetPlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -199,7 +199,7 @@ func (me *Handler) HandleGetPlaylist(c fiber.Ctx) error {
 	})
 }
 
-func (me *Handler) HandleEditPlaylist(c fiber.Ctx) error {
+func (me *Handler) handleEditPlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -243,7 +243,7 @@ func (me *Handler) HandleEditPlaylist(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
+func (me *Handler) handleDeletePlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -267,7 +267,7 @@ func (me *Handler) HandleDeletePlaylist(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
+func (me *Handler) handleAddVideoToPlaylist(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -300,7 +300,7 @@ func (me *Handler) HandleAddVideoToPlaylist(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
+func (me *Handler) handleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -333,7 +333,7 @@ func (me *Handler) HandleDeleteVideoFromPlaylist(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
+func (me *Handler) handleGetPlaylistVideos(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -390,7 +390,7 @@ func (me *Handler) HandleGetPlaylistVideos(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleGetSavedPlaylists(c fiber.Ctx) error {
+func (me *Handler) handleGetSavedPlaylists(c fiber.Ctx) error {
 	pr, err := parsePaginatedRequest[int](c)
 	if err != nil {
 		return err
@@ -428,7 +428,7 @@ func (me *Handler) HandleGetSavedPlaylists(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleAddToSavedPlaylists(c fiber.Ctx) error {
+func (me *Handler) handleAddToSavedPlaylists(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -461,7 +461,7 @@ func (me *Handler) HandleAddToSavedPlaylists(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteFromSavedPlaylists(c fiber.Ctx) error {
+func (me *Handler) handleDeleteFromSavedPlaylists(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound

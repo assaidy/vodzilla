@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
+func (me *Handler) handleGetWatchlaters(c fiber.Ctx) error {
 	pr, err := parsePaginatedRequest[int](c)
 	if err != nil {
 		return err
@@ -45,7 +45,7 @@ func (me *Handler) HandleGetWatchlaters(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleAddToWatchLaters(c fiber.Ctx) error {
+func (me *Handler) handleAddToWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -65,7 +65,7 @@ func (me *Handler) HandleAddToWatchLaters(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteFromWatchLaters(c fiber.Ctx) error {
+func (me *Handler) handleDeleteFromWatchLaters(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound

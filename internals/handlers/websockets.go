@@ -20,14 +20,14 @@ type websocketMessage struct {
 	Data any                  `json:"data"`
 }
 
-func (me *Handler) WithWebsocketEssentials(c fiber.Ctx) error {
+func (me *Handler) withWebsocketEssentials(c fiber.Ctx) error {
 	if !c.IsWebSocket() {
 		return errUpgradeRequired
 	}
 	return c.Next()
 }
 
-func (me *Handler) HandleWebsocket(c *websocket.Conn) {
+func (me *Handler) handleWebsocket(c *websocket.Conn) {
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
 	sub := me.redis.Subscribe(context.Background(), fmt.Sprintf("ws:%s", currentUserId))

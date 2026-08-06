@@ -5,7 +5,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleGetFeed(c fiber.Ctx) error {
+func (me *Handler) handleGetFeed(c fiber.Ctx) error {
 	pr, err := parsePaginatedRequest[uuid.UUID](c)
 	if err != nil {
 		return err

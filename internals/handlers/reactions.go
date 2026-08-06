@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
+func (me *Handler) handleViewVideo(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -45,7 +45,7 @@ func (me *Handler) HandleViewVideo(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleGetVideoViewsCount(c fiber.Ctx) error {
+func (me *Handler) handleGetVideoViewsCount(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -71,7 +71,7 @@ func (me *Handler) HandleGetVideoViewsCount(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"count": count})
 }
 
-func (me *Handler) HandleGetPlaylistViewsCount(c fiber.Ctx) error {
+func (me *Handler) handleGetPlaylistViewsCount(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -102,7 +102,7 @@ func (me *Handler) HandleGetPlaylistViewsCount(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"count": count})
 }
 
-func (me *Handler) HandleViewPlaylist(c fiber.Ctx) error {
+func (me *Handler) handleViewPlaylist(c fiber.Ctx) error {
 	playlistId, err := uuid.Parse(c.Params("playlist_id"))
 	if err != nil {
 		return errPlaylistNotFound
@@ -137,7 +137,7 @@ func (me *Handler) HandleViewPlaylist(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleCreateVideoComment(c fiber.Ctx) error {
+func (me *Handler) handleCreateVideoComment(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -208,7 +208,7 @@ type commentResponse struct {
 	RepliesCount int       `json:"repliesCount"`
 }
 
-func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
+func (me *Handler) handleGetVideoComments(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -260,7 +260,7 @@ func (me *Handler) HandleGetVideoComments(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
+func (me *Handler) handleCreateCommentReply(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
@@ -326,7 +326,7 @@ func (me *Handler) HandleCreateCommentReply(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"replyId": replyId})
 }
 
-func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
+func (me *Handler) handleGetCommentReplies(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
@@ -381,7 +381,7 @@ func (me *Handler) HandleGetCommentReplies(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
+func (me *Handler) handleDeleteComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
@@ -405,7 +405,7 @@ func (me *Handler) HandleDeleteComment(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleEditComment(c fiber.Ctx) error {
+func (me *Handler) handleEditComment(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
@@ -443,7 +443,7 @@ func (me *Handler) HandleEditComment(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
+func (me *Handler) handleAddVideoFeeling(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -505,7 +505,7 @@ func (me *Handler) HandleAddVideoFeeling(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
+func (me *Handler) handleDeleteVideoFeeling(c fiber.Ctx) error {
 	videoId, err := uuid.Parse(c.Params("video_id"))
 	if err != nil {
 		return errVideoNotFound
@@ -539,7 +539,7 @@ func (me *Handler) HandleDeleteVideoFeeling(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
+func (me *Handler) handleAddCommentFeeling(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
@@ -602,7 +602,7 @@ func (me *Handler) HandleAddCommentFeeling(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (me *Handler) HandleDeleteCommentFeeling(c fiber.Ctx) error {
+func (me *Handler) handleDeleteCommentFeeling(c fiber.Ctx) error {
 	commentId, err := uuid.Parse(c.Params("comment_id"))
 	if err != nil {
 		return errCommentNotFound
