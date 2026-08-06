@@ -794,6 +794,13 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 // - media service will controle the expiration and will publish events: VideoUploadExpired, VideoUploadCompleted
 // - video service will have multiple states for a video: uploading, transcoding, ..., published
 // - remove redundant cleanup workers and tables in both services.
+//
+// or
+// store object keys for any media in video (thumbnail/video object kye) or
+// user (avatar object key) tables.
+// for video object key, upload first then create the video with the object key.
+// don't store user/video ids in media service. it will only contain object keys.
+// keep the orphan_video_uploads table because client might upload a video file and never link it with a video.
 func (me *impl) orphanVideoUploadsCleanupJob(ctx context.Context) error {
 	objectKeys, err := me.queries.GetExpiredOrphanUploads(ctx)
 	if err != nil {

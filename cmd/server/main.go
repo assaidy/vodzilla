@@ -28,7 +28,6 @@ import (
 // TODO: use a proper message queue for events (kafka/rmq)
 // TODO: transcoding
 // TODO: monitoring
-// TODO: rate limiting
 // TODO: api docs
 // TODO: doc services/utils
 
