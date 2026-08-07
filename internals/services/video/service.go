@@ -3,7 +3,6 @@ package video
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -714,16 +713,16 @@ func (me *impl) GetSavedPlaylists(ctx context.Context, userId uuid.UUID, lastId 
 }
 
 func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
-	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
-	defer sub.Close()
-	ch := sub.Channel()
-
 	for {
 		select {
-		case message := <-ch:
+		case <-ctx.Done():
+			return nil
+		default:
 			var payload events.UserDeletedEventPayload
-			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
-				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			} else if !ok {
+				continue
 			}
 
 			var deletedVideoIds []uuid.UUID
@@ -766,17 +765,15 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			}
 
 			for _, id := range deletedVideoIds {
-				payload, err := json.Marshal(events.VideoDeletedEventPayload{VideoId: id})
-				if err != nil {
-					return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
-				}
-				if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
-					return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
+				if err := events.Publish(
+					ctx,
+					me.redis,
+					events.VideoDeletedEvent,
+					events.VideoDeletedEventPayload{VideoId: id},
+				); err != nil {
+					return err
 				}
 			}
-
-		case <-ctx.Done():
-			return nil
 		}
 	}
 }
@@ -798,12 +795,13 @@ func (me *impl) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) erro
 		return ErrVideoNotFound
 	}
 
-	payload, err := json.Marshal(events.VideoDeletedEventPayload{VideoId: videoId})
-	if err != nil {
-		return fmt.Errorf("failed to marshal %q event payload: %w", events.VideoDeletedEvent, err)
-	}
-	if err := me.redis.Publish(ctx, events.VideoDeletedEvent, payload).Err(); err != nil {
-		return fmt.Errorf("failed to publish %q event: %w", events.VideoDeletedEvent, err)
+	if err := events.Publish(
+		ctx,
+		me.redis,
+		events.VideoDeletedEvent,
+		events.VideoDeletedEventPayload{VideoId: videoId},
+	); err != nil {
+		return err
 	}
 
 	return nil

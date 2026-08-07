@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -113,18 +112,11 @@ func (me *impl) verificationEmailSenderJob(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		default:
-			result, err := me.redis.BLPop(ctx, 5*time.Second, EmailVerificationQueue).Result()
-			if err != nil {
-				if errors.Is(err, redis.Nil) || ctx.Err() != nil {
-					// BLPop timout or context canceled
-					continue
-				}
-				return fmt.Errorf("failed to BLPop email verification queue: %w", err)
-			}
-
-			var payload EmailVerificationQueuePayload
-			if err := json.Unmarshal([]byte(result[1]), &payload); err != nil {
-				return fmt.Errorf("failed to decode email verification queue payload: %w", err)
+			var payload events.EmailVerificationEventPayload
+			if ok, err := events.Consume(ctx, me.redis, events.EmailVerificationEvent, &payload); err != nil {
+				return fmt.Errorf("failed to consume %q event: %w", events.EmailVerificationEvent, err)
+			} else if !ok {
+				continue
 			}
 
 			if err := me.mailer.Send(ctx, mailer.Message{
@@ -189,13 +181,6 @@ func (me *impl) Register(ctx context.Context, email, password, name, username st
 	return nil
 }
 
-const EmailVerificationQueue = "user_service:email_verification"
-
-type EmailVerificationQueuePayload struct {
-	Email            string
-	VerificationLink string
-}
-
 func (me *impl) SendVerificationEmail(ctx context.Context, email, url string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 
@@ -230,15 +215,16 @@ func (me *impl) SendVerificationEmail(ctx context.Context, email, url string) er
 		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	paylaod, err := json.Marshal(EmailVerificationQueuePayload{
-		Email:            email,
-		VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationToken),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to encode email verification queue payload: %w", err)
-	}
-	if err := me.redis.RPush(ctx, EmailVerificationQueue, paylaod).Err(); err != nil {
-		return fmt.Errorf("failed to enqueue email verification queue payload: %w", err)
+	if err := events.Publish(
+		ctx,
+		me.redis,
+		events.EmailVerificationEvent,
+		events.EmailVerificationEventPayload{
+			Email:            email,
+			VerificationLink: fmt.Sprintf("%s?token=%s", url, verificationToken),
+		},
+	); err != nil {
+		return err
 	}
 
 	return nil
@@ -513,12 +499,13 @@ func (me *impl) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	payload, err := json.Marshal(events.UserDeletedEventPayload{UserId: userId})
-	if err != nil {
-		return fmt.Errorf("failed to marshal %q event payload: %w", events.UserDeletedEvent, err)
-	}
-	if err := me.redis.Publish(ctx, events.UserDeletedEvent, payload).Err(); err != nil {
-		return fmt.Errorf("failed to publish %q event: %w", events.UserDeletedEvent, err)
+	if err := events.Publish(
+		ctx,
+		me.redis,
+		events.UserDeletedEvent,
+		events.UserDeletedEventPayload{UserId: userId},
+	); err != nil {
+		return err
 	}
 
 	return nil

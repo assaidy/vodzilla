@@ -3,7 +3,6 @@ package history
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -138,47 +137,41 @@ func (me *impl) ClearWatchHistory(ctx context.Context, userId uuid.UUID) error {
 }
 
 func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
-	sub := me.redis.Subscribe(ctx, events.UserDeletedEvent)
-	defer sub.Close()
-	ch := sub.Channel()
-
 	for {
 		select {
-		case message := <-ch:
+		case <-ctx.Done():
+			return nil
+		default:
 			var payload events.UserDeletedEventPayload
-			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
-				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			} else if !ok {
+				continue
 			}
 
 			if err := me.queries.DeleteAllWatchHistoryForUser(ctx, payload.UserId); err != nil {
 				return fmt.Errorf("failed to delete all watch history for user: %w", err)
 			}
-
-		case <-ctx.Done():
-			return nil
 		}
 	}
 }
 
 func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
-	sub := me.redis.Subscribe(ctx, events.VideoDeletedEvent)
-	defer sub.Close()
-	ch := sub.Channel()
-
 	for {
 		select {
-		case message := <-ch:
+		case <-ctx.Done():
+			return nil
+		default:
 			var payload events.VideoDeletedEventPayload
-			if err := json.Unmarshal([]byte(message.Payload), &payload); err != nil {
-				return fmt.Errorf("failed to unmarshal %q event payload: %w", events.VideoDeletedEvent, err)
+			if ok, err := events.Consume(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to consume %q event: %w", events.VideoDeletedEvent, err)
+			} else if !ok {
+				continue
 			}
 
 			if err := me.queries.DeleteAllWatchHistoryForVideo(ctx, payload.VideoId); err != nil {
 				return fmt.Errorf("failed to delete all watch history for video: %w", err)
 			}
-
-		case <-ctx.Done():
-			return nil
 		}
 	}
 }

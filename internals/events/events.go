@@ -13,3 +13,14 @@ const VideoDeletedEvent = "video_service.video_deleted"
 type VideoDeletedEventPayload struct {
 	VideoId uuid.UUID
 }
+
+const EmailVerificationEvent = "user_service.email_verification"
+
+type EmailVerificationEventPayload struct {
+	Email            string
+	VerificationLink string
+}
+
+func queueName(eventName string) string {
+	return "queue:" + eventName
+}
