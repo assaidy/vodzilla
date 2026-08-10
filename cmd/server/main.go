@@ -85,7 +85,10 @@ func main() {
 
 	go func() {
 		port, _ := utils.GetEnv("PORT", "8080")
-		if err := router.Listen(fmt.Sprintf(":%s", port)); err != nil {
+		if err := router.Listen(
+			fmt.Sprintf(":%s", port),
+			fiber.ListenConfig{EnablePrefork: true, PreforkRecoverThreshold: -1},
+		); err != nil {
 			logger.Error("failed to start server", "error", err, "pid", os.Getpid())
 			os.Exit(1)
 		}
