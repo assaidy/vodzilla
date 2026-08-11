@@ -10,18 +10,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-func Publish(ctx context.Context, rdb *redis.Client, eventName string, payload any) error {
+func Enqueu(ctx context.Context, rdb *redis.Client, eventName string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal %q payload: %w", eventName, err)
 	}
 	if err := rdb.LPush(ctx, queueName(eventName), body).Err(); err != nil {
-		return fmt.Errorf("failed to publish %q event: %w", eventName, err)
+		return fmt.Errorf("failed to push to %q queue: %w", eventName, err)
 	}
 	return nil
 }
 
-func Consume(ctx context.Context, rdb *redis.Client, eventName string, payload any) (bool, error) {
+func Dequeue(ctx context.Context, rdb *redis.Client, eventName string, payload any) (bool, error) {
 	result, err := rdb.BRPop(ctx, 5*time.Second, queueName(eventName)).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) || ctx.Err() != nil {

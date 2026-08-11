@@ -18,9 +18,21 @@ import (
 
 type Service interface {
 	services.Service
+
+	// AddToWatchHistory records a new watch history entry for the given user and video.
 	AddToWatchHistory(ctx context.Context, userId, videoId uuid.UUID) error
+
+	// GetWatchHistory returns the watch history entries of the given user,
+	// paginated by the given last entry id and limit.
 	GetWatchHistory(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchHistoryEntry, error)
+
+	// DeleteWatchHistoryEntry deletes the watch history entry with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrWatchHistoryEntryNotFound] - no entry exists for the given user with the given id
 	DeleteWatchHistoryEntry(ctx context.Context, userId uuid.UUID, entryId int) error
+
+	// ClearWatchHistory deletes all watch history entries of the given user.
 	ClearWatchHistory(ctx context.Context, userId uuid.UUID) error
 }
 
@@ -143,8 +155,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}
@@ -163,8 +175,8 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.VideoDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.VideoDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.VideoDeletedEvent, err)
 			} else if !ok {
 				continue
 			}

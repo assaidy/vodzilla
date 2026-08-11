@@ -810,3 +810,249 @@ func TestHandleDeleteCommentFeeling(t *testing.T) {
 		assertKind(t, status, data, 404, "FeelingNotFound")
 	})
 }
+
+func TestHandleGetVideoFeelingCounts(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gvfc@example.com", "Password123", "Get VF Counts", "gvfc")
+	videoID := createVerifiedVideo(t, user.ID, "VF Counts Test", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/counts", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid video_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/not-a-uuid/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/00000000-0000-0000-0000-000000000000/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("zero counts", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(0), likes)
+		require.Equal(t, float64(0), dislikes)
+	})
+
+	t.Run("counts after like", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/videos/"+videoID.String(), fiber.Map{"kind": "like"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(1), likes)
+		require.Equal(t, float64(0), dislikes)
+	})
+
+	t.Run("counts after switching to dislike", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/videos/"+videoID.String(), fiber.Map{"kind": "dislike"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(0), likes)
+		require.Equal(t, float64(1), dislikes)
+	})
+}
+
+func TestHandleGetVideoFeelingForCurrentUser(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gvfu@example.com", "Password123", "Get VF User", "gvfu")
+	videoID := createVerifiedVideo(t, user.ID, "VF User Test", "")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/user", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid video_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/not-a-uuid/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("non-existent video", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/00000000-0000-0000-0000-000000000000/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "VideoNotFound")
+	})
+
+	t.Run("no feeling", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "FeelingNotFound")
+	})
+
+	t.Run("feeling after like", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/videos/"+videoID.String(), fiber.Map{"kind": "like"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		kind, _ := data["kind"].(string)
+		require.Equal(t, "like", kind)
+	})
+
+	t.Run("feeling after switching to dislike", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/videos/"+videoID.String(), fiber.Map{"kind": "dislike"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/videos/"+videoID.String()+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		kind, _ := data["kind"].(string)
+		require.Equal(t, "dislike", kind)
+	})
+}
+
+func TestHandleGetCommentFeelingCounts(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gcfc@example.com", "Password123", "Get CF Counts", "gcfc")
+	videoID := createVerifiedVideo(t, user.ID, "CF Counts Test", "")
+
+	resp := testRequest(t, app, http.MethodPost, "/reactions/comments/videos/"+videoID.String(), fiber.Map{"content": "CF Counts target"}, user.Session)
+	status, data := parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	commentID, _ := data["commentId"].(string)
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/counts", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid comment_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/not-a-uuid/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "CommentNotFound")
+	})
+
+	t.Run("non-existent comment", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/00000000-0000-0000-0000-000000000000/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "CommentNotFound")
+	})
+
+	t.Run("zero counts", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(0), likes)
+		require.Equal(t, float64(0), dislikes)
+	})
+
+	t.Run("counts after like", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentID, fiber.Map{"kind": "like"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(1), likes)
+		require.Equal(t, float64(0), dislikes)
+	})
+
+	t.Run("counts after switching to dislike", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentID, fiber.Map{"kind": "dislike"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/counts", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		likes, _ := data["likes"].(float64)
+		dislikes, _ := data["dislikes"].(float64)
+		require.Equal(t, float64(0), likes)
+		require.Equal(t, float64(1), dislikes)
+	})
+}
+
+func TestHandleGetCommentFeelingForCurrentUser(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+	user := createVerifiedUser(t, app, "gcfu@example.com", "Password123", "Get CF User", "gcfu")
+	videoID := createVerifiedVideo(t, user.ID, "CF User Test", "")
+
+	resp := testRequest(t, app, http.MethodPost, "/reactions/comments/videos/"+videoID.String(), fiber.Map{"content": "CF User target"}, user.Session)
+	status, data := parseResponse(t, resp)
+	assertKind(t, status, data, 200, "")
+	commentID, _ := data["commentId"].(string)
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/user", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("invalid comment_id", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/not-a-uuid/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "CommentNotFound")
+	})
+
+	t.Run("non-existent comment", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/00000000-0000-0000-0000-000000000000/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "CommentNotFound")
+	})
+
+	t.Run("no feeling", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 404, "FeelingNotFound")
+	})
+
+	t.Run("feeling after like", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentID, fiber.Map{"kind": "like"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		kind, _ := data["kind"].(string)
+		require.Equal(t, "like", kind)
+	})
+
+	t.Run("feeling after switching to dislike", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodPost, "/reactions/feelings/comments/"+commentID, fiber.Map{"kind": "dislike"}, user.Session)
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		resp.Body.Close()
+
+		resp = testRequest(t, app, http.MethodGet, "/reactions/feelings/comments/"+commentID+"/user", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		kind, _ := data["kind"].(string)
+		require.Equal(t, "dislike", kind)
+	})
+}

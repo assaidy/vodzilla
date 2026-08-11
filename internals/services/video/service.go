@@ -19,30 +19,139 @@ import (
 
 type Service interface {
 	services.Service
-	CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error)
+
+	// CreateVideo creates a new pending video for the given user and returns the new video id.
+	CreateVideo(ctx context.Context, userId uuid.UUID, title, description string) (uuid.UUID, error)
+
+	// ActivateVideo activates the pending video with the given id, making it publicly visible.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no pending video exists with the given id
 	ActivateVideo(ctx context.Context, videoId uuid.UUID) error
+
+	// GetVideoById returns the video with the given id.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
 	GetVideoById(ctx context.Context, id uuid.UUID) (*Video, error)
+
+	// GetVideosCountForUser returns the number of videos of the given user.
 	GetVideosCountForUser(ctx context.Context, userId uuid.UUID) (int, error)
+
+	// GetVideosForUser returns the videos of the given user,
+	// paginated by the given last video id and limit.
 	GetVideosForUser(ctx context.Context, userId, lastVideoId uuid.UUID, limit int) ([]Video, error)
+
+	// GetVideosForMultipleUsers returns the videos of the given users,
+	// paginated by the given last video id and limit.
 	GetVideosForMultipleUsers(ctx context.Context, userIds []uuid.UUID, lastVideoId uuid.UUID, limit int) ([]Video, error)
+
+	// DoesVideoExist reports whether a video with the given id exists.
 	DoesVideoExist(ctx context.Context, id uuid.UUID) (bool, error)
+
+	// IsInWatchLater reports whether the video with the given id is in the given user's watch later.
 	IsInWatchLater(ctx context.Context, videoId, userId uuid.UUID) (bool, error)
+
+	// AddVideoToWatchlater adds the video with the given id to the given user's watch later.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
+	//   - [ErrWatchlaterConflict] - the video is already in the user's watch later
 	AddVideoToWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
+
+	// DeleteVideoFromWatchlater removes the video with the given id from the given user's watch later.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
+	//   - [ErrWatchlaterVideoNotFound] - the video is not in the user's watch later
 	DeleteVideoFromWatchlater(ctx context.Context, videoId, userId uuid.UUID) error
+
+	// GetVideosInWatchlater returns the videos in the given user's watch later,
+	// paginated by the given last id and limit.
 	GetVideosInWatchlater(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]WatchlaterVideo, error)
+
+	// GetVideoOwner returns the id of the owner of the video with the given id.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
 	GetVideoOwner(ctx context.Context, videoId uuid.UUID) (uuid.UUID, error)
+
+	// CreatePlaylist creates a new playlist for the given user and returns the new playlist id.
 	CreatePlaylist(ctx context.Context, userId uuid.UUID, name, description string, isPublic bool) (uuid.UUID, error)
+
+	// DeletePlaylist deletes the playlist with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrPlaylistNotFound] - no playlist exists for the given user with the given id
 	DeletePlaylist(ctx context.Context, userId, playlistId uuid.UUID) error
+
+	// EditPlaylist updates the name, description and visibility of the playlist
+	// with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrPlaylistNotFound] - no playlist exists for the given user with the given id
 	EditPlaylist(ctx context.Context, userId, playlistId uuid.UUID, name, description string, isPublic bool) error
+
+	// AddVideoToPlaylist adds the video with the given id to the playlist
+	// with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
+	//   - [ErrPlaylistNotFound] - no playlist exists for the given user with the given id
+	//   - [ErrPlaylistVideoConflict] - the video is already in the playlist
 	AddVideoToPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
+
+	// DeleteVideoFromPlaylist removes the video with the given id from the playlist
+	// with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
+	//   - [ErrPlaylistNotFound] - no playlist exists for the given user with the given id
+	//   - [ErrPlaylistVideoNotFound] - the video is not in the playlist
 	DeleteVideoFromPlaylist(ctx context.Context, userId, videoId, playlistId uuid.UUID) error
+
+	// GetUserPlaylists returns the playlists of the given user,
+	// paginated by the given last playlist id and limit.
 	GetUserPlaylists(ctx context.Context, userId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]Playlist, error)
+
+	// GetUserPlaylistsWithVideoStatus returns the playlists of the given user with
+	// a flag indicating whether the video with the given id is in each playlist,
+	// paginated by the given last playlist id and limit.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
 	GetUserPlaylistsWithVideoStatus(ctx context.Context, userId, videoId, lastPlaylistId uuid.UUID, limit int, includePrivates bool) ([]PlaylistWithVideoStatus, error)
+
+	// GetPlaylist returns the playlist with the given id.
+	//
+	// Errors:
+	//   - [ErrPlaylistNotFound] - no playlist exists with the given id
 	GetPlaylist(ctx context.Context, playlistId uuid.UUID) (*Playlist, error)
+
+	// GetVideosInPlaylist returns the videos in the playlist with the given id,
+	// paginated by the given last id and limit.
 	GetVideosInPlaylist(ctx context.Context, playlistId uuid.UUID, lastId int, limit int) ([]PlaylistVideo, error)
+
+	// SavePlaylist adds the playlist with the given id to the given user's saved playlists.
+	//
+	// Errors:
+	//   - [ErrSavedPlaylistConflict] - the playlist is already saved by the user
 	SavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error
+
+	// UnsavePlaylist removes the playlist with the given id from the given user's saved playlists.
+	//
+	// Errors:
+	//   - [ErrSavedPlaylistNotFound] - the playlist is not saved by the user
 	UnsavePlaylist(ctx context.Context, playlistId, userId uuid.UUID) error
+
+	// GetSavedPlaylists returns the playlists saved by the given user,
+	// paginated by the given last id and limit.
 	GetSavedPlaylists(ctx context.Context, userId uuid.UUID, lastId int, limit int) ([]SavedPlaylist, error)
+
+	// DeleteVideo deletes the video with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists for the given user with the given id
 	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
 }
 
@@ -103,14 +212,14 @@ type CreateVideoParams struct {
 	Description string
 }
 
-func (me *impl) CreateVideo(ctx context.Context, params CreateVideoParams) (uuid.UUID, error) {
+func (me *impl) CreateVideo(ctx context.Context, userId uuid.UUID, title, description string) (uuid.UUID, error) {
 	videoId := uuid.Must(uuid.NewV7())
 
 	if err := me.queries.InsertPendingVideo(ctx, queries.InsertPendingVideoParams{
 		Id:          videoId,
-		UserId:      params.UserId,
-		Title:       params.Title,
-		Description: sql.NullString{Valid: params.Description != "", String: params.Description},
+		UserId:      userId,
+		Title:       title,
+		Description: sql.NullString{Valid: description != "", String: description},
 	}); err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert pending video: %w", err)
 	}
@@ -719,8 +828,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}
@@ -765,7 +874,7 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			}
 
 			for _, id := range deletedVideoIds {
-				if err := events.Publish(
+				if err := events.Enqueu(
 					ctx,
 					me.redis,
 					events.VideoDeletedEvent,
@@ -795,7 +904,7 @@ func (me *impl) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) erro
 		return ErrVideoNotFound
 	}
 
-	if err := events.Publish(
+	if err := events.Enqueu(
 		ctx,
 		me.redis,
 		events.VideoDeletedEvent,

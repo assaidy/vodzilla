@@ -128,11 +128,7 @@ func (me *Handler) handlePostVideo(c fiber.Ctx) error {
 
 	currentUserId := c.Locals("user_id").(uuid.UUID)
 
-	videoId, err := me.videoService.CreateVideo(c.RequestCtx(), video_service.CreateVideoParams{
-		UserId:      currentUserId,
-		Title:       request.Title,
-		Description: request.Description,
-	})
+	videoId, err := me.videoService.CreateVideo(c.RequestCtx(), currentUserId, request.Title, request.Description)
 	if err != nil {
 		return err
 	}

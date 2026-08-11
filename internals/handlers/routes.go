@@ -87,8 +87,12 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Delete("/reactions/comments/:comment_id", me.withSession, me.withCsrfToken, me.handleDeleteComment)
 	router.Post("/reactions/feelings/videos/:video_id", me.withSession, me.withCsrfToken, me.handleAddVideoFeeling)
 	router.Delete("/reactions/feelings/videos/:video_id", me.withSession, me.withCsrfToken, me.handleDeleteVideoFeeling)
+	router.Get("/reactions/feelings/videos/:video_id/counts", me.withSession, me.handleGetVideoFeelingCounts)
+	router.Get("/reactions/feelings/videos/:video_id/user", me.withSession, me.handleGetVideoFeelingForCurrentUser)
 	router.Post("/reactions/feelings/comments/:comment_id", me.withSession, me.withCsrfToken, me.handleAddCommentFeeling)
 	router.Delete("/reactions/feelings/comments/:comment_id", me.withSession, me.withCsrfToken, me.handleDeleteCommentFeeling)
+	router.Get("/reactions/feelings/comments/:comment_id/counts", me.withSession, me.handleGetCommentFeelingCounts)
+	router.Get("/reactions/feelings/comments/:comment_id/user", me.withSession, me.handleGetCommentFeelingForCurrentUser)
 
 	// Feed
 	router.Get("/feed", me.withSession, me.handleGetFeed)

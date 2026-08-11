@@ -635,3 +635,117 @@ func (me *Handler) handleDeleteCommentFeeling(c fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusOK)
 }
+
+func (me *Handler) handleGetVideoFeelingCounts(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
+	}
+
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return errVideoNotFound
+	}
+
+	counts, err := me.reactionService.GetFeelingCounts(c.RequestCtx(), videoId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"likes": counts.Likes, "dislikes": counts.Dislikes})
+}
+
+func (me *Handler) handleGetVideoFeelingForCurrentUser(c fiber.Ctx) error {
+	videoId, err := uuid.Parse(c.Params("video_id"))
+	if err != nil {
+		return errVideoNotFound
+	}
+
+	lock := me.newVideoLock(videoId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.videoService.DoesVideoExist(c.RequestCtx(), videoId); err != nil {
+		return err
+	} else if !ok {
+		return errVideoNotFound
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	kind, err := me.reactionService.GetUserFeeling(c.RequestCtx(), currentUserId, videoId)
+	if err != nil {
+		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
+			return errFeelingNotFound
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"kind": kind})
+}
+
+func (me *Handler) handleGetCommentFeelingCounts(c fiber.Ctx) error {
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
+	}
+
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.reactionService.DoesCommentExist(c.RequestCtx(), commentId); err != nil {
+		return err
+	} else if !ok {
+		return errCommentNotFound
+	}
+
+	counts, err := me.reactionService.GetFeelingCounts(c.RequestCtx(), commentId)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{"likes": counts.Likes, "dislikes": counts.Dislikes})
+}
+
+func (me *Handler) handleGetCommentFeelingForCurrentUser(c fiber.Ctx) error {
+	commentId, err := uuid.Parse(c.Params("comment_id"))
+	if err != nil {
+		return errCommentNotFound
+	}
+
+	lock := me.newCommentLock(commentId)
+	if err := lock.SpinRLock(c.RequestCtx(), spinLockTimeout); err != nil {
+		return err
+	}
+	defer lock.RUnLock(c.RequestCtx())
+
+	if ok, err := me.reactionService.DoesCommentExist(c.RequestCtx(), commentId); err != nil {
+		return err
+	} else if !ok {
+		return errCommentNotFound
+	}
+
+	currentUserId := c.Locals("user_id").(uuid.UUID)
+
+	kind, err := me.reactionService.GetUserFeeling(c.RequestCtx(), currentUserId, commentId)
+	if err != nil {
+		if errors.Is(err, reaction_service.ErrFeelingNotFound) {
+			return errFeelingNotFound
+		}
+		return err
+	}
+
+	return c.JSON(fiber.Map{"kind": kind})
+}

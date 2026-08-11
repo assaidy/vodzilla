@@ -26,17 +26,78 @@ import (
 
 type Service interface {
 	services.Service
+
+	// Register registers a new user with the given credentials.
+	//
+	// Errors:
+	//   - [ErrEmailConflict] - the email is already registered
+	//   - [ErrUsernameConflict] - the username is already taken or retired
 	Register(ctx context.Context, email, password, name, username string) error
+
+	// SendVerificationEmail sends a verification email with the given url to the user with the given email.
+	//
+	// Errors:
+	//   - [ErrEmailNotFound] - no user is registered with the given email
 	SendVerificationEmail(ctx context.Context, email, url string) error
+
+	// VerifyEmail verifies the user's email using the given verification token.
+	//
+	// Errors:
+	//   - [ErrTokenNotFound] - the token is invalid or expired
 	VerifyEmail(ctx context.Context, verificationToken string) error
+
+	// Login authenticates the user with the given email and password and creates a new session.
+	//
+	// Errors:
+	//   - [ErrUnauthorized] - the email or password is incorrect
+	//   - [ErrEmailNotVerified] - the user's email is not verified yet
 	Login(ctx context.Context, email, password string) (*Session, error)
+
+	// GetSession returns the session with the given id.
+	//
+	// Errors:
+	//   - [ErrSessionNotFound] - no session exists with the given id
 	GetSession(ctx context.Context, sessionId uuid.UUID) (*Session, error)
+
+	// Logout deletes the session with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrSessionNotFound] - no session exists for the given user with the given id
 	Logout(ctx context.Context, userId uuid.UUID, sessionId uuid.UUID) error
+
+	// GetUserById returns the user with the given id.
+	//
+	// Errors:
+	//   - [ErrUserNotFound] - no user exists with the given id
 	GetUserById(ctx context.Context, userId uuid.UUID) (*User, error)
+
+	// GetUserByUsername returns the user with the given username.
+	//
+	// Errors:
+	//   - [ErrUserNotFound] - no user exists with the given username
 	GetUserByUsername(ctx context.Context, username string) (*User, error)
+
+	// DoesUserExist reports whether a user with the given id exists.
 	DoesUserExist(ctx context.Context, userId uuid.UUID) (bool, error)
+
+	// EditProfile updates the name, username and bio of the user with the given id.
+	//
+	// Errors:
+	//   - [ErrUserNotFound] - no user exists with the given id
+	//   - [ErrUsernameConflict] - the username is already taken or retired by another user
 	EditProfile(ctx context.Context, userId uuid.UUID, name, username, bio string) error
+
+	// DeleteUser deletes the user with the given id and retires their username.
+	//
+	// Errors:
+	//   - [ErrUserNotFound] - no user exists with the given id
 	DeleteUser(ctx context.Context, userId uuid.UUID) error
+
+	// EditPassword changes the password of the user with the given id.
+	//
+	// Errors:
+	//   - [ErrUserNotFound] - no user exists with the given id
+	//   - [ErrUnauthorized] - the current password is incorrect
 	EditPassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error
 }
 
@@ -113,8 +174,8 @@ func (me *impl) verificationEmailSenderJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.EmailVerificationEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.EmailVerificationEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.EmailVerificationEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.EmailVerificationEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.EmailVerificationEvent, err)
 			} else if !ok {
 				continue
 			}
@@ -215,7 +276,7 @@ func (me *impl) SendVerificationEmail(ctx context.Context, email, url string) er
 		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	if err := events.Publish(
+	if err := events.Enqueu(
 		ctx,
 		me.redis,
 		events.EmailVerificationEvent,
@@ -499,7 +560,7 @@ func (me *impl) DeleteUser(ctx context.Context, userId uuid.UUID) error {
 		return fmt.Errorf("failed to commit tx: %w", err)
 	}
 
-	if err := events.Publish(
+	if err := events.Enqueu(
 		ctx,
 		me.redis,
 		events.UserDeletedEvent,

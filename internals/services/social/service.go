@@ -18,13 +18,38 @@ import (
 
 type Service interface {
 	services.Service
+
+	// Follow makes the given follower user follow the given followed user.
+	//
+	// Errors:
+	//   - [ErrSelfFollowNotAllowed] - the follower and followed ids are the same
+	//   - [ErrAlreadyFollowing] - the follower already follows the followed user
 	Follow(ctx context.Context, followerId, followedId uuid.UUID) error
+
+	// Unfollow makes the given follower user unfollow the given followed user.
+	//
+	// Errors:
+	//   - [ErrNotFollowing] - the follower does not follow the followed user
 	Unfollow(ctx context.Context, followerId, followedId uuid.UUID) error
+
+	// GetFollowCounts returns the followers and followeds counts of the given user.
 	GetFollowCounts(ctx context.Context, userId uuid.UUID) (*FollowCounts, error)
+
+	// IsFollower reports whether the given follower user follows the given followed user.
 	IsFollower(ctx context.Context, followerId, followedId uuid.UUID) (bool, error)
+
+	// GetFollowerIds returns the ids of the followers of the given user,
+	// paginated by the given last user id and limit.
 	GetFollowerIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error)
+
+	// GetFollowedIds returns the ids of the users followed by the given user,
+	// paginated by the given last user id and limit.
 	GetFollowedIds(ctx context.Context, userId, lastUserId uuid.UUID, limit int) ([]uuid.UUID, error)
+
+	// GetAllFollowedIds returns the ids of all users followed by the given user.
 	GetAllFollowedIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error)
+
+	// GetAllFollowerIds returns the ids of all followers of the given user.
 	GetAllFollowerIds(ctx context.Context, userId uuid.UUID) ([]uuid.UUID, error)
 }
 
@@ -194,8 +219,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}

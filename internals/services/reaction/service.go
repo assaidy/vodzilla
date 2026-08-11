@@ -19,18 +19,62 @@ import (
 
 type Service interface {
 	services.Service
+
+	// AddView records a new view for the given user on the target with the given kind and id.
 	AddView(ctx context.Context, userId uuid.UUID, targetId uuid.UUID, targetKind ViewTargetKind) error
+
+	// GetViewsCount returns the number of views on the target with the given id.
 	GetViewsCount(ctx context.Context, targetId uuid.UUID) (int, error)
+
+	// AddFeeling adds or updates the feeling of the given user on the target with the given kind and id.
 	AddFeeling(ctx context.Context, userId, targetId uuid.UUID, targetKind FeelingTargetKind, kind FeelingKind) error
+
+	// DeleteFeeling removes the feeling of the given user on the target with the given id.
+	//
+	// Errors:
+	//   - [ErrFeelingNotFound] - the given user has no feeling on the target
 	DeleteFeeling(ctx context.Context, userId, targetId uuid.UUID) error
+
+	// GetFeelingCounts returns the feeling counts on the target with the given id.
 	GetFeelingCounts(ctx context.Context, targetId uuid.UUID) (*FeelingCounts, error)
+
+	// GetUserFeeling returns the feeling of the given user on the target with the given id.
+	//
+	// Errors:
+	//   - [ErrFeelingNotFound] - the given user has no feeling on the target
 	GetUserFeeling(ctx context.Context, userId, targetId uuid.UUID) (FeelingKind, error)
+
+	// DoesCommentExist reports whether a comment with the given id exists.
 	DoesCommentExist(ctx context.Context, commentId uuid.UUID) (bool, error)
+
+	// GetCommentById returns the comment with the given id.
+	//
+	// Errors:
+	//   - [ErrCommentNotFound] - no comment exists with the given id
 	GetCommentById(ctx context.Context, commentId uuid.UUID) (*Comment, error)
+
+	// CreateComment creates a new comment by the given user on the target
+	// with the given kind and id, and returns the new comment id.
 	CreateComment(ctx context.Context, userId, targetId uuid.UUID, targetKind CommentTargetKind, content string) (uuid.UUID, error)
+
+	// EditComment updates the content of the comment with the given id owned by the given user.
+	//
+	// Errors:
+	//   - [ErrCommentNotFound] - no comment exists for the given user with the given id
 	EditComment(ctx context.Context, userId, commentId uuid.UUID, newContent string) error
+
+	// DeleteComment deletes the comment with the given id owned by the given user
+	// and all its replies.
+	//
+	// Errors:
+	//   - [ErrCommentNotFound] - no comment exists for the given user with the given id
 	DeleteComment(ctx context.Context, userId, commentId uuid.UUID) error
+
+	// GetCommentsCount returns the number of comments on the target with the given id.
 	GetCommentsCount(ctx context.Context, targetId uuid.UUID) (int, error)
+
+	// GetComments returns the comments on the target with the given id,
+	// paginated by the given last comment id and limit.
 	GetComments(ctx context.Context, targetId uuid.UUID, lastCommentId uuid.UUID, limit int) ([]Comment, error)
 }
 
@@ -198,7 +242,10 @@ func (me *impl) GetUserFeeling(ctx context.Context, userId, targetId uuid.UUID) 
 		TargetId: targetId,
 		UserId:   userId,
 	})
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrFeelingNotFound
+		}
 		return "", fmt.Errorf("failed to get user feeling: %w", err)
 	}
 
@@ -368,8 +415,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}
@@ -413,8 +460,8 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.VideoDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.VideoDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.VideoDeletedEvent, err)
 			} else if !ok {
 				continue
 			}

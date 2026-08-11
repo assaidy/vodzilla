@@ -19,9 +19,21 @@ import (
 
 type Service interface {
 	services.Service
+
+	// AddNotification creates a new notification for the given user with the given payload.
 	AddNotification(ctx context.Context, userId uuid.UUID, payload Payload) error
+
+	// MarkNotificationAsRead marks the notification with the given id owned by the given user as read.
+	//
+	// Errors:
+	//   - [ErrNotificationNotFound] - no notification exists for the given user with the given id
 	MarkNotificationAsRead(ctx context.Context, userId, notificationId uuid.UUID) error
+
+	// GetNotifications returns the notifications of the given user,
+	// paginated by the given last notification id and limit.
 	GetNotifications(ctx context.Context, userId, lastNotificationId uuid.UUID, limit int) ([]Notification, error)
+
+	// GetUnreadNotificationsCount returns the number of unread notifications of the given user.
 	GetUnreadNotificationsCount(ctx context.Context, userId uuid.UUID) (int, error)
 }
 
@@ -208,8 +220,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}

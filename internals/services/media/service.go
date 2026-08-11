@@ -27,18 +27,77 @@ import (
 
 type Service interface {
 	services.Service
+
+	// GenerateVideoPresignedPutUrls creates a multipart upload for the given user's video
+	// and returns presigned put URLs for each part of the given content type and file size.
 	GenerateVideoPresignedPutUrls(ctx context.Context, userId uuid.UUID, contentType string, fileSize int64) (*VideoPresignedUpload, error)
+
+	// ConfirmVideoUpload completes the multipart upload of the video with the given object key and upload id.
+	//
+	// Errors:
+	//   - [ErrNoPendingVideoUpload] - no pending upload exists for the given object key
+	//   - [ErrInvalidConfirmVideoUploadData] - the upload id doesn't match the pending upload or S3 rejected the parts
 	ConfirmVideoUpload(ctx context.Context, objectKey, uploadId string, parts []CompleteVideoUploadPart) error
+
+	// DeleteOrphanUpload removes the orphan upload record with the given object key.
 	DeleteOrphanUpload(ctx context.Context, objectKey string) error
+
+	// PostVideo links the uploaded video with the given object key to the video with the given id.
+	//
+	// Errors:
+	//   - [ErrOrphanUploadNotFound] - no orphan upload exists with the given object key
 	PostVideo(ctx context.Context, videoId uuid.UUID, objectKey string) error
+
+	// GenerateVideoPresignedGetUrl returns a presigned get url for the video with the given id.
+	//
+	// Errors:
+	//   - [ErrVideoNotFound] - no video exists with the given id
 	GenerateVideoPresignedGetUrl(ctx context.Context, videoId uuid.UUID) (string, error)
+
+	// GeneratePresignedAvatarUpload returns a presigned put url for uploading
+	// the given user's avatar with the given content type and file size.
 	GeneratePresignedAvatarUpload(ctx context.Context, userId uuid.UUID, contentType string, fileSize int64) (*AvatarPresignedUpload, error)
+
+	// ConfirmAvatarUpload completes the avatar upload of the given user and returns
+	// a presigned get url for the new avatar.
+	//
+	// Errors:
+	//   - [ErrNoPendingAvatarUpload] - no pending avatar upload exists for the given user
 	ConfirmAvatarUpload(ctx context.Context, userId uuid.UUID) (string, error)
+
+	// DeleteAvatar deletes the avatar of the given user.
+	//
+	// Errors:
+	//   - [ErrAvatarNotFound] - the given user has no avatar
 	DeleteAvatar(ctx context.Context, userId uuid.UUID) error
+
+	// GetAvatarUrl returns a presigned get url for the avatar of the given user.
+	//
+	// Errors:
+	//   - [ErrAvatarNotFound] - the given user has no avatar
 	GetAvatarUrl(ctx context.Context, userId uuid.UUID) (string, error)
+
+	// GeneratePresignedThumbnailUpload returns a presigned put url for uploading
+	// the thumbnail of the video with the given id, with the given content type and file size.
 	GeneratePresignedThumbnailUpload(ctx context.Context, videoId uuid.UUID, contentType string, fileSize int64) (*ThumbnailPresignedUpload, error)
+
+	// ConfirmThumbnailUpload completes the thumbnail upload of the video with the given id
+	// and returns a presigned get url for the new thumbnail.
+	//
+	// Errors:
+	//   - [ErrNoPendingThumbnailUpload] - no pending thumbnail upload exists for the given video
 	ConfirmThumbnailUpload(ctx context.Context, videoId uuid.UUID) (string, error)
+
+	// DeleteThumbnail deletes the thumbnail of the video with the given id.
+	//
+	// Errors:
+	//   - [ErrThumbnailNotFound] - the video with the given id has no thumbnail
 	DeleteThumbnail(ctx context.Context, videoId uuid.UUID) error
+
+	// GetThumbnailUrl returns a presigned get url for the thumbnail of the video with the given id.
+	//
+	// Errors:
+	//   - [ErrThumbnailNotFound] - the video with the given id has no thumbnail
 	GetThumbnailUrl(ctx context.Context, videoId uuid.UUID) (string, error)
 }
 
@@ -727,8 +786,8 @@ func (me *impl) videoDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.VideoDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.VideoDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.VideoDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.VideoDeletedEvent, err)
 			} else if !ok {
 				continue
 			}
@@ -827,8 +886,8 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 			return nil
 		default:
 			var payload events.UserDeletedEventPayload
-			if ok, err := events.Consume(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
-				return fmt.Errorf("failed to consume %q event: %w", events.UserDeletedEvent, err)
+			if ok, err := events.Dequeue(ctx, me.redis, events.UserDeletedEvent, &payload); err != nil {
+				return fmt.Errorf("failed to dequeue %q event: %w", events.UserDeletedEvent, err)
 			} else if !ok {
 				continue
 			}
