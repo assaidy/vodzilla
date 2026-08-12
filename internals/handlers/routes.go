@@ -22,7 +22,8 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Put("/auth/password", me.withSession, me.withCsrfToken, me.handleEditPassword)
 
 	// Profiles
-	router.Get("/profiles", me.withSession, me.handleGetProfile)
+	router.Get("/profiles/me", me.withSession, me.handleGetProfile)
+	router.Get("/profiles", me.withSession, me.handleSearchProfiles)
 	router.Get("/profiles/usernames/:username", me.withSession, me.handleGetProfileByUsername)
 	router.Get("/profiles/id/:user_id", me.withSession, me.handleGetProfileById)
 	router.Put("/profiles", me.withSession, me.withCsrfToken, me.handleEditProfile)
@@ -53,6 +54,7 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Delete("/videos/:video_id", me.withSession, me.withCsrfToken, me.handleDeleteVideo)
 	router.Get("/videos/users/:user_id", me.withSession, me.handleGetVideosForUser)
 	router.Get("/videos/users/:user_id/count", me.withSession, me.handleGetVideosCountForUser)
+	router.Get("/videos/", me.withSession, me.handleSearchVideos)
 
 	// Watch Later
 	router.Get("/watchlaters", me.withSession, me.handleGetWatchlaters)
@@ -108,5 +110,5 @@ func (me *Handler) RegisterRoutes(router *fiber.App) {
 	router.Delete("/history/:entry_id", me.withSession, me.withCsrfToken, me.handleDeleteWatchHistoryEntry)
 	router.Delete("/history", me.withSession, me.withCsrfToken, me.handleClearWatchHistory)
 
-	// TODO: search, recommendations
+	// TODO: recommendations
 }

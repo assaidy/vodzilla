@@ -111,3 +111,23 @@ delete from user_service.sessions where user_id = $1 and expires_at > now();
 
 -- name: DeleteAllEmailVerificationTokensForUser :exec
 delete from user_service.email_verification_tokens where user_id = $1 and expires_at > now();
+
+-- name: SearchUsers :many
+with q as (
+    select websearch_to_tsquery('english', sqlc.arg(query)) as query
+),
+results as (
+    select
+        u.*,
+        ts_rank(u.search_vector, q.query) as rank
+    from user_service.users u
+    cross join q
+    where u.search_vector @@ q.query
+    limit 1000 -- cap results to 1000
+)
+select *
+from results
+where sqlc.narg(last_rank)::real is null or sqlc.narg(last_user_id)::uuid is null
+   or (rank, id) < (sqlc.narg(last_rank)::real, sqlc.narg(last_user_id)::uuid)
+order by rank desc, id desc
+limit $1;

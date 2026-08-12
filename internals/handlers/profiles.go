@@ -38,6 +38,51 @@ func (me *Handler) handleGetProfile(c fiber.Ctx) error {
 	})
 }
 
+type searchCursor struct {
+	LastRank float32
+	LastId   uuid.UUID
+}
+
+// TEST: handleSearchProfiles
+func (me *Handler) handleSearchProfiles(c fiber.Ctx) error {
+	query := c.Query("query")
+	if err := validation.Validate(&query, validation.Required, validation.Length(1, 50)); err != nil {
+		return errInvalidData.details(fiber.Map{"query": err})
+	}
+
+	pr, err := parsePaginatedRequest[searchCursor](c)
+	if err != nil {
+		return err
+	}
+
+	profiles, err := me.userService.SearchUsers(c.RequestCtx(), query, pr.Cursor.LastRank, pr.Cursor.LastId, pr.Limit)
+	if err != nil {
+		return err
+	}
+
+	items := make([]profileResponse, 0, len(profiles))
+	for _, p := range profiles {
+		items = append(items, profileResponse{
+			Id:       p.Id,
+			Name:     p.Name,
+			Username: p.Username,
+			Email:    p.Email,
+			Bio:      p.Bio,
+		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		last := profiles[len(profiles)-1]
+		response.Cursor = encodeCursor(searchCursor{
+			LastRank: last.Rank,
+			LastId:   last.Id,
+		})
+	}
+
+	return c.JSON(response)
+}
+
 func (me *Handler) handleGetProfileByUsername(c fiber.Ctx) error {
 	username := c.Params("username")
 

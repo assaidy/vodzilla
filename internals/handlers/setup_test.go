@@ -238,7 +238,7 @@ func createVerifiedUser(t *testing.T, app *fiber.App, email, password, name, use
 
 	session := extractSession(resp)
 
-	resp = testRequest(t, app, http.MethodGet, "/profiles", nil, session)
+	resp = testRequest(t, app, http.MethodGet, "/profiles/me", nil, session)
 	status, data := parseResponse(t, resp)
 	require.Equal(t, 200, status, "get profile failed")
 

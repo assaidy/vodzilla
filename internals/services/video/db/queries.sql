@@ -198,3 +198,23 @@ delete from video_service.pending_videos where created_at < now() - '24 hours'::
 
 -- name: DeleteAllPendingVideosForUser :execrows
 delete from video_service.pending_videos where user_id = $1;
+
+-- name: SearchVideos :many
+with q as (
+    select websearch_to_tsquery('english', sqlc.arg(query)) as query
+),
+results as (
+    select
+        v.*,
+        ts_rank(u.search_vector, q.query) as rank
+    from video_service.videos v
+    cross join q
+    where v.search_vector @@ q.query
+    limit 1000 -- cap results to 1000
+)
+select *
+from results
+where sqlc.narg(last_rank)::real is null or sqlc.narg(last_video_id)::uuid is null
+   or (rank, id) < (sqlc.narg(last_rank)::real, sqlc.narg(last_video_id)::uuid)
+order by rank desc, id desc
+limit $1;

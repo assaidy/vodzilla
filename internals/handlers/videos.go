@@ -468,3 +468,43 @@ func (me *Handler) handleGetVideoThumbnailUrl(c fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"thumbnailUrl": thumbnailUrl})
 }
+
+// TEST: handleSearchVideos
+func (me *Handler) handleSearchVideos(c fiber.Ctx) error {
+	query := c.Query("query")
+	if err := validation.Validate(&query, validation.Required, validation.Length(1, 50)); err != nil {
+		return errInvalidData.details(fiber.Map{"query": err})
+	}
+
+	pr, err := parsePaginatedRequest[searchCursor](c)
+	if err != nil {
+		return err
+	}
+
+	videos, err := me.videoService.SearchVideos(c.RequestCtx(), query, pr.Cursor.LastRank, pr.Cursor.LastId, pr.Limit)
+	if err != nil {
+		return err
+	}
+
+	items := make([]videoResponse, 0, len(videos))
+	for _, v := range videos {
+		items = append(items, videoResponse{
+			Id:          v.Id,
+			UserId:      v.UserId,
+			Timestamp:   v.Timestamp,
+			Title:       v.Title,
+			Description: v.Description,
+		})
+	}
+
+	response := newPaginatedResponse(items, pr.Limit)
+	if response.HasMore {
+		last := videos[len(videos)-1]
+		response.Cursor = encodeCursor(searchCursor{
+			LastRank: last.Rank,
+			LastId:   last.Id,
+		})
+	}
+
+	return c.JSON(response)
+}

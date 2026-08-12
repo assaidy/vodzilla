@@ -15,13 +15,13 @@ func TestHandleGetProfile(t *testing.T) {
 	user := createVerifiedUser(t, app, "profown@example.com", "Password123", "Profile Own", "profown")
 
 	t.Run("no session", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, nil)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/me", nil, nil)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 401, "Unauthorized")
 	})
 
 	t.Run("own profile", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
+		resp := testRequest(t, app, http.MethodGet, "/profiles/me", nil, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
 	})
@@ -136,21 +136,17 @@ func TestHandleEditProfile(t *testing.T) {
 		}, user.Session)
 		status, data := parseResponse(t, resp)
 		assertKind(t, status, data, 200, "")
-	})
 
-	t.Run("verify edited profile", func(t *testing.T) {
-		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
-		status, data := parseResponse(t, resp)
-		_ = status
+		resp = testRequest(t, app, http.MethodGet, "/profiles/me", nil, user.Session)
+		_, data = parseResponse(t, resp)
 		name, _ := data["name"].(string)
 		if name != "Updated Profile" {
 			t.Errorf("name: want 'Updated Profile', got '%s'", name)
 		}
 	})
 
-	createVerifiedUser(t, app, "second@example.com", "Password123", "Second User", "seconduser")
-
 	t.Run("duplicate username", func(t *testing.T) {
+		createVerifiedUser(t, app, "second@example.com", "Password123", "Second User", "seconduser")
 		resp := testRequest(t, app, http.MethodPut, "/profiles", fiber.Map{
 			"name": "Updated Profile", "username": "seconduser", "bio": "",
 		}, user.Session)

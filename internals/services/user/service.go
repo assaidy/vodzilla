@@ -99,6 +99,16 @@ type Service interface {
 	//   - [ErrUserNotFound] - no user exists with the given id
 	//   - [ErrUnauthorized] - the current password is incorrect
 	EditPassword(ctx context.Context, userId uuid.UUID, currentPassword, newPassword string) error
+
+	// SearchUsers returns users matching the given query, ordered by relevance
+	// and paginated using the last returned rank and user ID as the cursor.
+	//
+	// Results are limited to the first 1000 matches across all pages.
+	//
+	// NOTE: Relevance scores are computed dynamically and may change between
+	// requests. As a result, the same user may appear on multiple pages.
+	// Callers should deduplicate results by user ID.
+	SearchUsers(ctx context.Context, query string, lastRank float32, lastUserId uuid.UUID, limit int) ([]searchUserResult, error)
 }
 
 type impl struct {
@@ -598,4 +608,37 @@ func (me *impl) EditPassword(ctx context.Context, userId uuid.UUID, currentPassw
 	}
 
 	return nil
+}
+
+type searchUserResult struct {
+	User
+	Rank float32
+}
+
+func (me *impl) SearchUsers(ctx context.Context, query string, lastRank float32, lastUserId uuid.UUID, limit int) ([]searchUserResult, error) {
+	rows, err := me.queries.SearchUsers(ctx, queries.SearchUsersParams{
+		Query:      query,
+		LastRank:   sql.NullFloat64{Valid: lastRank != 0, Float64: float64(lastRank)},
+		LastUserId: uuid.NullUUID{Valid: lastUserId != uuid.Nil, UUID: lastUserId},
+		Limit:      int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+
+	result := make([]searchUserResult, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, searchUserResult{
+			User: User{
+				Id:       r.Id,
+				Name:     r.Name,
+				Username: r.Username,
+				Email:    r.Email,
+				Bio:      r.Bio.String,
+			},
+			Rank: r.Rank,
+		})
+	}
+
+	return result, nil
 }

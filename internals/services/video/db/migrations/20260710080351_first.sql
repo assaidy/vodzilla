@@ -2,12 +2,18 @@
 create schema video_service;
 
 create table video_service.videos (
-  id           uuid         primary key,
-  user_id      uuid         not null,
-  title        varchar(256) not null,
-  description  varchar(500),
-  created_at   timestamptz  not null default now()
+  id            uuid         primary key,
+  user_id       uuid         not null,
+  title         varchar(256) not null,
+  description   varchar(500),
+  created_at    timestamptz  not null default now(),
+  search_vector tsvector     generated always as (
+    setweight(to_tsvector('english', title), 'A') ||
+    setweight(to_tsvector('english', coalesce(description, '')), 'B')
+  ) stored
 );
+
+create index on user_service.users using gin (search_vector);
 
 create table video_service.watchlaters (
   id       bigserial   primary key,

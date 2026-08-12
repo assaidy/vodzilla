@@ -153,6 +153,16 @@ type Service interface {
 	// Errors:
 	//   - [ErrVideoNotFound] - no video exists for the given user with the given id
 	DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) error
+
+	// SearchVideos returns videos matching the given query, ordered by relevance
+	// and paginated using the last returned rank and video ID as the cursor.
+	//
+	// Results are limited to the first 1000 matches across all pages.
+	//
+	// NOTE: Relevance scores are computed dynamically and may change between
+	// requests. As a result, the same video may appear on multiple pages.
+	// Callers should deduplicate results by video ID.
+	SearchVideos(ctx context.Context, query string, lastRank float32, lastVideoId uuid.UUID, limit int) ([]searchVideoResult, error)
 }
 
 type impl struct {
@@ -914,4 +924,37 @@ func (me *impl) DeleteVideo(ctx context.Context, videoId, userId uuid.UUID) erro
 	}
 
 	return nil
+}
+
+type searchVideoResult struct {
+	Video
+	Rank float32
+}
+
+func (me *impl) SearchVideos(ctx context.Context, query string, lastRank float32, lastVideoId uuid.UUID, limit int) ([]searchVideoResult, error) {
+	rows, err := me.queries.SearchVideos(ctx, queries.SearchVideosParams{
+		Query:       query,
+		LastRank:    sql.NullFloat64{Valid: lastRank != 0, Float64: float64(lastRank)},
+		LastVideoId: uuid.NullUUID{Valid: lastVideoId != uuid.Nil, UUID: lastVideoId},
+		Limit:       int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+
+	result := make([]searchVideoResult, 0, len(rows))
+	for _, r := range rows {
+		result = append(result, searchVideoResult{
+			Video: Video{
+				Id:          r.Id,
+				UserId:      r.UserId,
+				Timestamp:   r.CreatedAt,
+				Title:       r.Title,
+				Description: r.Description.String,
+			},
+			Rank: r.Rank,
+		})
+	}
+
+	return result, nil
 }
