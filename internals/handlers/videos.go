@@ -469,7 +469,6 @@ func (me *Handler) handleGetVideoThumbnailUrl(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"thumbnailUrl": thumbnailUrl})
 }
 
-// TEST: handleSearchVideos
 func (me *Handler) handleSearchVideos(c fiber.Ctx) error {
 	query := c.Query("query")
 	if err := validation.Validate(&query, validation.Required, validation.Length(1, 50)); err != nil {

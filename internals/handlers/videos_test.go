@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -813,5 +814,103 @@ func TestHandleGetVideoThumbnailUrl(t *testing.T) {
 		if thumbnailURL == "" {
 			t.Error("expected non-empty thumbnailUrl")
 		}
+	})
+}
+
+func TestHandleSearchVideos(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+
+	user := createVerifiedUser(t, app, "vidsrch@example.com", "Password123", "Vid Search", "vidsrch")
+	createVerifiedVideo(t, user.ID, "Golang Tips", "Learn Go programming")
+	createVerifiedVideo(t, user.ID, "Rust Basics", "Intro to Rust")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=golang", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("missing query", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("query too long", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query="+strings.Repeat("a", 51), nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("limit too low", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=golang&limit=5", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidLimit")
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=golang&cursor=notbase64!!", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidCursor")
+	})
+
+	t.Run("search by title", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=golang", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, "Golang Tips", item["title"])
+		require.Equal(t, user.ID.String(), item["userId"])
+	})
+
+	t.Run("search by description", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=programming", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, "Golang Tips", item["title"])
+	})
+
+	t.Run("no matches", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=zzqqxxyy", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
+		hasMore, _ := data["hasMore"].(bool)
+		require.False(t, hasMore)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		for i := 0; i < 16; i++ {
+			createVerifiedVideo(t, user.ID, fmt.Sprintf("Ranked Video %d", i), fmt.Sprintf("ranked description %d", i))
+		}
+
+		resp := testRequest(t, app, http.MethodGet, "/videos/?query=ranked&limit=15", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 15)
+		hasMore, _ := data["hasMore"].(bool)
+		require.True(t, hasMore)
+		firstCursor, _ := data["cursor"].(string)
+		require.NotEmpty(t, firstCursor)
+
+		resp = testRequest(t, app, http.MethodGet, "/videos/?query=ranked&limit=15&cursor="+firstCursor, nil, user.Session)
+		status, data = parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+
+		items2, _ := data["items"].([]any)
+		require.Len(t, items2, 1)
+		hasMore2, _ := data["hasMore"].(bool)
+		require.False(t, hasMore2)
+		cursor2, _ := data["cursor"].(string)
+		require.Empty(t, cursor2)
 	})
 }

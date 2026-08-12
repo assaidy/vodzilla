@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v3"
@@ -406,5 +408,103 @@ func TestHandleGetProfileAvatarUrl(t *testing.T) {
 		if avatarURL == "" {
 			t.Error("expected non-empty avatarUrl")
 		}
+	})
+}
+
+func TestHandleSearchProfiles(t *testing.T) {
+	defer resetDb(t)
+	app := newTestApp(t)
+
+	user := createVerifiedUser(t, app, "srch@example.com", "Password123", "Search Owner", "srchowner")
+	createVerifiedUser(t, app, "alice@example.com", "Password123", "Alice Wonderland", "alicewonder")
+	createVerifiedUser(t, app, "stargazer@example.com", "Password123", "Star Gazer", "star")
+
+	t.Run("no session", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=wonderland", nil, nil)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 401, "Unauthorized")
+	})
+
+	t.Run("missing query", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("query too long", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query="+strings.Repeat("a", 51), nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidData")
+	})
+
+	t.Run("limit too low", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=wonderland&limit=5", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidLimit")
+	})
+
+	t.Run("invalid cursor", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=wonderland&cursor=notbase64!!", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		assertKind(t, status, data, 400, "InvalidCursor")
+	})
+
+	t.Run("search by name", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=wonderland", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, "Alice Wonderland", item["name"])
+		require.Equal(t, "alicewonder", item["username"])
+	})
+
+	t.Run("search by username", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=star", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 1)
+		item := items[0].(map[string]any)
+		require.Equal(t, "star", item["username"])
+	})
+
+	t.Run("no matches", func(t *testing.T) {
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=zzqqxxyy", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+		items, _ := data["items"].([]any)
+		require.Empty(t, items)
+		hasMore, _ := data["hasMore"].(bool)
+		require.False(t, hasMore)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		for i := 0; i < 16; i++ {
+			createVerifiedUser(t, app, fmt.Sprintf("pagerank%d@example.com", i), "Password123", fmt.Sprintf("Ranked User %d", i), fmt.Sprintf("ranked%d", i))
+		}
+
+		resp := testRequest(t, app, http.MethodGet, "/profiles?query=ranked&limit=15", nil, user.Session)
+		status, data := parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+
+		items, _ := data["items"].([]any)
+		require.Len(t, items, 15)
+		hasMore, _ := data["hasMore"].(bool)
+		require.True(t, hasMore)
+		firstCursor, _ := data["cursor"].(string)
+		require.NotEmpty(t, firstCursor)
+
+		resp = testRequest(t, app, http.MethodGet, "/profiles?query=ranked&limit=15&cursor="+firstCursor, nil, user.Session)
+		status, data = parseResponse(t, resp)
+		require.Equal(t, http.StatusOK, status)
+
+		items2, _ := data["items"].([]any)
+		require.Len(t, items2, 1)
+		hasMore2, _ := data["hasMore"].(bool)
+		require.False(t, hasMore2)
+		cursor2, _ := data["cursor"].(string)
+		require.Empty(t, cursor2)
 	})
 }

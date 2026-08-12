@@ -1,6 +1,8 @@
 include .env
+MAKEFLAGS += --no-print-directory
 
 build:
+	go mod tidy
 	sqlc generate
 	go fmt ./...
 	go build -o ./bin/server ./cmd/server/
@@ -33,8 +35,21 @@ goose-reset: validate-goose-service
 goose-new: validate-goose-service validate-goose-name
 	@$(GOOSE_ENV) goose create $(name) sql -table="$(service)_goose_db_version"
 
+SERVICES = $(shell ls -d ./internals/services/*/ | xargs -n1 basename)
+goose-up-all:
+	@for service in $(SERVICES); do \
+		[ -d "./internals/services/$$service/db/migrations" ] || continue; \
+		echo "==> goose up: $$service"; \
+		make goose-up service=$$service; \
+	done
+goose-reset-all:
+	@for service in $(SERVICES); do \
+		[ -d "./internals/services/$$service/db/migrations" ] || continue; \
+		echo "==> goose reset: $$service"; \
+		make goose-reset service=$$service; \
+	done
+
 pg-cli:
-	@echo  "$(POSTGRES_URL)"
 	@pgcli "$(POSTGRES_URL)"
 
 redis-cli:

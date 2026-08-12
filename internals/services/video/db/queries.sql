@@ -206,7 +206,7 @@ with q as (
 results as (
     select
         v.*,
-        ts_rank(u.search_vector, q.query) as rank
+        ts_rank(v.search_vector, q.query) as rank
     from video_service.videos v
     cross join q
     where v.search_vector @@ q.query

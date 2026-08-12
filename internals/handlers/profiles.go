@@ -43,7 +43,6 @@ type searchCursor struct {
 	LastId   uuid.UUID
 }
 
-// TEST: handleSearchProfiles
 func (me *Handler) handleSearchProfiles(c fiber.Ctx) error {
 	query := c.Query("query")
 	if err := validation.Validate(&query, validation.Required, validation.Length(1, 50)); err != nil {
