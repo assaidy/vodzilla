@@ -844,8 +844,6 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 				continue
 			}
 
-			var deletedVideoIds []uuid.UUID
-
 			if err := func() error {
 				tx, err := me.db.BeginTx(ctx, nil)
 				if err != nil {
@@ -854,8 +852,20 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 				defer tx.Rollback()
 				qtx := me.queries.WithTx(tx)
 
-				if deletedVideoIds, err = qtx.DeleteAllVideosForUser(ctx, payload.UserId); err != nil {
+				deletedVideoIds, err := qtx.DeleteAllVideosForUser(ctx, payload.UserId)
+				if err != nil {
 					return fmt.Errorf("failed to delete all videos for user: %w", err)
+				}
+
+				for _, id := range deletedVideoIds {
+					if err := events.Enqueu(
+						ctx,
+						me.redis,
+						events.VideoDeletedEvent,
+						events.VideoDeletedEventPayload{VideoId: id},
+					); err != nil {
+						return err
+					}
 				}
 
 				if _, err := qtx.DeleteAllPendingVideosForUser(ctx, payload.UserId); err != nil {
@@ -881,17 +891,6 @@ func (me *impl) userDeletedEventConsumerJob(ctx context.Context) error {
 				return nil
 			}(); err != nil {
 				return err
-			}
-
-			for _, id := range deletedVideoIds {
-				if err := events.Enqueu(
-					ctx,
-					me.redis,
-					events.VideoDeletedEvent,
-					events.VideoDeletedEventPayload{VideoId: id},
-				); err != nil {
-					return err
-				}
 			}
 		}
 	}
